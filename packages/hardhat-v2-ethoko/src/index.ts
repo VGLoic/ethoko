@@ -20,6 +20,7 @@ import {
   displayPushResult,
   displayDifferences,
   displayListArtifactsResultsJson,
+  displayRestoreResult,
 } from "@ethoko/core/cli-ui";
 import {
   CliError,
@@ -30,6 +31,8 @@ import {
   listPulledArtifacts,
   pull,
   push,
+  restore,
+  type RestoreResult,
 } from "@ethoko/core/cli-client";
 import { EthokoHardhatConfigSchema, EthokoHardhatUserConfig } from "./config";
 
@@ -583,117 +586,6 @@ Output JSON for scripting
   });
 
 ethokoScope
-  .task(
-    "diff",
-    "Compare a local compilation artifacts with an existing release.",
-  )
-  .addOptionalParam("artifactPath", "The compilation artifact path to compare")
-  .addOptionalParam(
-    "id",
-    "The ID of the artifact to compare with, can not be used with the `tag` parameter",
-  )
-  .addOptionalParam(
-    "tag",
-    "The tag of the artifact to compare with, can not be used with the `id` parameter",
-  )
-  .addFlag("debug", "Enable debug mode")
-  .addFlag("silent", "Suppress CLI output (except errors and warnings)")
-  .setAction(async (opts, hre) => {
-    const ethokoConfig = hre.config.ethoko;
-    if (!ethokoConfig) {
-      cliError("Ethoko is not configured");
-      process.exitCode = 1;
-      return;
-    }
-
-    const paramParsingResult = z
-      .object({
-        artifactPath: z.string().min(1).optional(),
-        id: z.string().optional(),
-        tag: z.string().optional(),
-        debug: z.boolean().default(ethokoConfig.debug),
-        silent: z.boolean().default(false),
-      })
-      .safeParse(opts);
-    if (!paramParsingResult.success) {
-      cliError("Invalid arguments");
-      if (ethokoConfig.debug) {
-        console.error(paramParsingResult.error);
-      }
-      process.exitCode = 1;
-      return;
-    }
-    if (paramParsingResult.data.id && paramParsingResult.data.tag) {
-      cliError("The ID and tag parameters can not be used together");
-      process.exitCode = 1;
-      return;
-    }
-
-    if (!paramParsingResult.data.id && !paramParsingResult.data.tag) {
-      cliError("The artifact must be identified by a tag or an ID");
-      process.exitCode = 1;
-      return;
-    }
-
-    const finalArtifactPath =
-      paramParsingResult.data.artifactPath ||
-      ethokoConfig.compilationOutputPath;
-
-    if (!finalArtifactPath) {
-      cliError(
-        "Artifact path must be provided either via --artifact-path flag or compilationOutputPath in config",
-      );
-      process.exitCode = 1;
-      return;
-    }
-
-    let search: { type: "id"; id: string } | { type: "tag"; tag: string };
-    if (paramParsingResult.data.id) {
-      search = { type: "id", id: paramParsingResult.data.id };
-    } else if (paramParsingResult.data.tag) {
-      search = { type: "tag", tag: paramParsingResult.data.tag };
-    } else {
-      cliError("The artifact must be identified by a tag or an ID");
-      process.exitCode = 1;
-      return;
-    }
-
-    boxHeader(
-      `Comparing with artifact "${ethokoConfig.project}:${search.type === "id" ? search.id : search.tag}"`,
-      paramParsingResult.data.silent,
-    );
-
-    const localStorage = new LocalStorage(ethokoConfig.pulledArtifactsPath);
-
-    await generateDiffWithTargetRelease(
-      finalArtifactPath,
-      { project: ethokoConfig.project, search },
-      localStorage,
-      {
-        debug: paramParsingResult.data.debug,
-        isCI: process.env.CI === "true" || process.env.CI === "1",
-        silent: paramParsingResult.data.silent,
-      },
-    )
-      .then((result) =>
-        displayDifferences(result, paramParsingResult.data.silent),
-      )
-      .catch((err: unknown) => {
-        if (err instanceof CliError) {
-          cliError(err.message);
-        } else {
-          cliError(
-            "An unexpected error occurred, please fill an issue with the error details if the problem persists",
-          );
-          if (err instanceof Error) {
-            console.error(err);
-          }
-        }
-        process.exitCode = 1;
-      });
-  });
-
-ethokoScope
   .task("export", "Export contract ABI from a pulled artifact.")
   .setDescription(
     `Export a contract ABI from a locally pulled artifact.
@@ -835,6 +727,253 @@ Pipe to another tool
 
         console.log(JSON.stringify(result.contract.abi, null, 2));
       })
+      .catch((err: unknown) => {
+        if (err instanceof CliError) {
+          cliError(err.message);
+        } else {
+          cliError(
+            "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+          );
+          if (err instanceof Error) {
+            console.error(err);
+          }
+        }
+        process.exitCode = 1;
+      });
+  });
+
+ethokoScope
+  .task(
+    "restore",
+    "Restore original compilation artifacts from a pulled artifact.",
+  )
+  .setDescription(
+    `Restore original compilation artifacts from a locally pulled artifact.
+
+The artifact must be identified by tag or ID. By default, the project is the one configured in the Hardhat configuration.
+
+Restore by tag
+  npx hardhat ethoko restore --tag v1.2.3 --output ./restored
+
+Restore by ID
+  npx hardhat ethoko restore --id dcauXtavGLxC --output ./restored
+
+Force overwrite existing directory
+  npx hardhat ethoko restore --tag v1.2.3 --output ./restored --force
+`,
+  )
+  .addOptionalParam(
+    "id",
+    "The ID of the artifact to restore, can not be used with the `tag` parameter",
+  )
+  .addOptionalParam(
+    "tag",
+    "The tag of the artifact to restore, can not be used with the `id` parameter",
+  )
+  .addOptionalParam(
+    "project",
+    "The project to restore from, defaults to the configured project",
+  )
+  .addParam(
+    "output",
+    "Output directory path where the artifacts will be restored",
+  )
+  .addFlag("force", "Overwrite output directory if it already exists")
+  .addFlag("debug", "Enable debug mode")
+  .addFlag("silent", "Suppress CLI output (except errors and warnings)")
+  .setAction(async (opts, hre) => {
+    const ethokoConfig = hre.config.ethoko;
+    if (!ethokoConfig) {
+      cliError("Ethoko is not configured");
+      process.exitCode = 1;
+      return;
+    }
+
+    const optsParsingResult = z
+      .object({
+        id: z.string().optional(),
+        tag: z.string().optional(),
+        project: z.string().optional().default(ethokoConfig.project),
+        output: z.string().min(1),
+        force: z.boolean().default(false),
+        debug: z.boolean().default(ethokoConfig.debug),
+        silent: z.boolean().default(false),
+      })
+      .safeParse(opts);
+    if (!optsParsingResult.success) {
+      cliError("Invalid arguments");
+      if (ethokoConfig.debug) {
+        console.error(optsParsingResult.error);
+      }
+      process.exitCode = 1;
+      return;
+    }
+
+    if (optsParsingResult.data.id && optsParsingResult.data.tag) {
+      cliError("The ID and tag parameters can not be used together");
+      process.exitCode = 1;
+      return;
+    }
+
+    let search: { type: "tag"; tag: string } | { type: "id"; id: string };
+    if (optsParsingResult.data.id) {
+      search = { type: "id", id: optsParsingResult.data.id };
+    } else if (optsParsingResult.data.tag) {
+      search = { type: "tag", tag: optsParsingResult.data.tag };
+    } else {
+      cliError("The artifact must be identified by a tag or an ID");
+      process.exitCode = 1;
+      return;
+    }
+
+    boxHeader(
+      `Restoring artifact "${optsParsingResult.data.project}:${search.type === "tag" ? search.tag : search.id}"`,
+      optsParsingResult.data.silent,
+    );
+
+    const storageProvider =
+      ethokoConfig.storageConfiguration.type === "aws"
+        ? new S3BucketProvider({
+            bucketName: ethokoConfig.storageConfiguration.awsBucketName,
+            bucketRegion: ethokoConfig.storageConfiguration.awsRegion,
+            accessKeyId: ethokoConfig.storageConfiguration.awsAccessKeyId,
+            secretAccessKey:
+              ethokoConfig.storageConfiguration.awsSecretAccessKey,
+            role: ethokoConfig.storageConfiguration.awsRole,
+            debug: optsParsingResult.data.debug,
+          })
+        : new LocalStorageProvider({
+            path: ethokoConfig.storageConfiguration.path,
+            debug: optsParsingResult.data.debug,
+          });
+
+    const localStorage = new LocalStorage(ethokoConfig.pulledArtifactsPath);
+
+    await restore(
+      { project: optsParsingResult.data.project, search },
+      optsParsingResult.data.output,
+      storageProvider,
+      localStorage,
+      {
+        force: optsParsingResult.data.force,
+        debug: ethokoConfig.debug || optsParsingResult.data.debug,
+        silent: optsParsingResult.data.silent,
+      },
+    )
+      .then((result: RestoreResult) =>
+        displayRestoreResult(result, optsParsingResult.data.silent),
+      )
+      .catch((err: unknown) => {
+        if (err instanceof CliError) {
+          cliError(err.message);
+        } else {
+          cliError(
+            "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+          );
+          if (err instanceof Error) {
+            console.error(err);
+          }
+        }
+        process.exitCode = 1;
+      });
+  });
+
+ethokoScope
+  .task(
+    "diff",
+    "Compare a local compilation artifacts with an existing release.",
+  )
+  .addOptionalParam("artifactPath", "The compilation artifact path to compare")
+  .addOptionalParam(
+    "id",
+    "The ID of the artifact to compare with, can not be used with the `tag` parameter",
+  )
+  .addOptionalParam(
+    "tag",
+    "The tag of the artifact to compare with, can not be used with the `id` parameter",
+  )
+  .addFlag("debug", "Enable debug mode")
+  .addFlag("silent", "Suppress CLI output (except errors and warnings)")
+  .setAction(async (opts, hre) => {
+    const ethokoConfig = hre.config.ethoko;
+    if (!ethokoConfig) {
+      cliError("Ethoko is not configured");
+      process.exitCode = 1;
+      return;
+    }
+
+    const paramParsingResult = z
+      .object({
+        artifactPath: z.string().min(1).optional(),
+        id: z.string().optional(),
+        tag: z.string().optional(),
+        debug: z.boolean().default(ethokoConfig.debug),
+        silent: z.boolean().default(false),
+      })
+      .safeParse(opts);
+    if (!paramParsingResult.success) {
+      cliError("Invalid arguments");
+      if (ethokoConfig.debug) {
+        console.error(paramParsingResult.error);
+      }
+      process.exitCode = 1;
+      return;
+    }
+    if (paramParsingResult.data.id && paramParsingResult.data.tag) {
+      cliError("The ID and tag parameters can not be used together");
+      process.exitCode = 1;
+      return;
+    }
+
+    if (!paramParsingResult.data.id && !paramParsingResult.data.tag) {
+      cliError("The artifact must be identified by a tag or an ID");
+      process.exitCode = 1;
+      return;
+    }
+
+    const finalArtifactPath =
+      paramParsingResult.data.artifactPath ||
+      ethokoConfig.compilationOutputPath;
+
+    if (!finalArtifactPath) {
+      cliError(
+        "Artifact path must be provided either via --artifact-path flag or compilationOutputPath in config",
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    let search: { type: "id"; id: string } | { type: "tag"; tag: string };
+    if (paramParsingResult.data.id) {
+      search = { type: "id", id: paramParsingResult.data.id };
+    } else if (paramParsingResult.data.tag) {
+      search = { type: "tag", tag: paramParsingResult.data.tag };
+    } else {
+      cliError("The artifact must be identified by a tag or an ID");
+      process.exitCode = 1;
+      return;
+    }
+
+    boxHeader(
+      `Comparing with artifact "${ethokoConfig.project}:${search.type === "id" ? search.id : search.tag}"`,
+      paramParsingResult.data.silent,
+    );
+
+    const localStorage = new LocalStorage(ethokoConfig.pulledArtifactsPath);
+
+    await generateDiffWithTargetRelease(
+      finalArtifactPath,
+      { project: ethokoConfig.project, search },
+      localStorage,
+      {
+        debug: paramParsingResult.data.debug,
+        isCI: process.env.CI === "true" || process.env.CI === "1",
+        silent: paramParsingResult.data.silent,
+      },
+    )
+      .then((result) =>
+        displayDifferences(result, paramParsingResult.data.silent),
+      )
       .catch((err: unknown) => {
         if (err instanceof CliError) {
           cliError(err.message);

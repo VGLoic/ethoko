@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-import path from "path";
 import { beforeEach, describe, expect, test } from "vitest";
 import {
   inspectArtifact,
@@ -16,12 +15,12 @@ import {
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import type { LocalStorage } from "@/local-storage";
-import { LocalStorageProvider, StorageProvider } from "@/storage-provider";
+import { StorageProvider } from "@/storage-provider";
 
 describe.each([
-  ["Local Storage Provider", "local" as const, createTestLocalStorageProvider],
-  ["Amazon S3 Storage Provider", "s3" as const, createTestS3StorageProvider],
-])("Push-Pull E2E Tests (%s)", (_, providerType, createStorageProvider) => {
+  ["Local Storage Provider", createTestLocalStorageProvider],
+  ["Amazon S3 Storage Provider", createTestS3StorageProvider],
+])("Push-Pull E2E Tests (%s)", (_, createStorageProvider) => {
   let storageProvider: StorageProvider;
   let localStorage: LocalStorage;
 
@@ -609,41 +608,4 @@ describe.each([
       ),
     ).rejects.toThrow();
   });
-
-  test.runIf(providerType === "local")(
-    "stores original content files",
-    async () => {
-      const localStorageProvider = storageProvider as LocalStorageProvider;
-      const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-      const artifactFixture =
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
-
-      await localStorage.ensureProjectSetup(project);
-
-      const artifactId = await push(
-        artifactFixture.folderPath,
-        project,
-        undefined,
-        storageProvider,
-        {
-          force: false,
-          debug: false,
-          silent: true,
-        },
-      );
-
-      const providerRoot = localStorageProvider.getPath();
-      const storedBuildInfo = path.join(
-        providerRoot,
-        project,
-        "ids",
-        artifactId,
-        "original-content",
-        artifactFixture.buildInfoPath.replace(/^\.\//, ""),
-      );
-
-      const stored = await fs.stat(storedBuildInfo);
-      expect(stored.isFile()).toBe(true);
-    },
-  );
 });

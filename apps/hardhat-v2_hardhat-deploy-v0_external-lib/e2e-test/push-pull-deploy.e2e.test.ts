@@ -20,10 +20,17 @@ describe("[Hardhat v2 - Hardhat-deploy v0 - external lib] Push artifact, pull ar
   test("it generates the typings", () =>
     asyncExec("npx hardhat --config ./hardhat.config.e2e.ts ethoko typings"));
 
-  test("it checks types", () => asyncExec("pnpm check-types"));
+  test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
 
   test("it deploys", () =>
     asyncExec(
       "npx hardhat --config ./hardhat.config.e2e.ts deploy --no-compile",
     ));
+
+  test("it restores the original artifacts", async () => {
+    await asyncExec(
+      `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${TAG_NAME} --output ./ethoko-e2e/restored-artifacts-${TAG_NAME}`,
+    );
+    await asyncExec(`ls -la ./ethoko-e2e/restored-artifacts-${TAG_NAME}`);
+  });
 });

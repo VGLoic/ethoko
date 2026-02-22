@@ -51,11 +51,18 @@ describe.each([
     test("it generates the typings", () =>
       asyncExec("npx hardhat --config ./hardhat.config.e2e.ts ethoko typings"));
 
-    test("it checks types", () => asyncExec("pnpm check-types"));
+    test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
 
     test("it deploys", () =>
       asyncExec(
         `npx hardhat --config ./hardhat.config.e2e.ts deploy --tags ${tag}`,
       ));
+
+    test("it restores the original artifacts", async () => {
+      await asyncExec(
+        `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${tag} --output ./ethoko-e2e/restored-artifacts-${tag}`,
+      );
+      await asyncExec(`ls -la ./ethoko-e2e/restored-artifacts-${tag}`);
+    });
   },
 );

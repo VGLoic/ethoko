@@ -41,6 +41,22 @@ export class LocalStorageProvider implements StorageProvider {
       .map((entry) => entry.name.replace(".json", ""));
   }
 
+  public async listOriginalContent(
+    project: string,
+    id: string,
+  ): Promise<string[]> {
+    const originalContentRoot = this.originalContentRootPath(project, id);
+    const rootExists = await this.exists(originalContentRoot);
+    if (!rootExists) {
+      return [];
+    }
+    const files: string[] = [];
+    await this.collectOriginalContentFiles(originalContentRoot, files);
+    return files.map((filePath) =>
+      path.relative(originalContentRoot, filePath),
+    );
+  }
+
   public async hasArtifactByTag(
     project: string,
     tag: string,
@@ -103,12 +119,28 @@ export class LocalStorageProvider implements StorageProvider {
     return createReadStream(tagFilePath);
   }
 
+  public async downloadOriginalContent(
+    project: string,
+    id: string,
+    relativePath: string,
+  ): Promise<Stream> {
+    const filePath = path.join(
+      this.originalContentRootPath(project, id),
+      relativePath,
+    );
+    return createReadStream(filePath);
+  }
+
   private idsPath(project: string): string {
     return path.join(this.storagePath, project, "ids");
   }
 
   private tagsPath(project: string): string {
     return path.join(this.storagePath, project, "tags");
+  }
+
+  private originalContentRootPath(project: string, id: string): string {
+    return path.join(this.idsPath(project), id, "original-content");
   }
 
   private idFilePath(project: string, id: string): string {
@@ -164,6 +196,24 @@ export class LocalStorageProvider implements StorageProvider {
       return await fs.readdir(dirPath, { withFileTypes: true });
     } catch {
       return [];
+    }
+  }
+
+  private async collectOriginalContentFiles(
+    dirPath: string,
+    files: string[],
+  ): Promise<void> {
+    const entries = await this.safeReadDir(dirPath);
+    if (entries.length === 0) {
+      return;
+    }
+    for (const entry of entries) {
+      const entryPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        await this.collectOriginalContentFiles(entryPath, files);
+      } else if (entry.isFile()) {
+        files.push(entryPath);
+      }
     }
   }
 

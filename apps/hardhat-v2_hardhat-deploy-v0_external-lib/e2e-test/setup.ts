@@ -2,7 +2,9 @@ import fs from "fs/promises";
 
 export async function setup(): Promise<void> {
   console.log("\n========================================");
-  console.log("🚀 Starting [Hardhat v3 - Hardhat-deploy v2] E2E Test Suite");
+  console.log(
+    "🚀 Starting [Hardhat v2 - Hardhat-deploy v0 - external lib] E2E Test Suite",
+  );
   console.log("========================================\n");
 
   await cleanUpLocalEthokoStorage();

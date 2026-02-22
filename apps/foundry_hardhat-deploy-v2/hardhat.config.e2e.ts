@@ -8,12 +8,13 @@ export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko, HardhatDeploy],
   ethoko: {
     project: "forge-counter",
+    pulledArtifactsPath: "./ethoko-e2e/.ethoko",
+    typingsPath: "./.ethoko-typings",
     compilationOutputPath: "./out",
     storageConfiguration: {
       type: "local",
-      path: "./ethoko-e2e",
+      path: "./ethoko-e2e/.storage",
     },
-    debug: false,
   },
   solidity: {
     profiles: {

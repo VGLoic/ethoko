@@ -166,6 +166,41 @@ export class S3BucketProvider implements StorageProvider {
     return ids;
   }
 
+  public async listOriginalContent(
+    project: string,
+    id: string,
+  ): Promise<string[]> {
+    const client = await this.getClient();
+    const prefix = `${this.rootPath}/${project}/ids/${id}/original-content/`;
+    const paths: string[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: this.config.bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      });
+      const listResult = await client.send(listCommand);
+      const contents = listResult.Contents;
+      if (contents) {
+        for (const content of contents) {
+          const key = content.Key;
+          if (!key) continue;
+          const relativeKey = key.replace(prefix, "");
+          if (relativeKey.length > 0) {
+            paths.push(relativeKey);
+          }
+        }
+      }
+      continuationToken = listResult.IsTruncated
+        ? listResult.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return paths;
+  }
+
   public async listTags(project: string): Promise<string[]> {
     const client = await this.getClient();
     const listCommand = new ListObjectsV2Command({
@@ -297,6 +332,24 @@ export class S3BucketProvider implements StorageProvider {
     const getObjectResult = await client.send(getObjectCommand);
     if (!getObjectResult.Body) {
       throw new Error("Error fetching the artifact");
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return getObjectResult.Body.transformToWebStream() as any;
+  }
+
+  public async downloadOriginalContent(
+    project: string,
+    id: string,
+    relativePath: string,
+  ): Promise<Stream> {
+    const client = await this.getClient();
+    const getObjectCommand = new GetObjectCommand({
+      Bucket: this.config.bucketName,
+      Key: `${this.rootPath}/${project}/ids/${id}/original-content/${relativePath}`,
+    });
+    const getObjectResult = await client.send(getObjectCommand);
+    if (!getObjectResult.Body) {
+      throw new Error("Error fetching the original content");
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return getObjectResult.Body.transformToWebStream() as any;
