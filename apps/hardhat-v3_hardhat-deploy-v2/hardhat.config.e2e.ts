@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko, HardhatDeploy],
   ethoko: {
     project: "curious-counter",
+    pulledArtifactsPath: "./ethoko-e2e",
     compilationOutputPath: "./artifacts",
     storageConfiguration: {
       type: "local",

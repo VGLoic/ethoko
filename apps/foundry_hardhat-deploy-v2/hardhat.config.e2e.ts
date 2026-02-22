@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko, HardhatDeploy],
   ethoko: {
     project: "forge-counter",
+    pulledArtifactsPath: "./ethoko-e2e",
     compilationOutputPath: "./out",
     storageConfiguration: {
       type: "local",

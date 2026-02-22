@@ -191,6 +191,19 @@ Export the ABI as a TypeScript `const`:
 echo "export const MY_ABI = $(npx hardhat ethoko export --tag 2026-02-02 --contract Counter) as const;" > ./my-abi.ts
 ```
 
+### Restore
+
+Restore original compilation artifacts from a locally pulled artifact to a local directory.
+
+```bash
+npx hardhat ethoko restore --id b5e41181986a --output ./restored
+npx hardhat ethoko restore --tag 2026-02-02 --output ./restored
+npx hardhat ethoko restore --tag v1.2.3 --project another-project --output ./restored
+```
+
+> [!NOTE]
+> The artifact must be pulled locally before restoring, and the output directory must be empty unless the `--force` flag is used.
+
 ### Diff
 
 Compare a local compilation artifacts with an existing compilation artifact and print the contracts for which differences have been found.

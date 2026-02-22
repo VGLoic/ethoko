@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
   ethoko: {
     project: "ignited-counter",
+    pulledArtifactsPath: "./ethoko-e2e",
     compilationOutputPath: "./artifacts",
     storageConfiguration: {
       type: "local",

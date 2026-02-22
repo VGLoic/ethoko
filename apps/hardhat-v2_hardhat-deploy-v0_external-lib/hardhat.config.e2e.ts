@@ -7,7 +7,7 @@ import { EthokoHardhatUserConfig } from "hardhat-v2-ethoko";
 
 const ethokoConfig: EthokoHardhatUserConfig = {
   project: "doubtful-counter",
-  pulledArtifactsPath: ".ethoko",
+  pulledArtifactsPath: "./ethoko-e2e",
   typingsPath: ".ethoko-typings",
   compilationOutputPath: "./artifacts",
   storageConfiguration: {

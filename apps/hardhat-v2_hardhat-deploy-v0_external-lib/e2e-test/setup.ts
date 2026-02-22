@@ -28,4 +28,18 @@ async function cleanUpLocalEthokoStorage() {
   if (doesExist) {
     await fs.rm("ethoko-e2e", { recursive: true });
   }
+
+  const entries = await fs.readdir(".", { withFileTypes: true });
+  const restoreFolders = entries
+    .filter(
+      (entry) =>
+        entry.isDirectory() && entry.name.startsWith("restored-artifacts-"),
+    )
+    .map((entry) => entry.name);
+
+  await Promise.all(
+    restoreFolders.map((folder) =>
+      fs.rm(folder, { recursive: true, force: true }),
+    ),
+  );
 }

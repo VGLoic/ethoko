@@ -156,6 +156,54 @@ const hardhatEthoko: HardhatPlugin = {
       .setAction(() => import("./tasks/inspect.js"))
       .build(),
     task(
+      ["ethoko", "restore"],
+      "Restore original compilation artifacts from a pulled artifact.",
+    )
+      .addOption({
+        name: "id",
+        description:
+          "The ID of the artifact to restore, can not be used with the `tag` parameter",
+        type: ArgumentType.STRING_WITHOUT_DEFAULT,
+        defaultValue: undefined,
+      })
+      .addOption({
+        name: "tag",
+        description:
+          "The tag of the artifact to restore, can not be used with the `id` parameter",
+        type: ArgumentType.STRING_WITHOUT_DEFAULT,
+        defaultValue: undefined,
+      })
+      .addOption({
+        name: "project",
+        description:
+          "The project to restore from, defaults to the configured project",
+        type: ArgumentType.STRING_WITHOUT_DEFAULT,
+        defaultValue: undefined,
+      })
+      .addOption({
+        name: "output",
+        description:
+          "Output directory path where the artifacts will be restored",
+        type: ArgumentType.STRING,
+        defaultValue: "",
+      })
+      .addFlag({
+        name: "force",
+        description: "Overwrite output directory if it already exists",
+      })
+      .addFlag({
+        name: "debug",
+        description: "Enable debug mode",
+      })
+      .addFlag({
+        name: "silent",
+        description: "Suppress CLI output (except errors and warnings)",
+      })
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Dynamic import type inference limitation with tsup
+      .setAction(() => import("./tasks/restore.js"))
+      .build(),
+    task(
       ["ethoko", "diff"],
       "Compare a local compilation artifacts with an existing release.",
     )
