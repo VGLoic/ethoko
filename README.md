@@ -96,6 +96,14 @@ Export the ABI of a specific contract for a given tag
   <img alt="Export example" src="images/export-example.png">
 </picture>
 
+
+The original compilation artifacts are never lost and always available for restoration
+
+<picture>
+  <img alt="Restore example" src="images/restore-example.png">
+</picture>
+
+
 ### Complete guide and examples
 
 Please refer to the [Hardhat Ethoko documentation](packages/hardhat-ethoko/README.md)
