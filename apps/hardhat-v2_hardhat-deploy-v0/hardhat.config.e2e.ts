@@ -7,12 +7,12 @@ import { EthokoHardhatUserConfig } from "hardhat-v2-ethoko";
 
 const ethokoConfig: EthokoHardhatUserConfig = {
   project: "dummy-counter",
-  pulledArtifactsPath: "./ethoko-e2e",
-  typingsPath: ".ethoko-typings",
+  pulledArtifactsPath: "./ethoko-e2e/.ethoko",
+  typingsPath: "./.ethoko-typings",
   compilationOutputPath: "./artifacts",
   storageConfiguration: {
     type: "local",
-    path: "ethoko-e2e",
+    path: "./ethoko-e2e/.storage",
   },
 };
 

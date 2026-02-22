@@ -53,9 +53,9 @@ describe.each([
 
     test("it restores the original artifacts", async () => {
       await asyncExec(
-        `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${tag} --output ./restored-artifacts-${tag}`,
+        `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${tag} --output ./ethoko-e2e/restored-artifacts-${tag}`,
       );
-      await asyncExec(`ls -la ./restored-artifacts-${tag}`);
+      await asyncExec(`ls -la ./ethoko-e2e/restored-artifacts-${tag}`);
     });
 
     test("it checks types", () => asyncExec("pnpm check-types"));

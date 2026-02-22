@@ -7,11 +7,12 @@ export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
   ethoko: {
     project: "ignited-counter",
-    pulledArtifactsPath: "./ethoko-e2e",
+    pulledArtifactsPath: "./ethoko-e2e/.ethoko",
+    typingsPath: "./.ethoko-typings",
     compilationOutputPath: "./artifacts",
     storageConfiguration: {
       type: "local",
-      path: "./ethoko-e2e",
+      path: "./ethoko-e2e/.storage",
     },
   },
   solidity: {

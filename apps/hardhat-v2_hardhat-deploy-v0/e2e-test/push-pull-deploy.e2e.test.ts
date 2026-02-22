@@ -22,9 +22,9 @@ describe("[Hardhat v2 - Hardhat-deploy v0] Push artifact, pull artifact, deploy"
 
   test("it restores the original artifacts", async () => {
     await asyncExec(
-      `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${TAG_NAME} --output ./restored-artifacts-${TAG_NAME}`,
+      `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${TAG_NAME} --output ./ethoko-e2e/restored-artifacts-${TAG_NAME}`,
     );
-    await asyncExec(`ls -la ./restored-artifacts-${TAG_NAME}`);
+    await asyncExec(`ls -la ./ethoko-e2e/restored-artifacts-${TAG_NAME}`);
   });
 
   test("it checks types", () => asyncExec("pnpm check-types"));
