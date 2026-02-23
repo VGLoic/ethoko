@@ -45,7 +45,55 @@ pnpm vitest run test/e2e/push-pull.e2e.test.ts
 pnpm vitest run -t "test name pattern"
 ```
 
-**Test Framework:** Vitest with global setup, 60s timeout, located in `test/**/*.e2e.test.ts`
+**Test Framework:** Vitest with global setup, 60s timeout, located in `test/**/*.e2e.test.ts` for `packages/core` and `e2e-test/*.e2e.test.ts` for integration apps `apps/`.
+
+### E2E Test Pattern for `@ethoko/core`
+
+E2E tests use a fixture-based pattern with Vitest's `test.extend()` for automatic setup/cleanup:
+
+**Structure:**
+
+```typescript
+import {
+  STORAGE_PROVIDER_STRATEGIES,
+  storageProviderTest,
+} from "@test/helpers/storage-provider-test";
+
+describe.for(STORAGE_PROVIDER_STRATEGIES)(
+  "Test Suite Name (%s)", // %s = storage provider name
+  ([, storageProviderFactory]) => {
+    // Scope the storage provider factory for all tests in this suite
+    storageProviderTest.scoped({ storageProviderFactory });
+
+    // Simple test
+    storageProviderTest(
+      "test name",
+      async ({ storageProvider, localStorage }) => {
+        // Test implementation - fixtures auto-cleanup on completion
+      },
+    );
+
+    // Parameterized test
+    storageProviderTest.for([
+      ["Case 1", data1],
+      ["Case 2", data2],
+    ] as const)(
+      "test: %s",
+      async ([name, data], { storageProvider, localStorage }) => {
+        // Test implementation
+      },
+    );
+  },
+);
+```
+
+**Key Points:**
+
+- All tests automatically run against both Local Storage and S3 (LocalStack) providers
+- Fixtures (`storageProvider`, `localStorage`) are auto-setup and auto-cleaned
+- No manual `beforeEach`/`afterEach` needed
+- Use `storageProviderTest.for()` instead of `describe.each()` for parameterized tests
+- Always use `as const` on test data arrays for better type inference
 
 **Build Dependencies:** Turborepo manages task dependencies. `lint`, `check-types`, and `test` depend on `build` completing first.
 
@@ -59,7 +107,8 @@ pnpm vitest run -t "test name pattern"
 2. **`pnpm check-types`** - Typecheck all packages
 3. **`pnpm lint`** - Lint all packages (max 0 warnings)
 4. **`pnpm format`** - Format all packages
-5. **`pnpm test:e2e`** - Run all E2E tests
+5. **`pnpm test:e2e:core`** - Run all E2E tests for `@ethoko/core`
+6. **`pnpm test:e2e:apps`** - Run all E2E tests for integration apps
 
 ### Failure Handling
 
