@@ -268,15 +268,6 @@ importers:
       '@nomicfoundation/hardhat-verify':
         specifier: ^3.0.0
         version: 3.0.9(hardhat@3.1.7)
-      '@rocketh/deploy':
-        specifier: ^0.18.0
-        version: 0.18.0(typescript@5.8.3)(zod@3.25.76)
-      '@rocketh/node':
-        specifier: ^0.18.2
-        version: 0.18.2(rocketh@0.18.1(typescript@5.8.3)(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)
-      '@rocketh/read-execute':
-        specifier: ^0.18.0
-        version: 0.18.0(typescript@5.8.3)(zod@3.25.76)
       '@types/node':
         specifier: ^22.8.5
         version: 22.15.3
@@ -298,9 +289,6 @@ importers:
       prettier-plugin-solidity:
         specifier: ^2.2.1
         version: 2.2.1(prettier@3.7.4)
-      rocketh:
-        specifier: ^0.18.1
-        version: 0.18.1(typescript@5.8.3)(zod@3.25.76)
       typescript:
         specifier: ~5.8.0
         version: 5.8.3
@@ -6543,37 +6531,12 @@ snapshots:
       '@nomicfoundation/solidity-analyzer-linux-x64-musl': 0.1.2
       '@nomicfoundation/solidity-analyzer-win32-x64-msvc': 0.1.2
 
-  '@rocketh/core@0.18.0(typescript@5.8.3)(zod@3.25.76)':
-    dependencies:
-      abitype: 1.2.3(typescript@5.8.3)(zod@3.25.76)
-      eip-1193: 0.6.5
-      named-logs: 0.4.1
-      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
   '@rocketh/core@0.18.0(typescript@5.8.3)(zod@4.3.6)':
     dependencies:
       abitype: 1.2.3(typescript@5.8.3)(zod@4.3.6)
       eip-1193: 0.6.5
       named-logs: 0.4.1
       viem: 2.45.1(typescript@5.8.3)(zod@4.3.6)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@rocketh/deploy@0.18.0(typescript@5.8.3)(zod@3.25.76)':
-    dependencies:
-      '@rocketh/core': 0.18.0(typescript@5.8.3)(zod@3.25.76)
-      abitype: 1.2.3(typescript@5.8.3)(zod@3.25.76)
-      eip-1193: 0.6.5
-      named-logs: 0.4.1
-      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
       - typescript
@@ -6587,26 +6550,6 @@ snapshots:
       eip-1193: 0.6.5
       named-logs: 0.4.1
       viem: 2.45.1(typescript@5.8.3)(zod@4.3.6)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@rocketh/node@0.18.2(rocketh@0.18.1(typescript@5.8.3)(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)':
-    dependencies:
-      '@rocketh/core': 0.18.0(typescript@5.8.3)(zod@3.25.76)
-      '@types/prompts': 2.4.9
-      change-case: 5.4.4
-      commander: 14.0.3
-      eip-1193: 0.6.5
-      ldenv: 0.3.16
-      named-logs: 0.4.1
-      named-logs-console: 0.5.1
-      prompts: 2.4.2
-      rocketh: 0.18.1(typescript@5.8.3)(zod@3.25.76)
-      tsx: 4.21.0
-      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
       - typescript
@@ -6627,19 +6570,6 @@ snapshots:
       rocketh: 0.18.1(typescript@5.8.3)(zod@4.3.6)
       tsx: 4.21.0
       viem: 2.45.1(typescript@5.8.3)(zod@4.3.6)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@rocketh/read-execute@0.18.0(typescript@5.8.3)(zod@3.25.76)':
-    dependencies:
-      '@rocketh/core': 0.18.0(typescript@5.8.3)(zod@3.25.76)
-      abitype: 1.2.3(typescript@5.8.3)(zod@3.25.76)
-      eip-1193: 0.6.5
-      named-logs: 0.4.1
-      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
       - typescript
@@ -9772,22 +9702,6 @@ snapshots:
   rlp@2.2.7:
     dependencies:
       bn.js: 5.2.2
-
-  rocketh@0.18.1(typescript@5.8.3)(zod@3.25.76):
-    dependencies:
-      '@rocketh/core': 0.18.0(typescript@5.8.3)(zod@3.25.76)
-      abitype: 1.2.3(typescript@5.8.3)(zod@3.25.76)
-      change-case: 5.4.4
-      eip-1193: 0.6.5
-      eip-1193-jsonrpc-provider: 0.4.3
-      ldenv: 0.3.16
-      named-logs: 0.4.1
-      viem: 2.45.1(typescript@5.8.3)(zod@3.25.76)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
 
   rocketh@0.18.1(typescript@5.8.3)(zod@4.3.6):
     dependencies:
