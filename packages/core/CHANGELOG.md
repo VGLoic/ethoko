@@ -1,5 +1,16 @@
 # @ethoko/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 500d664: Add sync method for artifact retrieval in generated ts typings
+- 92a28d3: Push original contract artifacts for all foundry compilation type, add support for test and scripts in case of Foundry
+- 4d5f356: Update generated typings for contract artifact in order to be more aligned with respect to Hardhat Ignition or Hardhat Deploy expected types
+- b82795a: Add contract artifacts to original content for hardhat v3
+- 0c89eb1: Expose the restore command in order to restore original compilation output files
+- 1589a88: Migrate from zod v3 to zod v4. Major performance improvements have been noticed.
+
 ## 0.3.0
 
 ### Minor Changes

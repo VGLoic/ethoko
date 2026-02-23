@@ -1,5 +1,22 @@
 # hardhat-v2-ethoko
 
+## 0.4.0
+
+### Minor Changes
+
+- 0c89eb1: Expose the restore command in order to restore original compilation output files
+- 1589a88: Migrate from zod v3 to zod v4. Major performance improvements have been noticed.
+
+### Patch Changes
+
+- Updated dependencies [500d664]
+- Updated dependencies [92a28d3]
+- Updated dependencies [4d5f356]
+- Updated dependencies [b82795a]
+- Updated dependencies [0c89eb1]
+- Updated dependencies [1589a88]
+  - @ethoko/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
