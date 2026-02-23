@@ -4,9 +4,14 @@ import { asyncExec } from "./async-exec.js";
 
 describe.each([
   [
-    "~~Default compilation WITHOUT test and scripts~~",
+    "~~Default compilation WITHOUT --build-info WITHOUT test and scripts~~",
     "forge build --force --skip test --skip script",
     "2026-forge-default",
+  ],
+  [
+    "~~Default compilation WITHOUT --build-info WITH test and scripts~~",
+    "forge build --force",
+    "2026-forge-default-full",
   ],
   [
     "~~Compilation WITH --build-info WITHOUT test and scripts~~",

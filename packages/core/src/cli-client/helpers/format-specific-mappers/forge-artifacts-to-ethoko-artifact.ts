@@ -15,6 +15,7 @@ import {
   SolcJsonOutputSchema,
 } from "@/utils/artifacts-schemas/solc-v0.8.33/output-json";
 import { lookForForgeContractArtifactPath } from "./retrieve-forge-contract-artifacts-paths";
+import { warn } from "@/cli-ui/utils";
 
 /**
  * The default Forge build info format splits the contract output into multiple files, the build info file contains only the mapping to these files.
@@ -176,9 +177,13 @@ export async function forgeArtifactsToEthokoArtifact(
       }
     }
 
-    throw new Error(
-      `The number of visited contract paths (${rebuiltSourceIdToPath.size}) does not match the number of expected contract paths (${expectedSourceIdToPath.size}). Missing contract paths:\n${pathsNotVisited.join(",\n")}.`,
-    );
+    if (debug) {
+      warn(
+        `Some contract artifact paths were not visited during the retrieval of Forge contract artifacts. This might be due to a change in the Forge output format or contract files containing pure types. Missing contract paths:\n${pathsNotVisited.join(
+          ",\n",
+        )}.`,
+      );
+    }
   }
 
   input.settings.libraries = inputLibraries;

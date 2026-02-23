@@ -4,6 +4,7 @@ import { toAsyncResult } from "@/utils/result";
 import { ForgeCompilerContractOutputSchema } from "@/utils/artifacts-schemas/forge-v1";
 import z from "zod";
 import { lookForContractArtifactPath } from "./look-for-contract-artifact-path";
+import { warn } from "@/cli-ui";
 
 /**
  * When using the --build-info option, Forge artifacts have the usual Build Info input and output
@@ -41,6 +42,7 @@ export async function retrieveForgeContractArtifactsPaths(
   }
 
   // We verify that all contract paths have been visited
+  // We may have differences due to contracts containing pure types, which are not output as artifacts by Forge
   if (rebuiltSourceIdToPath.size !== expectedSourceIdToPath.size) {
     const pathsNotVisited: string[] = [];
     for (const [id, path] of expectedSourceIdToPath.entries()) {
@@ -49,9 +51,13 @@ export async function retrieveForgeContractArtifactsPaths(
       }
     }
 
-    throw new Error(
-      `The number of visited contract paths (${rebuiltSourceIdToPath.size}) does not match the number of expected contract paths (${expectedSourceIdToPath.size}). Missing contract paths:\n${pathsNotVisited.join(",\n")}.`,
-    );
+    if (debug) {
+      warn(
+        `Some contract artifact paths were not visited during the retrieval of Forge contract artifacts. This might be due to a change in the Forge output format or contract files containing pure types. Missing contract paths:\n${pathsNotVisited.join(
+          ",\n",
+        )}.`,
+      );
+    }
   }
 
   return additionalArtifactsPaths;
