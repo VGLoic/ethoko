@@ -1,324 +1,334 @@
 import fs from "fs/promises";
-import { beforeEach, describe, expect, test } from "vitest";
+import { describe, expect } from "vitest";
 import { listPulledArtifacts, pull, push } from "@/cli-client/index";
-import { createTestLocalStorage } from "@test/helpers/local-storage-factory";
-import {
-  createTestLocalStorageProvider,
-  createTestS3StorageProvider,
-} from "@test/helpers/storage-provider-factory";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
-import type { LocalStorage } from "@/local-storage";
-import { StorageProvider } from "@/storage-provider";
+import {
+  STORAGE_PROVIDER_STRATEGIES,
+  storageProviderTest,
+} from "@test/helpers/storage-provider-test";
 
-describe.each([
-  ["Local Storage Provider", createTestLocalStorageProvider],
-  ["Amazon S3 Storage Provider", createTestS3StorageProvider],
-])("Push-Pull E2E Tests (%s)", (_, createStorageProvider) => {
-  let storageProvider: StorageProvider;
-  let localStorage: LocalStorage;
+describe.for(STORAGE_PROVIDER_STRATEGIES)(
+  "Push-Pull E2E Tests (%s)",
+  ([, storageProviderFactory]) => {
+    storageProviderTest.scoped({ storageProviderFactory });
 
-  beforeEach(async () => {
-    const providerSetup = await createStorageProvider();
-    storageProvider = providerSetup.storageProvider;
+    storageProviderTest.for([
+      [
+        "Hardhat V2 Counter",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER,
+      ],
+      ["Foundry Counter", TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER],
+      [
+        "Hardhat V3 Counter",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER,
+      ],
+      [
+        "Foundry Build Info Counter",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER,
+      ],
+    ] as const)(
+      "push artifact [%s] without tag → pull by ID",
+      async ([, artifactFixture], { storageProvider, localStorage }) => {
+        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
-    const localStorageSetup = await createTestLocalStorage();
-    localStorage = localStorageSetup.localStorage;
+        await localStorage.ensureProjectSetup(project);
 
-    return async () => {
-      await localStorageSetup.cleanup();
-      await providerSetup.cleanup();
-    };
-  });
+        const artifactId = await push(
+          artifactFixture.folderPath,
+          project,
+          undefined,
+          storageProvider,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
 
-  test.each([
-    [
-      "Hardhat V2 Counter",
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER,
-    ],
-    ["Foundry Counter", TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER],
-    [
-      "Hardhat V3 Counter",
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER,
-    ],
-    [
-      "Foundry Build Info Counter",
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER,
-    ],
-  ])(
-    "push artifact [%s] without tag → pull by ID",
-    async (_, artifactFixture) => {
-      const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
+        expect(artifactId).toBeTruthy();
+        expect(artifactId).toHaveLength(12);
 
-      await localStorage.ensureProjectSetup(project);
+        const hasArtifact = await storageProvider.hasArtifactById(
+          project,
+          artifactId,
+        );
+        expect(hasArtifact).toBe(true);
 
-      const artifactId = await push(
-        artifactFixture.folderPath,
-        project,
-        undefined,
-        storageProvider,
-        {
+        const pullResult = await pull(
+          project,
+          { type: "id", id: artifactId },
+          storageProvider,
+          localStorage,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
+
+        expect(pullResult.pulledIds).toContain(artifactId);
+        expect(pullResult.failedIds).toHaveLength(0);
+
+        const listArtifactsResult = await listPulledArtifacts(localStorage, {
+          debug: false,
+          silent: true,
+        });
+        expect(
+          listArtifactsResult.some(
+            (r) => r.id === artifactId && r.project === project,
+          ),
+        ).toBe(true);
+
+        const localArtifact = await localStorage.retrieveArtifactById(
+          project,
+          artifactId,
+        );
+        const originalContent = await fs.readFile(
+          artifactFixture.buildInfoPath,
+          "utf-8",
+        );
+        const originalJson = JSON.parse(originalContent) as { id: string };
+
+        expect(localArtifact.origin.id).toBe(originalJson.id);
+      },
+    );
+
+    storageProviderTest(
+      "push artifact with tag → pull by tag",
+      async ({ storageProvider, localStorage }) => {
+        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
+        const tag = TEST_CONSTANTS.TAGS.V1;
+        const artifactFixture =
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+
+        await localStorage.ensureProjectSetup(project);
+
+        const artifactId = await push(
+          artifactFixture.folderPath,
+          project,
+          tag,
+          storageProvider,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
+
+        const hasTag = await storageProvider.hasArtifactByTag(project, tag);
+        const hasId = await storageProvider.hasArtifactById(
+          project,
+          artifactId,
+        );
+        expect(hasTag).toBe(true);
+        expect(hasId).toBe(true);
+
+        const pullResult = await pull(
+          project,
+          { type: "tag", tag },
+          storageProvider,
+          localStorage,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
+
+        expect(pullResult.pulledTags).toContain(tag);
+        expect(pullResult.failedTags).toHaveLength(0);
+
+        const listArtifactsResult = await listPulledArtifacts(localStorage, {
+          debug: false,
+          silent: true,
+        });
+        expect(
+          listArtifactsResult.some(
+            (r) =>
+              r.tag === tag && r.project === project && r.id === artifactId,
+          ),
+          `Expected pulled artifacts to contain tag "${tag}" with ID "${artifactId}" for project "${project}", got: ${JSON.stringify(listArtifactsResult)}`,
+        ).toBe(true);
+      },
+    );
+
+    storageProviderTest(
+      "pull all artifacts for a project",
+      async ({ storageProvider, localStorage }) => {
+        const project = createTestProjectName(
+          TEST_CONSTANTS.PROJECTS.MULTI_ARTIFACT,
+        );
+        const artifactFixture =
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+
+        await localStorage.ensureProjectSetup(project);
+
+        const tag1 = TEST_CONSTANTS.TAGS.V1;
+        const tag2 = TEST_CONSTANTS.TAGS.V2;
+
+        await push(artifactFixture.folderPath, project, tag1, storageProvider, {
           force: false,
           debug: false,
           silent: true,
-        },
-      );
+        });
+        await push(artifactFixture.folderPath, project, tag2, storageProvider, {
+          force: true,
+          debug: false,
+          silent: true,
+        });
 
-      expect(artifactId).toBeTruthy();
-      expect(artifactId).toHaveLength(12);
+        const pullResult = await pull(
+          project,
+          null,
+          storageProvider,
+          localStorage,
+          { force: false, debug: false, silent: true },
+        );
 
-      const hasArtifact = await storageProvider.hasArtifactById(
-        project,
-        artifactId,
-      );
-      expect(hasArtifact).toBe(true);
+        expect(pullResult.pulledTags).toHaveLength(2);
+        expect(pullResult.pulledTags).toContain(tag1);
+        expect(pullResult.pulledTags).toContain(tag2);
 
-      const pullResult = await pull(
-        project,
-        { type: "id", id: artifactId },
-        storageProvider,
-        localStorage,
-        {
+        const listArtifactsResult = await listPulledArtifacts(localStorage, {
+          debug: false,
+          silent: true,
+        });
+        const pulledTags = listArtifactsResult
+          .filter((r) => r.project === project)
+          .map((r) => r.tag);
+        expect(pulledTags).toContain(tag1);
+        expect(pulledTags).toContain(tag2);
+      },
+    );
+
+    storageProviderTest(
+      "force push overwrites existing tag",
+      async ({ storageProvider, localStorage }) => {
+        const project = createTestProjectName(
+          TEST_CONSTANTS.PROJECTS.FORCE_TEST,
+        );
+        const tag = TEST_CONSTANTS.TAGS.LATEST;
+        const artifactFixture =
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+
+        await localStorage.ensureProjectSetup(project);
+
+        const id1 = await push(
+          artifactFixture.folderPath,
+          project,
+          tag,
+          storageProvider,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
+
+        await expect(
+          push(artifactFixture.folderPath, project, tag, storageProvider, {
+            force: false,
+            debug: false,
+            silent: true,
+          }),
+        ).rejects.toThrow(/already exists/);
+
+        const id2 = await push(
+          artifactFixture.folderPath,
+          project,
+          tag,
+          storageProvider,
+          {
+            force: true,
+            debug: false,
+            silent: true,
+          },
+        );
+
+        expect(id1).toBe(id2);
+
+        const hasTag = await storageProvider.hasArtifactByTag(project, tag);
+        expect(hasTag).toBe(true);
+      },
+    );
+
+    storageProviderTest(
+      "pull with force re-downloads existing artifacts",
+      async ({ storageProvider, localStorage }) => {
+        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
+        const tag = TEST_CONSTANTS.TAGS.V1;
+        const artifactFixture =
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+
+        await localStorage.ensureProjectSetup(project);
+
+        await push(artifactFixture.folderPath, project, tag, storageProvider, {
           force: false,
           debug: false,
           silent: true,
-        },
-      );
+        });
+        await pull(
+          project,
+          { type: "tag", tag },
+          storageProvider,
+          localStorage,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
 
-      expect(pullResult.pulledIds).toContain(artifactId);
-      expect(pullResult.failedIds).toHaveLength(0);
+        const result1 = await pull(
+          project,
+          { type: "tag", tag },
+          storageProvider,
+          localStorage,
+          {
+            force: false,
+            debug: false,
+            silent: true,
+          },
+        );
+        expect(result1.pulledTags).toHaveLength(0);
 
-      const listArtifactsResult = await listPulledArtifacts(localStorage, {
-        debug: false,
-        silent: true,
-      });
-      expect(
-        listArtifactsResult.some(
-          (r) => r.id === artifactId && r.project === project,
-        ),
-      ).toBe(true);
-
-      const localArtifact = await localStorage.retrieveArtifactById(
-        project,
-        artifactId,
-      );
-      const originalContent = await fs.readFile(
-        artifactFixture.buildInfoPath,
-        "utf-8",
-      );
-      const originalJson = JSON.parse(originalContent) as { id: string };
-
-      expect(localArtifact.origin.id).toBe(originalJson.id);
-    },
-  );
-
-  test("push artifact with tag → pull by tag", async () => {
-    const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-    const tag = TEST_CONSTANTS.TAGS.V1;
-    const artifactFixture =
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
-
-    await localStorage.ensureProjectSetup(project);
-
-    const artifactId = await push(
-      artifactFixture.folderPath,
-      project,
-      tag,
-      storageProvider,
-      {
-        force: false,
-        debug: false,
-        silent: true,
+        const result2 = await pull(
+          project,
+          { type: "tag", tag },
+          storageProvider,
+          localStorage,
+          {
+            force: true,
+            debug: false,
+            silent: true,
+          },
+        );
+        expect(result2.pulledTags).toContain(tag);
       },
     );
 
-    const hasTag = await storageProvider.hasArtifactByTag(project, tag);
-    const hasId = await storageProvider.hasArtifactById(project, artifactId);
-    expect(hasTag).toBe(true);
-    expect(hasId).toBe(true);
+    storageProviderTest(
+      "pull non-existent artifact returns error",
+      async ({ storageProvider, localStorage }) => {
+        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
-    const pullResult = await pull(
-      project,
-      { type: "tag", tag },
-      storageProvider,
-      localStorage,
-      {
-        force: false,
-        debug: false,
-        silent: true,
+        await localStorage.ensureProjectSetup(project);
+
+        await expect(
+          pull(
+            project,
+            { tag: "non-existent-tag", type: "tag" },
+            storageProvider,
+            localStorage,
+            {
+              force: false,
+              debug: false,
+              silent: true,
+            },
+          ),
+        ).rejects.toThrow();
       },
     );
-
-    expect(pullResult.pulledTags).toContain(tag);
-    expect(pullResult.failedTags).toHaveLength(0);
-
-    const listArtifactsResult = await listPulledArtifacts(localStorage, {
-      debug: false,
-      silent: true,
-    });
-    expect(
-      listArtifactsResult.some(
-        (r) => r.tag === tag && r.project === project && r.id === artifactId,
-      ),
-      `Expected pulled artifacts to contain tag "${tag}" with ID "${artifactId}" for project "${project}", got: ${JSON.stringify(listArtifactsResult)}`,
-    ).toBe(true);
-  });
-
-  test("pull all artifacts for a project", async () => {
-    const project = createTestProjectName(
-      TEST_CONSTANTS.PROJECTS.MULTI_ARTIFACT,
-    );
-    const artifactFixture =
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
-
-    await localStorage.ensureProjectSetup(project);
-
-    const tag1 = TEST_CONSTANTS.TAGS.V1;
-    const tag2 = TEST_CONSTANTS.TAGS.V2;
-
-    await push(artifactFixture.folderPath, project, tag1, storageProvider, {
-      force: false,
-      debug: false,
-      silent: true,
-    });
-    await push(artifactFixture.folderPath, project, tag2, storageProvider, {
-      force: true,
-      debug: false,
-      silent: true,
-    });
-
-    const pullResult = await pull(
-      project,
-      null,
-      storageProvider,
-      localStorage,
-      { force: false, debug: false, silent: true },
-    );
-
-    expect(pullResult.pulledTags).toHaveLength(2);
-    expect(pullResult.pulledTags).toContain(tag1);
-    expect(pullResult.pulledTags).toContain(tag2);
-
-    const listArtifactsResult = await listPulledArtifacts(localStorage, {
-      debug: false,
-      silent: true,
-    });
-    const pulledTags = listArtifactsResult
-      .filter((r) => r.project === project)
-      .map((r) => r.tag);
-    expect(pulledTags).toContain(tag1);
-    expect(pulledTags).toContain(tag2);
-  });
-
-  test("force push overwrites existing tag", async () => {
-    const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.FORCE_TEST);
-    const tag = TEST_CONSTANTS.TAGS.LATEST;
-    const artifactFixture =
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
-
-    await localStorage.ensureProjectSetup(project);
-
-    const id1 = await push(
-      artifactFixture.folderPath,
-      project,
-      tag,
-      storageProvider,
-      {
-        force: false,
-        debug: false,
-        silent: true,
-      },
-    );
-
-    await expect(
-      push(artifactFixture.folderPath, project, tag, storageProvider, {
-        force: false,
-        debug: false,
-        silent: true,
-      }),
-    ).rejects.toThrow(/already exists/);
-
-    const id2 = await push(
-      artifactFixture.folderPath,
-      project,
-      tag,
-      storageProvider,
-      {
-        force: true,
-        debug: false,
-        silent: true,
-      },
-    );
-
-    expect(id1).toBe(id2);
-
-    const hasTag = await storageProvider.hasArtifactByTag(project, tag);
-    expect(hasTag).toBe(true);
-  });
-
-  test("pull with force re-downloads existing artifacts", async () => {
-    const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-    const tag = TEST_CONSTANTS.TAGS.V1;
-    const artifactFixture =
-      TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
-
-    await localStorage.ensureProjectSetup(project);
-
-    await push(artifactFixture.folderPath, project, tag, storageProvider, {
-      force: false,
-      debug: false,
-      silent: true,
-    });
-    await pull(project, { type: "tag", tag }, storageProvider, localStorage, {
-      force: false,
-      debug: false,
-      silent: true,
-    });
-
-    const result1 = await pull(
-      project,
-      { type: "tag", tag },
-      storageProvider,
-      localStorage,
-      {
-        force: false,
-        debug: false,
-        silent: true,
-      },
-    );
-    expect(result1.pulledTags).toHaveLength(0);
-
-    const result2 = await pull(
-      project,
-      { type: "tag", tag },
-      storageProvider,
-      localStorage,
-      {
-        force: true,
-        debug: false,
-        silent: true,
-      },
-    );
-    expect(result2.pulledTags).toContain(tag);
-  });
-
-  test("pull non-existent artifact returns error", async () => {
-    const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-
-    await localStorage.ensureProjectSetup(project);
-
-    await expect(
-      pull(
-        project,
-        { tag: "non-existent-tag", type: "tag" },
-        storageProvider,
-        localStorage,
-        {
-          force: false,
-          debug: false,
-          silent: true,
-        },
-      ),
-    ).rejects.toThrow();
-  });
-});
+  },
+);

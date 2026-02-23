@@ -8,47 +8,60 @@ import {
 } from "@/storage-provider";
 import { TEST_CONSTANTS } from "./test-constants";
 
-export interface TestStorageProvider<
+export abstract class StorageProviderFactory<
   T extends StorageProvider = StorageProvider,
 > {
+  abstract create(): Promise<TestStorageProvider<T>>;
+}
+interface TestStorageProvider<T extends StorageProvider = StorageProvider> {
   storageProvider: T;
   cleanup: () => Promise<void>;
 }
 
-export async function createTestLocalStorageProvider(): Promise<TestStorageProvider> {
-  const tempDir = await fs.mkdtemp(
-    path.join(os.tmpdir(), TEST_CONSTANTS.PATHS.TEMP_DIR_PREFIX),
-  );
+export class TestLocalStorageProviderFactory extends StorageProviderFactory<LocalStorageProvider> {
+  constructor(private debug: boolean = false) {
+    super();
+  }
 
-  const storageProvider = new LocalStorageProvider({
-    path: tempDir,
-    debug: false,
-  });
+  async create(): Promise<TestStorageProvider<LocalStorageProvider>> {
+    const tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), TEST_CONSTANTS.PATHS.TEMP_DIR_PREFIX),
+    );
 
-  const cleanup = async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  };
+    const storageProvider = new LocalStorageProvider({
+      path: tempDir,
+      debug: this.debug,
+    });
 
-  return { storageProvider, cleanup };
+    const cleanup = async () => {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    };
+
+    return { storageProvider, cleanup };
+  }
 }
 
-export async function createTestS3StorageProvider(opts?: {
-  debug?: boolean;
-}): Promise<TestStorageProvider> {
-  const storageProvider = new S3BucketProvider({
-    bucketName: TEST_CONSTANTS.BUCKET_NAME,
-    bucketRegion: TEST_CONSTANTS.LOCALSTACK.REGION,
-    accessKeyId: TEST_CONSTANTS.LOCALSTACK.ACCESS_KEY_ID,
-    secretAccessKey: TEST_CONSTANTS.LOCALSTACK.SECRET_ACCESS_KEY,
-    endpoint: TEST_CONSTANTS.LOCALSTACK.ENDPOINT,
-    forcePathStyle: true,
-    debug: opts?.debug ?? false,
-    rootPath: "projects",
-  });
+export class TestS3StorageProviderFactory extends StorageProviderFactory<S3BucketProvider> {
+  constructor(private debug: boolean = false) {
+    super();
+  }
 
-  const cleanup = async () => {
-    // No cleanup needed for S3 provider in this test setup
-  };
+  async create(): Promise<TestStorageProvider<S3BucketProvider>> {
+    const storageProvider = new S3BucketProvider({
+      bucketName: TEST_CONSTANTS.BUCKET_NAME,
+      bucketRegion: TEST_CONSTANTS.LOCALSTACK.REGION,
+      accessKeyId: TEST_CONSTANTS.LOCALSTACK.ACCESS_KEY_ID,
+      secretAccessKey: TEST_CONSTANTS.LOCALSTACK.SECRET_ACCESS_KEY,
+      endpoint: TEST_CONSTANTS.LOCALSTACK.ENDPOINT,
+      forcePathStyle: true,
+      debug: this.debug,
+      rootPath: "projects",
+    });
 
-  return { storageProvider, cleanup };
+    const cleanup = async () => {
+      // No cleanup needed for S3 provider in this test setup
+    };
+
+    return { storageProvider, cleanup };
+  }
 }

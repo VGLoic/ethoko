@@ -45,7 +45,7 @@ pnpm vitest run test/e2e/push-pull.e2e.test.ts
 pnpm vitest run -t "test name pattern"
 ```
 
-**Test Framework:** Vitest with global setup, 60s timeout, located in `test/**/*.e2e.test.ts`
+**Test Framework:** Vitest with global setup, 60s timeout, located in `test/**/*.e2e.test.ts` for `packages/core` and `e2e-test/*.e2e.test.ts` for integration apps `apps/`.
 
 **Build Dependencies:** Turborepo manages task dependencies. `lint`, `check-types`, and `test` depend on `build` completing first.
 
@@ -59,7 +59,8 @@ pnpm vitest run -t "test name pattern"
 2. **`pnpm check-types`** - Typecheck all packages
 3. **`pnpm lint`** - Lint all packages (max 0 warnings)
 4. **`pnpm format`** - Format all packages
-5. **`pnpm test:e2e`** - Run all E2E tests
+5. **`pnpm test:e2e:core`** - Run all E2E tests for `@ethoko/core`
+6. **`pnpm test:e2e:apps`** - Run all E2E tests for integration apps
 
 ### Failure Handling
 
