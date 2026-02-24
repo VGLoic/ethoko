@@ -100,10 +100,23 @@ jobs:
       - run: pnpm install
       - run: pnpm build
       - name: Create Release Pull Request or Publish to NPM
+        id: changesets
         uses: changesets/action@v1
         with:
           publish: "pnpm release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Trigger E2E tests in VGLoic/v4-core-ethoko-test repository
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+              repo_owner="VGLoic"
+              repo_name="v4-core-ethoko-test"
+              event_type="trigger-e2e-tests"
+              curl -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${{ secrets.PAT_UNI_FORK_TEST }}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                https://api.github.com/repos/${repo_owner}/${repo_name}/dispatches \
+                -d '{"event_type":"'"${event_type}"'","client_payload":{"unit":false,"integration":true}}'
 
