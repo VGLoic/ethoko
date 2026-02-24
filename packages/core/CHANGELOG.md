@@ -1,5 +1,11 @@
 # @ethoko/core
 
+## 0.6.0
+
+### Minor Changes
+
+- 33a8b4c: This is a test for CI integration
+
 ## 0.5.0
 
 ### Minor Changes
