@@ -25,3 +25,4 @@
 # Ethoko files
 .ethoko/
 .ethoko-typings/
+.ethoko-e2e/

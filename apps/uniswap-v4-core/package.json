@@ -1,0 +1,21 @@
+{
+  "name": "uniswap-v4-core",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Fork of Core smart contracts of Uniswap v4 - Meant for testing with Ethoko",
+  "scripts": {
+    "test:e2e:apps": "vitest run e2e-test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.2",
+    "@types/node": "^22.8.5",
+    "eslint": "^9.39.1",
+    "hardhat": "^3.1.7",
+    "hardhat-ethoko": "0.4.1",
+    "typescript": "~5.8.0",
+    "viem": "^2.43.0",
+    "vitest": "^4.0.17"
+  }
+}

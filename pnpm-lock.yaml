@@ -299,6 +299,36 @@ importers:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
 
+  apps/uniswap-v4-core:
+    devDependencies:
+      '@nomicfoundation/hardhat-network-helpers':
+        specifier: ^3.0.0
+        version: 3.0.3(hardhat@3.1.7)
+      '@nomicfoundation/hardhat-toolbox-viem':
+        specifier: ^5.0.2
+        version: 5.0.2(02fef8f6ee7b4154aeddbfc7395cf23e)
+      '@types/node':
+        specifier: ^22.8.5
+        version: 22.15.3
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1
+      hardhat:
+        specifier: ^3.1.7
+        version: 3.1.7
+      hardhat-ethoko:
+        specifier: 0.4.1
+        version: 0.4.1(hardhat@3.1.7)
+      typescript:
+        specifier: ~5.8.0
+        version: 5.8.3
+      viem:
+        specifier: ^2.43.0
+        version: 2.45.1(typescript@5.8.3)(zod@4.3.6)
+      vitest:
+        specifier: ^4.0.17
+        version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
+
   packages/core:
     dependencies:
       '@aws-sdk/client-s3':
@@ -1033,6 +1063,9 @@ packages:
 
   '@ethersproject/wordlists@5.8.0':
     resolution: {integrity: sha512-2df9bbXicZws2Sb5S6ET493uJ0Z84Fjr3pC4tu/qlnZERibZCeUVuqdtt+7Tv9xxhUxHoIekIA7avrKUWHrezg==}
+
+  '@ethoko/core@0.5.0':
+    resolution: {integrity: sha512-JwERfpW/J0aVtnJhNLx61NUk0CslMQNwVD2EBlHJN0Qt7mbv38XowYtjPa+TZUuiLBOP2koJcQRfoosi0wcgZA==}
 
   '@fastify/busboy@2.1.1':
     resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
@@ -3060,6 +3093,11 @@ packages:
     peerDependencies:
       '@rocketh/node': ^0.18.2
       hardhat: ^3.1.7
+
+  hardhat-ethoko@0.4.1:
+    resolution: {integrity: sha512-Ulv3A/SP6k9sFTw/4jZtJqfOwbLteI9ILArV2IgtsxxtqEQygKgGzLwWLq9dzGlu29b2WViIdXw0kHGIeQZY7g==}
+    peerDependencies:
+      hardhat: ^3.x
 
   hardhat-gas-reporter@1.0.10:
     resolution: {integrity: sha512-02N4+So/fZrzJ88ci54GqwVA3Zrf0C9duuTyGt0CFRIh/CdNwbnTgkXkRfojOMLBQ+6t+lBIkgbsOtqMvNwikA==}
@@ -6031,6 +6069,19 @@ snapshots:
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
 
+  '@ethoko/core@0.5.0':
+    dependencies:
+      '@aws-sdk/client-s3': 3.978.0
+      '@aws-sdk/client-sts': 3.981.0
+      '@ethersproject/keccak256': 5.8.0
+      '@ethersproject/strings': 5.8.0
+      '@smithy/types': 3.7.2
+      boxen: 5.1.2
+      ora: 5.4.1
+      zod: 4.3.6
+    transitivePeerDependencies:
+      - aws-crt
+
   '@fastify/busboy@2.1.1': {}
 
   '@humanfs/core@0.19.1': {}
@@ -8614,6 +8665,14 @@ snapshots:
       zod: 4.3.6
     transitivePeerDependencies:
       - supports-color
+
+  hardhat-ethoko@0.4.1(hardhat@3.1.7):
+    dependencies:
+      '@ethoko/core': 0.5.0
+      hardhat: 3.1.7
+      zod: 4.3.6
+    transitivePeerDependencies:
+      - aws-crt
 
   hardhat-gas-reporter@1.0.10(hardhat@2.28.0(ts-node@10.9.2(@types/node@22.15.3)(typescript@5.9.2))(typescript@5.9.2)):
     dependencies:
