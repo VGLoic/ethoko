@@ -1,6 +1,7 @@
 import { beforeAll, describe, test } from "vitest";
 import fs from "fs/promises";
 import { asyncExec } from "./async-exec.js";
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
 
 export function foundryDescribe(
   title: string,
@@ -48,9 +49,9 @@ export function foundryDescribe(
 
     test("it restores the original artifacts", async () => {
       await asyncExec(
-        `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${tag} --output ./ethoko-e2e/restored-artifacts-${tag}`,
+        `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${tag} --output ./${E2E_FOLDER_PATH}/restored-artifacts-${tag}`,
       );
-      await asyncExec(`ls -la ./ethoko-e2e/restored-artifacts-${tag}`);
+      await asyncExec(`ls -la ./${E2E_FOLDER_PATH}/restored-artifacts-${tag}`);
     });
   });
 }

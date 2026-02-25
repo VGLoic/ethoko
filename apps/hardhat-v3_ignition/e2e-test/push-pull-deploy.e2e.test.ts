@@ -1,5 +1,6 @@
 import { describe, test } from "vitest";
 import { asyncExec } from "./async-exec.js";
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
 
 const TAG_NAME = "2026-02-02";
 
@@ -29,8 +30,10 @@ describe("[Hardhat v3 - Hardhat Ignition] Push artifact, pull artifact, deploy",
 
   test("it restores the original artifacts", async () => {
     await asyncExec(
-      `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${TAG_NAME} --output ./ethoko-e2e/restored-artifacts-${TAG_NAME}`,
+      `npx hardhat --config ./hardhat.config.e2e.ts ethoko restore --tag ${TAG_NAME} --output ./${E2E_FOLDER_PATH}/restored-artifacts-${TAG_NAME}`,
     );
-    await asyncExec(`ls -la ./ethoko-e2e/restored-artifacts-${TAG_NAME}`);
+    await asyncExec(
+      `ls -la ./${E2E_FOLDER_PATH}/restored-artifacts-${TAG_NAME}`,
+    );
   });
 });

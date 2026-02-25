@@ -1,6 +1,7 @@
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
 import { foundryDescribe } from "./foundry-describe.js";
 
-const outputArtifactsPath = "./ethoko-e2e/out-2026-forge-default";
+const outputArtifactsPath = `${E2E_FOLDER_PATH}/out-2026-forge-default`;
 
 foundryDescribe(
   "[Foundry Hardhat-deploy v2] - Default compilation WITHOUT --build-info WITHOUT test and scripts - Push artifact, pull artifact, deploy",

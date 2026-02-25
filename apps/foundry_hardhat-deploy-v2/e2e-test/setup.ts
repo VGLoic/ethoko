@@ -1,13 +1,10 @@
 import fs from "fs/promises";
-import { asyncExec } from "./async-exec.js";
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
 
 export async function setup(): Promise<void> {
   console.log("\n========================================");
   console.log("🚀 Starting [Foundry - Hardhat-deploy v2] E2E Test Suite");
   console.log("========================================\n");
-
-  // Install forge dependencies before running the tests to avoid concurrent installations when running multiple test files
-  await asyncExec("forge install");
 
   await cleanUpLocalEthokoStorage();
 
@@ -26,10 +23,10 @@ export async function teardown(): Promise<void> {
 
 async function cleanUpLocalEthokoStorage() {
   const doesExist = await fs
-    .stat("ethoko-e2e")
+    .stat(E2E_FOLDER_PATH)
     .then(() => true)
     .catch(() => false);
   if (doesExist) {
-    await fs.rm("ethoko-e2e", { recursive: true });
+    await fs.rm(E2E_FOLDER_PATH, { recursive: true });
   }
 }
