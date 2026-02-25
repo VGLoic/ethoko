@@ -1,9 +1,13 @@
 import fs from "fs/promises";
+import { asyncExec } from "./async-exec.js";
 
 export async function setup(): Promise<void> {
   console.log("\n========================================");
   console.log("🚀 Starting [Foundry - Hardhat-deploy v2] E2E Test Suite");
   console.log("========================================\n");
+
+  // Install forge dependencies before running the tests to avoid concurrent installations when running multiple test files
+  await asyncExec("forge install");
 
   await cleanUpLocalEthokoStorage();
 
