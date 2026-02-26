@@ -11,6 +11,11 @@ import {
 
 /**
  * Local storage implementation for storing artifacts on the local filesystem.
+ *
+ * Storage layout (relative to rootPath)
+ * - {project}/ids/{id}/input.json
+ * - {project}/ids/{id}/output.json
+ * - {project}/tags/{tag}.json (manifest: { id })
  */
 export class LocalStorage {
   public readonly rootPath: string;

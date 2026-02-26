@@ -17,6 +17,15 @@ type LocalStorageProviderConfig = {
   debug?: boolean;
 };
 
+/**
+ * Local filesystem storage provider.
+ *
+ * Storage layout (relative to storagePath)
+ * - {project}/ids/{id}/input.json
+ * - {project}/ids/{id}/output.json
+ * - {project}/ids/{id}/original/** (original compilation content)
+ * - {project}/tags/{tag}.json (manifest: { id })
+ */
 export class LocalStorageProvider implements StorageProvider {
   private readonly storagePath: string;
   private readonly debug: boolean;
