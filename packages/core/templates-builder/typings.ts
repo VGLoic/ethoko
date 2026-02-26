@@ -239,23 +239,43 @@ async function getCompilationArtifact(
   project: string,
   tag: string,
 ): Promise<EthokoBuildInfo> {
-  const buildInfoExists = await fs
-    .stat(`${ETHOKO_PATH}/${project}/tags/${tag}.json`)
-    .catch(() => false);
+  const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
+  const buildInfoExists = await fs.stat(manifestPath).catch(() => false);
   if (!buildInfoExists) {
     throw new Error(`artifact not found for "${project}:${tag}". Skipping`);
   }
-  const buildInfoContentResult = await toAsyncResult(
-    fs
-      .readFile(`${ETHOKO_PATH}/${project}/tags/${tag}.json`, "utf-8")
-      .then(JSON.parse),
+  const manifestContentResult = await toAsyncResult(
+    fs.readFile(manifestPath, "utf-8").then(JSON.parse),
   );
-  if (!buildInfoContentResult.success) {
-    console.error(buildInfoContentResult.error);
-    throw buildInfoContentResult.error;
+  if (!manifestContentResult.success) {
+    console.error(manifestContentResult.error);
+    throw manifestContentResult.error;
+  }
+  const manifest = manifestContentResult.value as { id: string };
+
+  const inputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/input.json`;
+  const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
+
+  const [inputResult, outputResult] = await Promise.all([
+    toAsyncResult(fs.readFile(inputPath, "utf-8").then(JSON.parse)),
+    toAsyncResult(fs.readFile(outputPath, "utf-8").then(JSON.parse)),
+  ]);
+  if (!inputResult.success) {
+    console.error(inputResult.error);
+    throw inputResult.error;
+  }
+  if (!outputResult.success) {
+    console.error(outputResult.error);
+    throw outputResult.error;
   }
 
-  return buildInfoContentResult.value;
+  return {
+    id: manifest.id,
+    solcLongVersion: inputResult.value.solcLongVersion,
+    origin: inputResult.value.origin,
+    input: inputResult.value.input,
+    output: outputResult.value.output,
+  };
 }
 
 /**
@@ -275,12 +295,23 @@ function getCompilationArtifactSync(
   }
 
   try {
-    const buildInfoContent = fsSync.readFileSync(
-      `${ETHOKO_PATH}/${project}/tags/${tag}.json`,
-      "utf-8",
-    );
-    const jsonContent = JSON.parse(buildInfoContent);
-    return jsonContent as EthokoBuildInfo;
+    const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
+    const manifestContent = fsSync.readFileSync(manifestPath, "utf-8");
+    const manifest = JSON.parse(manifestContent) as { id: string };
+
+    const inputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/input.json`;
+    const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
+    const inputContent = fsSync.readFileSync(inputPath, "utf-8");
+    const outputContent = fsSync.readFileSync(outputPath, "utf-8");
+    const input = JSON.parse(inputContent);
+    const output = JSON.parse(outputContent);
+    return {
+      id: manifest.id,
+      solcLongVersion: input.solcLongVersion,
+      origin: input.origin,
+      input: input.input,
+      output: output.output,
+    };
   } catch (e) {
     console.error(e);
     throw e;

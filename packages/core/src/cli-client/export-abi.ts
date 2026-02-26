@@ -34,11 +34,14 @@ export async function exportContractAbi(
 
   const artifactResult = await toAsyncResult(
     artifact.search.type === "tag"
-      ? localStorage.retrieveArtifactByTag(
+      ? localStorage.retrieveOutputArtifactByTag(
           artifact.project,
           artifact.search.tag,
         )
-      : localStorage.retrieveArtifactById(artifact.project, artifact.search.id),
+      : localStorage.retrieveOutputArtifactById(
+          artifact.project,
+          artifact.search.id,
+        ),
     { debug: opts.debug },
   );
   if (!artifactResult.success) {

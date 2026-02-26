@@ -57,8 +57,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(inspectResult.id).toBe(artifactId);
         expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
         expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
-        expect(inspectResult.artifactPath).toContain(`/tags/${tag}.json`);
-        expect(inspectResult.fileSize).toBeGreaterThan(0);
+        expect(inspectResult.artifacts.input.path).toContain(
+          `/ids/${artifactId}/input.json`,
+        );
+        expect(inspectResult.artifacts.input.size).toBeGreaterThan(0);
+        expect(inspectResult.artifacts.output.path).toContain(
+          `/ids/${artifactId}/output.json`,
+        );
+        expect(inspectResult.artifacts.output.size).toBeGreaterThan(0);
         const fullyQualifiedPathsResult = inspectResult.contractsBySource
           .map((c) =>
             c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
@@ -114,8 +120,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(inspectResult.id).toBe(artifactId);
         expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
         expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
-        expect(inspectResult.fileSize).toBeGreaterThan(0);
-        expect(inspectResult.artifactPath).toContain(`/ids/${artifactId}.json`);
+        expect(inspectResult.artifacts.input.size).toBeGreaterThan(0);
+        expect(inspectResult.artifacts.input.path).toContain(
+          `/ids/${artifactId}/input.json`,
+        );
+        expect(inspectResult.artifacts.output.size).toBeGreaterThan(0);
+        expect(inspectResult.artifacts.output.path).toContain(
+          `/ids/${artifactId}/output.json`,
+        );
         const fullyQualifiedPathsResult = inspectResult.contractsBySource
           .map((c) =>
             c.contracts.map((contract) => `${c.sourcePath}:${contract}`),

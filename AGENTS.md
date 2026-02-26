@@ -382,13 +382,3 @@ When creating multi-step plans:
 
 - Keep plans extremely concise - sacrifice grammar for brevity
 - End each plan with unresolved questions (if any)
-- Each step should complete ONE task only (e.g., implementation + its tests)
-
-### Before submitting changes for a step
-
-Ensure all code changes adhere to the standards and guidelines below.
-
-### Before starting a new step
-
-- Verify the previous step is fully complete and accepted
-- Commit all changes from the previous step with a concise message

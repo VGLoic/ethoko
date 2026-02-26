@@ -179,7 +179,13 @@ export async function pull(
       }
 
       const createResult = await toAsyncResult(
-        localStorage.createArtifactByTag(project, tag, downloadResult.value),
+        localStorage.createArtifactByTag(
+          project,
+          tag,
+          downloadResult.value.id,
+          downloadResult.value.input,
+          downloadResult.value.output,
+        ),
         { debug: opts.debug },
       );
       if (!createResult.success) {
@@ -200,7 +206,12 @@ export async function pull(
       }
 
       const createResult = await toAsyncResult(
-        localStorage.createArtifactById(project, id, downloadResult.value),
+        localStorage.createArtifactById(
+          project,
+          id,
+          downloadResult.value.input,
+          downloadResult.value.output,
+        ),
         { debug: opts.debug },
       );
       if (!createResult.success) {

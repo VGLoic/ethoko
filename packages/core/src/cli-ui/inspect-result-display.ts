@@ -30,11 +30,18 @@ export function displayInspectResult(
       `Origin: ${ORIGIN_FORMAT_LABELS[result.origin.format]} (${result.origin.id})}`,
     ),
   );
+  // One line for input and one line for output, since they can differ significantly in size and path
   summaryLines.push(
-    styleText(LOG_COLORS.log, `File size: ${formatBytes(result.fileSize)}`),
+    styleText(
+      LOG_COLORS.log,
+      `Input artifact: ${result.artifacts.input.path} (${formatBytes(result.artifacts.input.size)})`,
+    ),
   );
   summaryLines.push(
-    styleText(LOG_COLORS.log, `File path: ${result.artifactPath}`),
+    styleText(
+      LOG_COLORS.log,
+      `Output artifact: ${result.artifacts.output.path} (${formatBytes(result.artifacts.output.size)})`,
+    ),
   );
   summaryLines.push("");
   summaryLines.push(styleText(["bold", LOG_COLORS.log], "Compiler Settings:"));

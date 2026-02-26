@@ -1,13 +1,21 @@
 import fs from "fs/promises";
 import { Stream } from "stream";
 import {
-  EthokoArtifact,
-  EthokoArtifactSchema,
+  EthokoInputArtifact,
+  EthokoInputArtifactSchema,
+  EthokoOutputArtifact,
+  EthokoOutputArtifactSchema,
+  TagManifest,
+  TagManifestSchema,
 } from "./utils/artifacts-schemas/ethoko-v0";
-import z from "zod";
 
 /**
  * Local storage implementation for storing artifacts on the local filesystem.
+ *
+ * Storage layout (relative to rootPath)
+ * - {project}/ids/{id}/input.json
+ * - {project}/ids/{id}/output.json
+ * - {project}/tags/{tag}.json (manifest: { id })
  */
 export class LocalStorage {
   public readonly rootPath: string;
@@ -23,7 +31,7 @@ export class LocalStorage {
    * @returns True if the ID exists, false otherwise.
    */
   public async hasId(project: string, id: string): Promise<boolean> {
-    return this.exists(`${this.rootPath}/${project}/ids/${id}.json`);
+    return this.exists(`${this.rootPath}/${project}/ids/${id}`);
   }
 
   /**
@@ -61,15 +69,12 @@ export class LocalStorage {
     const entries = await fs.readdir(`${this.rootPath}/${project}/ids`, {
       withFileTypes: true,
     });
-    const ids = [];
-    for (const entry of entries) {
-      if (entry.isFile()) {
-        ids.push(entry.name.replace(".json", ""));
-      }
-    }
+    const ids = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
     const statsPromises = ids.map((id) =>
       fs
-        .stat(`${this.rootPath}/${project}/ids/${id}.json`)
+        .stat(`${this.rootPath}/${project}/ids/${id}`)
         .then((stat) => ({ id, stat })),
     );
     const allStats = await Promise.all(statsPromises);
@@ -116,67 +121,108 @@ export class LocalStorage {
    * Creates an artifact associated with the given ID.
    * @param project The project name.
    * @param id The artifact ID.
-   * @param artifact The artifact content.
+   * @param inputArtifact The input artifact content.
+   * @param outputArtifact The output artifact content.
    */
   public async createArtifactById(
     project: string,
     id: string,
-    artifact: Stream,
+    inputArtifact: Stream,
+    outputArtifact: Stream,
   ): Promise<void> {
-    return fs.writeFile(`${this.rootPath}/${project}/ids/${id}.json`, artifact);
+    const idDir = `${this.rootPath}/${project}/ids/${id}`;
+    await fs.mkdir(idDir, { recursive: true });
+    await Promise.all([
+      fs.writeFile(`${idDir}/input.json`, inputArtifact),
+      fs.writeFile(`${idDir}/output.json`, outputArtifact),
+    ]);
   }
 
   /**
    * Creates an artifact associated with the given tag.
    * @param project The project name.
    * @param tag The tag name.
-   * @param artifact The artifact content.
+   * @param id The artifact ID.
+   * @param inputArtifact The input artifact content.
+   * @param outputArtifact The output artifact content.
    */
   public async createArtifactByTag(
     project: string,
     tag: string,
-    artifact: Stream,
+    id: string,
+    inputArtifact: Stream,
+    outputArtifact: Stream,
   ): Promise<void> {
-    return fs.writeFile(
+    await this.createArtifactById(project, id, inputArtifact, outputArtifact);
+    const manifest: TagManifest = { id };
+    await fs.writeFile(
       `${this.rootPath}/${project}/tags/${tag}.json`,
-      artifact,
+      JSON.stringify(manifest),
     );
   }
 
   /**
-   * Retrieves the artifact associated with the given tag.
+   * Retrieves the input artifact associated with the given tag.
    * @param project The project name.
    * @param tag The tag name.
-   * @returns The artifact.
+   * @returns The input artifact.
    */
-  public async retrieveArtifactByTag(
+  public async retrieveInputArtifactByTag(
     project: string,
     tag: string,
-  ): Promise<EthokoArtifact> {
-    const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/tags/${tag}.json`,
-      "utf-8",
-    );
-    const rawArtifact = JSON.parse(artifactContent);
-    return EthokoArtifactSchema.parse(rawArtifact);
+  ): Promise<EthokoInputArtifact> {
+    const id = await this.retrieveArtifactId(project, tag);
+    return this.retrieveInputArtifactById(project, id);
   }
 
   /**
-   * Retrieves the artifact associated with the given ID.
+   * Retrieves the output artifact associated with the given tag.
+   * @param project The project name.
+   * @param tag The tag name.
+   * @returns The output artifact.
+   */
+  public async retrieveOutputArtifactByTag(
+    project: string,
+    tag: string,
+  ): Promise<EthokoOutputArtifact> {
+    const id = await this.retrieveArtifactId(project, tag);
+    return this.retrieveOutputArtifactById(project, id);
+  }
+
+  /**
+   * Retrieves the input artifact associated with the given ID.
    * @param project The project name.
    * @param id The artifact ID.
-   * @returns The artifact.
+   * @returns The input artifact.
    */
-  public async retrieveArtifactById(
+  public async retrieveInputArtifactById(
     project: string,
     id: string,
-  ): Promise<EthokoArtifact> {
+  ): Promise<EthokoInputArtifact> {
     const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/ids/${id}.json`,
+      `${this.rootPath}/${project}/ids/${id}/input.json`,
       "utf-8",
     );
     const rawArtifact = JSON.parse(artifactContent);
-    return EthokoArtifactSchema.parse(rawArtifact);
+    return EthokoInputArtifactSchema.parse(rawArtifact);
+  }
+
+  /**
+   * Retrieves the output artifact associated with the given ID.
+   * @param project The project name.
+   * @param id The artifact ID.
+   * @returns The output artifact.
+   */
+  public async retrieveOutputArtifactById(
+    project: string,
+    id: string,
+  ): Promise<EthokoOutputArtifact> {
+    const artifactContent = await fs.readFile(
+      `${this.rootPath}/${project}/ids/${id}/output.json`,
+      "utf-8",
+    );
+    const rawArtifact = JSON.parse(artifactContent);
+    return EthokoOutputArtifactSchema.parse(rawArtifact);
   }
 
   /**
@@ -194,8 +240,8 @@ export class LocalStorage {
       "utf-8",
     );
     const rawArtifact = JSON.parse(artifactContent);
-    const artifact = z.object({ id: z.string() }).parse(rawArtifact);
-    return artifact.id;
+    const manifest = TagManifestSchema.parse(rawArtifact);
+    return manifest.id;
   }
 
   /**

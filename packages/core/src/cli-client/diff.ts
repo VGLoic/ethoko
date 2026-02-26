@@ -6,7 +6,7 @@ import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import { lookForBuildInfoJsonFile } from "./helpers/look-for-build-info-json-file";
 import { mapBuildInfoToEthokoArtifact } from "./helpers/map-build-info-to-ethoko-artifact";
-import { EthokoArtifact } from "@/utils/artifacts-schemas/ethoko-v0";
+import { EthokoOutputArtifact } from "@/utils/artifacts-schemas/ethoko-v0";
 import type { BuildInfoPath } from "./helpers/look-for-build-info-json-file";
 
 function buildInfoPathToSuccessText(buildInfoPath: BuildInfoPath): string {
@@ -202,11 +202,11 @@ export async function generateDiffWithTargetRelease(
     // @dev the mapBuildInfoToEthokoArtifact function throws an Error with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
     throw ethokoArtifactParsingResult.error;
   }
-  const ethokoArtifact = ethokoArtifactParsingResult.value.artifact;
+  const { outputArtifact } = ethokoArtifactParsingResult.value;
   steps.succeed("Compilation artifact is valid");
 
   const virtualReleaseContractHashesResult = await toAsyncResult(
-    generateContractHashes(ethokoArtifact),
+    generateContractHashes(outputArtifact),
     { debug: opts.debug },
   );
   if (!virtualReleaseContractHashesResult.success) {
@@ -220,11 +220,14 @@ export async function generateDiffWithTargetRelease(
   steps.start("Reading target artifact...");
   const artifactContentResult = await toAsyncResult(
     artifact.search.type === "tag"
-      ? localStorage.retrieveArtifactByTag(
+      ? localStorage.retrieveOutputArtifactByTag(
           artifact.project,
           artifact.search.tag,
         )
-      : localStorage.retrieveArtifactById(artifact.project, artifact.search.id),
+      : localStorage.retrieveOutputArtifactById(
+          artifact.project,
+          artifact.search.id,
+        ),
     { debug: opts.debug },
   );
   if (!artifactContentResult.success) {
@@ -286,7 +289,7 @@ export async function generateDiffWithTargetRelease(
 }
 
 async function generateContractHashes(
-  artifact: EthokoArtifact,
+  artifact: EthokoOutputArtifact,
 ): Promise<Map<string, string>> {
   const contractHashes = new Map<string, string>();
   for (const contractPath in artifact.output.contracts) {
@@ -306,7 +309,7 @@ async function generateContractHashes(
   return contractHashes;
 }
 
-type Contract = EthokoArtifact["output"]["contracts"][string][string];
+type Contract = EthokoOutputArtifact["output"]["contracts"][string][string];
 function hashContract(contract: Contract): string {
   const hash = createHash("sha256");
 

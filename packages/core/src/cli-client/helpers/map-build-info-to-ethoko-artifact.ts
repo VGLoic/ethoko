@@ -1,4 +1,7 @@
-import { EthokoArtifact } from "@/utils/artifacts-schemas/ethoko-v0";
+import {
+  EthokoInputArtifact,
+  EthokoOutputArtifact,
+} from "@/utils/artifacts-schemas/ethoko-v0";
 import fs from "fs/promises";
 import { CliError } from "../error";
 import { toAsyncResult, toResult } from "@/utils/result";
@@ -18,25 +21,29 @@ import { retrieveHardhatv3ContractArtifactsPaths } from "./format-specific-mappe
 import { retrieveForgeContractArtifactsPaths } from "./format-specific-mappers/retrieve-forge-contract-artifacts-paths";
 
 /**
- * Given a path to a candidate build info JSON file, try to output a EthokoArtifact.
+ * Given a path to a candidate build info JSON file, try to output Ethoko artifacts.
  *
  * This function is meant to be used in other CLI client methods, since it throws a CliError, it can be used without any wrapping, i.e.
  * ```ts
- * const {artifact, originalContentPaths} = await mapBuildInfoToEthokoArtifact(buildInfoPath);
+ * const {inputArtifact, outputArtifact, originalContentPaths} = await mapBuildInfoToEthokoArtifact(buildInfoPath);
  * ```
  *
  * The format of the build info has already been detected previously by the caller.
- * According to the detected format, this function will fully satisfy the build info content, validate it and map it to the EthokoArtifact format.
+ * According to the detected format, this function will fully satisfy the build info content, validate it and map it to the Ethoko artifact format.
  *
- * @param buildInfoPath The candidate build info path to parse and map to a EthokoArtifact, it contains both the format and the path to the build info JSON files
+ * @param buildInfoPath The candidate build info path to parse and map to Ethoko artifacts, it contains both the format and the path to the build info JSON files
  * @param debug Whether to enable debug logging
- * @return The EthokoArtifact mapped from the build info JSON file and the paths to the original content files
+ * @return The Ethoko artifacts mapped from the build info JSON file and the paths to the original content files
  * @throws A CliError if the file cannot be parsed, if the build info is not valid or if the mapping fails
  */
 export async function mapBuildInfoToEthokoArtifact(
   buildInfoPath: BuildInfoPath,
   debug: boolean,
-): Promise<{ artifact: EthokoArtifact; originalContentPaths: string[] }> {
+): Promise<{
+  inputArtifact: EthokoInputArtifact;
+  outputArtifact: EthokoOutputArtifact;
+  originalContentPaths: string[];
+}> {
   if (buildInfoPath.format === "hardhat-v3") {
     // @dev readJsonFile throws a CliError so it is safe to use it directly without wrapping it in a try catch block
     const inputJsonContent = await readJsonFile(
@@ -104,18 +111,26 @@ export async function mapBuildInfoToEthokoArtifact(
       );
     }
 
-    return {
-      artifact: {
-        id: deriveEthokoArtifactId(outputParsingResult.data.output),
-        origin: {
-          id: inputParsingResult.data.id,
-          format: inputParsingResult.data._format,
-          outputFormat: outputParsingResult.data._format,
-        },
-        input: inputParsingResult.data.input,
-        output: outputParsingResult.data.output,
-        solcLongVersion: inputParsingResult.data.solcLongVersion,
+    const id = deriveEthokoArtifactId(inputParsingResult.data.input);
+    const inputArtifact: EthokoInputArtifact = {
+      id,
+      origin: {
+        id: inputParsingResult.data.id,
+        format: inputParsingResult.data._format,
+        outputFormat: outputParsingResult.data._format,
       },
+      __format: "ethoko-input-v0",
+      input: inputParsingResult.data.input,
+      solcLongVersion: inputParsingResult.data.solcLongVersion,
+    };
+    const outputArtifact: EthokoOutputArtifact = {
+      id,
+      __format: "ethoko-output-v0",
+      output: outputParsingResult.data.output,
+    };
+    return {
+      inputArtifact,
+      outputArtifact,
       originalContentPaths: [
         buildInfoPath.inputPath,
         buildInfoPath.outputPath,
@@ -131,7 +146,7 @@ export async function mapBuildInfoToEthokoArtifact(
     debug,
   );
 
-  // We validate the content and map it to the EthokoArtifact format based on the previously detected format
+  // We validate the content and map it to the Ethoko artifact format based on the previously detected format
 
   if (buildInfoPath.format === "hardhat-v2") {
     const parsingResult = HardhatV2CompilerOutputSchema.safeParse(jsonContent);
@@ -145,17 +160,25 @@ export async function mapBuildInfoToEthokoArtifact(
         `The provided build info file "${buildInfoPath.path}" seems to be in the Hardhat V2 format but we failed to validate it. Please provide a valid Hardhat V2 build info JSON file. Run with debug mode for more info.`,
       );
     }
-    return {
-      artifact: {
-        id: deriveEthokoArtifactId(parsingResult.data.output),
-        origin: {
-          id: parsingResult.data.id,
-          format: parsingResult.data._format,
-        },
-        solcLongVersion: parsingResult.data.solcLongVersion,
-        input: parsingResult.data.input,
-        output: parsingResult.data.output,
+    const id = deriveEthokoArtifactId(parsingResult.data.input);
+    const inputArtifact: EthokoInputArtifact = {
+      id,
+      __format: "ethoko-input-v0",
+      origin: {
+        id: parsingResult.data.id,
+        format: parsingResult.data._format,
       },
+      solcLongVersion: parsingResult.data.solcLongVersion,
+      input: parsingResult.data.input,
+    };
+    const outputArtifact: EthokoOutputArtifact = {
+      id,
+      __format: "ethoko-output-v0",
+      output: parsingResult.data.output,
+    };
+    return {
+      inputArtifact,
+      outputArtifact,
       originalContentPaths: [buildInfoPath.path],
     };
   }
@@ -188,17 +211,25 @@ export async function mapBuildInfoToEthokoArtifact(
       );
     }
 
-    return {
-      artifact: {
-        id: deriveEthokoArtifactId(parsingResult.data.output),
-        origin: {
-          id: parsingResult.data.id,
-          format: parsingResult.data._format,
-        },
-        solcLongVersion: parsingResult.data.solcLongVersion,
-        input: parsingResult.data.input,
-        output: parsingResult.data.output,
+    const id = deriveEthokoArtifactId(parsingResult.data.input);
+    const inputArtifact: EthokoInputArtifact = {
+      id,
+      __format: "ethoko-input-v0",
+      origin: {
+        id: parsingResult.data.id,
+        format: parsingResult.data._format,
       },
+      solcLongVersion: parsingResult.data.solcLongVersion,
+      input: parsingResult.data.input,
+    };
+    const outputArtifact: EthokoOutputArtifact = {
+      id,
+      __format: "ethoko-output-v0",
+      output: parsingResult.data.output,
+    };
+    return {
+      inputArtifact,
+      outputArtifact,
       originalContentPaths: [
         buildInfoPath.path,
         ...contractArtifactsPathsResult.value,
@@ -234,7 +265,8 @@ export async function mapBuildInfoToEthokoArtifact(
       );
     }
     return {
-      artifact: mappingResult.value.artifact,
+      inputArtifact: mappingResult.value.inputArtifact,
+      outputArtifact: mappingResult.value.outputArtifact,
       originalContentPaths: mappingResult.value.additionalArtifactsPaths.concat(
         buildInfoPath.path,
       ),

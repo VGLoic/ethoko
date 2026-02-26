@@ -4,7 +4,12 @@ import { createReadStream, Dirent } from "fs";
 import { Stream } from "stream";
 import { styleText } from "node:util";
 import { LOG_COLORS } from "@/cli-ui/utils";
-import { EthokoArtifact } from "../utils/artifacts-schemas/ethoko-v0";
+import {
+  EthokoInputArtifact,
+  EthokoOutputArtifact,
+  TagManifest,
+  TagManifestSchema,
+} from "../utils/artifacts-schemas/ethoko-v0";
 import { StorageProvider } from "./storage-provider.interface";
 
 type LocalStorageProviderConfig = {
@@ -12,6 +17,15 @@ type LocalStorageProviderConfig = {
   debug?: boolean;
 };
 
+/**
+ * Local filesystem storage provider.
+ *
+ * Storage layout (relative to storagePath)
+ * - {project}/ids/{id}/input.json
+ * - {project}/ids/{id}/output.json
+ * - {project}/ids/{id}/original/** (original compilation content)
+ * - {project}/tags/{tag}.json (manifest: { id })
+ */
 export class LocalStorageProvider implements StorageProvider {
   private readonly storagePath: string;
   private readonly debug: boolean;
@@ -37,8 +51,8 @@ export class LocalStorageProvider implements StorageProvider {
     const idsPath = this.idsPath(project);
     const entries = await this.safeReadDir(idsPath);
     return entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map((entry) => entry.name.replace(".json", ""));
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
   }
 
   public async listOriginalContent(
@@ -65,29 +79,41 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   public async hasArtifactById(project: string, id: string): Promise<boolean> {
-    return this.exists(this.idFilePath(project, id));
+    return this.exists(this.idDirPath(project, id));
   }
 
   public async uploadArtifact(
     project: string,
-    artifact: EthokoArtifact,
+    inputArtifact: EthokoInputArtifact,
+    outputArtifact: EthokoOutputArtifact,
     tag: string | undefined,
     originalContentPaths: string[],
   ): Promise<void> {
     await this.ensureProjectSetup(project);
 
-    const idFilePath = this.idFilePath(project, artifact.id);
-    await fs.writeFile(idFilePath, JSON.stringify(artifact));
+    const idDir = this.idDirPath(project, inputArtifact.id);
+    await fs.mkdir(idDir, { recursive: true });
+    await Promise.all([
+      fs.writeFile(
+        this.inputFilePath(project, inputArtifact.id),
+        JSON.stringify(inputArtifact),
+      ),
+      fs.writeFile(
+        this.outputFilePath(project, inputArtifact.id),
+        JSON.stringify(outputArtifact),
+      ),
+    ]);
 
     if (tag) {
       const tagFilePath = this.tagFilePath(project, tag);
-      await fs.copyFile(idFilePath, tagFilePath);
+      const manifest: TagManifest = { id: inputArtifact.id };
+      await fs.writeFile(tagFilePath, JSON.stringify(manifest));
     }
 
     for (const originalContentPath of originalContentPaths) {
       const targetPath = this.originalContentPath(
         project,
-        artifact.id,
+        inputArtifact.id,
         originalContentPath,
       );
       await this.copyOriginalContent(originalContentPath, targetPath);
@@ -97,7 +123,7 @@ export class LocalStorageProvider implements StorageProvider {
       console.error(
         styleText(
           LOG_COLORS.log,
-          `Stored artifact ${project}:${tag || artifact.id} in ${this.storagePath}`,
+          `Stored artifact ${project}:${tag || inputArtifact.id} in ${this.storagePath}`,
         ),
       );
     }
@@ -106,17 +132,25 @@ export class LocalStorageProvider implements StorageProvider {
   public async downloadArtifactById(
     project: string,
     id: string,
-  ): Promise<Stream> {
-    const idFilePath = this.idFilePath(project, id);
-    return createReadStream(idFilePath);
+  ): Promise<{ input: Stream; output: Stream }> {
+    return {
+      input: createReadStream(this.inputFilePath(project, id)),
+      output: createReadStream(this.outputFilePath(project, id)),
+    };
   }
 
   public async downloadArtifactByTag(
     project: string,
     tag: string,
-  ): Promise<Stream> {
+  ): Promise<{ id: string; input: Stream; output: Stream }> {
     const tagFilePath = this.tagFilePath(project, tag);
-    return createReadStream(tagFilePath);
+    const manifestContent = await fs.readFile(tagFilePath, "utf-8");
+    const manifest = TagManifestSchema.parse(JSON.parse(manifestContent));
+    const streams = await this.downloadArtifactById(project, manifest.id);
+    return {
+      id: manifest.id,
+      ...streams,
+    };
   }
 
   public async downloadOriginalContent(
@@ -140,11 +174,11 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private originalContentRootPath(project: string, id: string): string {
-    return path.join(this.idsPath(project), id, "original-content");
+    return path.join(this.idDirPath(project, id), "original");
   }
 
-  private idFilePath(project: string, id: string): string {
-    return path.join(this.idsPath(project), `${id}.json`);
+  private idDirPath(project: string, id: string): string {
+    return path.join(this.idsPath(project), id);
   }
 
   private tagFilePath(project: string, tag: string): string {
@@ -157,7 +191,15 @@ export class LocalStorageProvider implements StorageProvider {
     sourcePath: string,
   ): string {
     const sanitized = this.sanitizePath(sourcePath);
-    return path.join(this.idsPath(project), id, "original-content", sanitized);
+    return path.join(this.idDirPath(project, id), "original", sanitized);
+  }
+
+  private inputFilePath(project: string, id: string): string {
+    return path.join(this.idDirPath(project, id), "input.json");
+  }
+
+  private outputFilePath(project: string, id: string): string {
+    return path.join(this.idDirPath(project, id), "output.json");
   }
 
   private sanitizePath(filePath: string): string {

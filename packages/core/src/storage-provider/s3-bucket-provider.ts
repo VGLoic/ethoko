@@ -1,6 +1,5 @@
 import { Stream } from "stream";
 import {
-  CopyObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
   NoSuchKey,
@@ -11,7 +10,12 @@ import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import { NodeJsClient } from "@smithy/types";
 import { styleText } from "node:util";
 import { LOG_COLORS } from "@/cli-ui/utils";
-import { EthokoArtifact } from "../utils/artifacts-schemas/ethoko-v0";
+import {
+  EthokoInputArtifact,
+  EthokoOutputArtifact,
+  TagManifest,
+  TagManifestSchema,
+} from "../utils/artifacts-schemas/ethoko-v0";
 import { StorageProvider } from "./storage-provider.interface";
 import fs from "fs/promises";
 
@@ -39,6 +43,13 @@ type RoleCredentials = {
 };
 
 export class S3BucketProvider implements StorageProvider {
+  /**
+   * S3 storage layout (prefix under rootPath)
+   * - {project}/ids/{id}/input.json
+   * - {project}/ids/{id}/output.json
+   * - {project}/ids/{id}/original/** (original compilation content)
+   * - {project}/tags/{tag}.json (manifest: { id })
+   */
   private readonly config: S3BucketProviderConfig;
   private client: NodeJsClient<S3Client> | undefined;
   private readonly rootPath: string;
@@ -143,27 +154,18 @@ export class S3BucketProvider implements StorageProvider {
 
   public async listIds(project: string): Promise<string[]> {
     const client = await this.getClient();
+    const prefix = `${this.rootPath}/${project}/ids/`;
     const listCommand = new ListObjectsV2Command({
       Bucket: this.config.bucketName,
-      Prefix: `${this.rootPath}/${project}/ids/`,
+      Prefix: prefix,
+      Delimiter: "/",
     });
     const listResult = await client.send(listCommand);
-    const contents = listResult.Contents;
-    if (!contents) {
-      return [];
-    }
-    const ids = [];
-    for (const content of contents) {
-      const key = content.Key;
-      if (!key) continue;
-      // Consider only .json files under the "ids" prefix, we ignore any other subfolders or files (e.g. original content files)
-      const relativeKey = key.replace(`${this.rootPath}/${project}/ids/`, "");
-      if (relativeKey.endsWith(".json") && !relativeKey.includes("/")) {
-        const id = relativeKey.replace(".json", "");
-        ids.push(id);
-      }
-    }
-    return ids;
+    const commonPrefixes = listResult.CommonPrefixes || [];
+    return commonPrefixes
+      .map((entry) => entry.Prefix)
+      .filter((entry): entry is string => entry !== undefined)
+      .map((entry) => entry.replace(prefix, "").replace("/", ""));
   }
 
   public async listOriginalContent(
@@ -171,7 +173,7 @@ export class S3BucketProvider implements StorageProvider {
     id: string,
   ): Promise<string[]> {
     const client = await this.getClient();
-    const prefix = `${this.rootPath}/${project}/ids/${id}/original-content/`;
+    const prefix = `${this.rootPath}/${project}/ids/${id}/original/`;
     const paths: string[] = [];
     let continuationToken: string | undefined;
 
@@ -244,46 +246,54 @@ export class S3BucketProvider implements StorageProvider {
 
   public async hasArtifactById(project: string, id: string): Promise<boolean> {
     const client = await this.getClient();
-    const headCommand = new GetObjectCommand({
+    const listCommand = new ListObjectsV2Command({
       Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}.json`,
+      Prefix: `${this.rootPath}/${project}/ids/${id}/`,
+      MaxKeys: 1,
     });
-    const headResult = await client.send(headCommand).catch((err) => {
-      if (err instanceof NoSuchKey) {
-        return null;
-      }
-      throw err;
-    });
-    return Boolean(headResult);
+    const listResult = await client.send(listCommand);
+    return (listResult.Contents?.length ?? 0) > 0;
   }
 
   public async uploadArtifact(
     project: string,
-    artifact: EthokoArtifact,
+    inputArtifact: EthokoInputArtifact,
+    outputArtifact: EthokoOutputArtifact,
     tag: string | undefined,
     originalContentPaths: string[],
   ): Promise<void> {
     const client = await this.getClient();
-    const idKey = `${this.rootPath}/${project}/ids/${artifact.id}.json`;
-
-    const putIdCommand = new PutObjectCommand({
-      Bucket: this.config.bucketName,
-      Key: idKey,
-      Body: JSON.stringify(artifact),
-    });
-    await client.send(putIdCommand);
+    const inputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/input.json`;
+    const outputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/output.json`;
+    await Promise.all([
+      client.send(
+        new PutObjectCommand({
+          Bucket: this.config.bucketName,
+          Key: inputKey,
+          Body: JSON.stringify(inputArtifact),
+        }),
+      ),
+      client.send(
+        new PutObjectCommand({
+          Bucket: this.config.bucketName,
+          Key: outputKey,
+          Body: JSON.stringify(outputArtifact),
+        }),
+      ),
+    ]);
 
     if (tag) {
-      const copyCommand = new CopyObjectCommand({
+      const manifest: TagManifest = { id: inputArtifact.id };
+      const putTagCommand = new PutObjectCommand({
         Bucket: this.config.bucketName,
         Key: `${this.rootPath}/${project}/tags/${tag}.json`,
-        CopySource: `${this.config.bucketName}/${idKey}`,
+        Body: JSON.stringify(manifest),
       });
-      await client.send(copyCommand);
+      await client.send(putTagCommand);
     }
 
     // Upload original content files as well, using the artifact ID as reference
-    // These files are stored under `${this.rootPath}/${project}/ids/${artifact.id}/original-content/` prefix, so they don't interfere with the main artifact JSON file and can be easily retrieved when downloading the artifact
+    // These files are stored under `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/` prefix, so they don't interfere with the main artifact JSON file and can be easily retrieved when downloading the artifact
     for (const originalContentPath of originalContentPaths) {
       const content = await fs.readFile(originalContentPath);
       let sanitizedPath = originalContentPath;
@@ -296,7 +306,7 @@ export class S3BucketProvider implements StorageProvider {
       }
       const putCommand = new PutObjectCommand({
         Bucket: this.config.bucketName,
-        Key: `${this.rootPath}/${project}/ids/${artifact.id}/original-content/${sanitizedPath}`,
+        Key: `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/${sanitizedPath}`,
         Body: content,
       });
       await client.send(putCommand);
@@ -306,24 +316,35 @@ export class S3BucketProvider implements StorageProvider {
   public async downloadArtifactById(
     project: string,
     id: string,
-  ): Promise<Stream> {
+  ): Promise<{ input: Stream; output: Stream }> {
     const client = await this.getClient();
-    const getObjectCommand = new GetObjectCommand({
+    const inputCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}.json`,
+      Key: `${this.rootPath}/${project}/ids/${id}/input.json`,
     });
-    const getObjectResult = await client.send(getObjectCommand);
-    if (!getObjectResult.Body) {
-      throw new Error("Error fetching the artifact");
+    const outputCommand = new GetObjectCommand({
+      Bucket: this.config.bucketName,
+      Key: `${this.rootPath}/${project}/ids/${id}/output.json`,
+    });
+    const [inputResult, outputResult] = await Promise.all([
+      client.send(inputCommand),
+      client.send(outputCommand),
+    ]);
+    if (!inputResult.Body || !outputResult.Body) {
+      throw new Error(
+        `Artifact corrupted on remote storage for ID ${id}, requires attention`,
+      );
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return getObjectResult.Body.transformToWebStream() as any;
+    return {
+      input: inputResult.Body as Stream,
+      output: outputResult.Body as Stream,
+    };
   }
 
   public async downloadArtifactByTag(
     project: string,
     tag: string,
-  ): Promise<Stream> {
+  ): Promise<{ id: string; input: Stream; output: Stream }> {
     const client = await this.getClient();
     const getObjectCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
@@ -331,10 +352,17 @@ export class S3BucketProvider implements StorageProvider {
     });
     const getObjectResult = await client.send(getObjectCommand);
     if (!getObjectResult.Body) {
-      throw new Error("Error fetching the artifact");
+      throw new Error(
+        `Tag manifest corrupted on remote storage for tag ${tag}, requires attention`,
+      );
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return getObjectResult.Body.transformToWebStream() as any;
+    const manifestContent = await getObjectResult.Body.transformToString();
+    const manifest = TagManifestSchema.parse(JSON.parse(manifestContent));
+    const streams = await this.downloadArtifactById(project, manifest.id);
+    return {
+      id: manifest.id,
+      ...streams,
+    };
   }
 
   public async downloadOriginalContent(
@@ -345,7 +373,7 @@ export class S3BucketProvider implements StorageProvider {
     const client = await this.getClient();
     const getObjectCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}/original-content/${relativePath}`,
+      Key: `${this.rootPath}/${project}/ids/${id}/original/${relativePath}`,
     });
     const getObjectResult = await client.send(getObjectCommand);
     if (!getObjectResult.Body) {

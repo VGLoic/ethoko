@@ -79,7 +79,6 @@ export async function push(
     // @dev the mapBuildInfoToEthokoArtifact function throws an Error with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
     throw ethokoArtifactParsingResult.error;
   }
-  const ethokoArtifact = ethokoArtifactParsingResult.value.artifact;
   steps.succeed("Compilation artifact is valid");
 
   // Step 3: Check if tag exists
@@ -116,7 +115,8 @@ export async function push(
   const pushResult = await toAsyncResult(
     storageProvider.uploadArtifact(
       project,
-      ethokoArtifact,
+      ethokoArtifactParsingResult.value.inputArtifact,
+      ethokoArtifactParsingResult.value.outputArtifact,
       tag,
       ethokoArtifactParsingResult.value.originalContentPaths,
     ),
@@ -126,10 +126,10 @@ export async function push(
   if (!pushResult.success) {
     steps.fail("Failed to upload artifact");
     throw new CliError(
-      `Error pushing the artifact "${project}:${tag || ethokoArtifact.id}" to the storage, please check the storage configuration or run with debug mode for more info`,
+      `Error pushing the artifact "${project}:${tag || ethokoArtifactParsingResult.value.inputArtifact.id}" to the storage, please check the storage configuration or run with debug mode for more info`,
     );
   }
   steps.succeed("Artifact uploaded successfully");
 
-  return ethokoArtifact.id;
+  return ethokoArtifactParsingResult.value.inputArtifact.id;
 }

@@ -129,7 +129,7 @@ export async function generateArtifactsSummariesAndTypings(
         contractsPerTag[tag] = [];
       }
       const artifactResult = await toAsyncResult(
-        localStorage.retrieveArtifactByTag(project, tag),
+        localStorage.retrieveOutputArtifactByTag(project, tag),
         { debug: opts.debug },
       );
       if (!artifactResult.success) {

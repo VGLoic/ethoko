@@ -1,6 +1,8 @@
 import {
-  EthokoArtifact,
-  EthokoArtifactSchema,
+  EthokoInputArtifact,
+  EthokoInputArtifactSchema,
+  EthokoOutputArtifact,
+  EthokoOutputArtifactSchema,
 } from "@/utils/artifacts-schemas/ethoko-v0";
 import {
   FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT,
@@ -9,7 +11,10 @@ import {
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import z from "zod";
 import path from "path";
-import { SettingsSchema } from "@/utils/artifacts-schemas/solc-v0.8.33/input-json";
+import {
+  SettingsSchema,
+  SolcJsonInputSchema,
+} from "@/utils/artifacts-schemas/solc-v0.8.33/input-json";
 import {
   SolcContractSchema,
   SolcJsonOutputSchema,
@@ -29,14 +34,14 @@ import { warn } from "@/cli-ui/utils";
  *   - <contract-name>.json (contains the output for the contract)
  * - ...
  *
- * To reconstruct the EthokoArtifact, we need to read the build info file, then read all the contract output files, and reconstruct the input and output in the EthokoArtifact format.
+ * To reconstruct the Ethoko artifacts, we need to read the build info file, then read all the contract output files, and reconstruct the input and output in the Ethoko artifact format.
  *
  * For this:
  * - we place ourselves in the root folder (one level above the build-info folder),
  * - we recursively look for all the .json files (except the one in the build-info folder), each of them corresponds to a contract output, for each of them:
  *  - we look for the .json files, each of them corresponds to a contract output, for each of them:
  *    - we parse the content, we reconstruct the output and input parts
- * At the end, we compare the contracts we explored with the mapping in the build info file, if they match, we can be confident that we reconstructed the input and output correctly, and we can return the EthokoArtifact.
+ * At the end, we compare the contracts we explored with the mapping in the build info file, if they match, we can be confident that we reconstructed the input and output correctly, and we can return the Ethoko artifacts.
  * @param buildInfoPath The path to the Forge build info JSON file (the one in the build-info folder)
  * @param forgeBuildInfo The parsed content of the Forge build info JSON file
  */
@@ -44,7 +49,11 @@ export async function forgeArtifactsToEthokoArtifact(
   buildInfoPath: string,
   forgeBuildInfo: z.infer<typeof ForgeCompilerDefaultOutputSchema>,
   debug: boolean,
-): Promise<{ artifact: EthokoArtifact; additionalArtifactsPaths: string[] }> {
+): Promise<{
+  inputArtifact: EthokoInputArtifact;
+  outputArtifact: EthokoOutputArtifact;
+  additionalArtifactsPaths: string[];
+}> {
   const expectedSourceIdToPath = new Map(
     Object.entries(forgeBuildInfo.source_id_to_path),
   );
@@ -154,12 +163,12 @@ export async function forgeArtifactsToEthokoArtifact(
         legacyAssembly: undefined, // not handled
         bytecode: {
           ...contract.bytecode,
-          // The bytecode in the default Forge output is 0x-prefixed, but the EthokoArtifact format expects it to be non-prefixed, so we strip the 0x prefix here.
+          // The bytecode in the default Forge output is 0x-prefixed, but the Ethoko artifact format expects it to be non-prefixed, so we strip the 0x prefix here.
           object: strip0xPrefix(contract.bytecode.object),
         },
         deployedBytecode: {
           ...contract.deployedBytecode,
-          // The bytecode in the default Forge output is 0x-prefixed, but the EthokoArtifact format expects it to be non-prefixed, so we strip the 0x prefix here.
+          // The bytecode in the default Forge output is 0x-prefixed, but the Ethoko artifact format expects it to be non-prefixed, so we strip the 0x prefix here.
           object: strip0xPrefix(contract.deployedBytecode.object),
         },
         methodIdentifiers: contract.methodIdentifiers,
@@ -195,26 +204,47 @@ export async function forgeArtifactsToEthokoArtifact(
     contracts: outputContracts,
   } satisfies z.infer<typeof SolcJsonOutputSchema>;
 
-  const ethokoArtifact = {
-    id: deriveEthokoArtifactId(output),
-    solcLongVersion,
+  const inputParsingResult = SolcJsonInputSchema.safeParse(input);
+  if (!inputParsingResult.success) {
+    throw new Error(
+      `Failed to parse the reconstructed input from the Forge build info default format. Error: ${inputParsingResult.error}`,
+    );
+  }
+  const id = deriveEthokoArtifactId(inputParsingResult.data);
+  const inputArtifact = {
+    id,
+    __format: "ethoko-input-v0",
+    solcLongVersion: solcLongVersion ?? "unknown",
     origin: {
       id: forgeBuildInfo.id,
       format: FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT,
     },
-    input,
+    input: inputParsingResult.data,
+  } satisfies EthokoInputArtifact;
+  const outputArtifact = {
+    id,
+    __format: "ethoko-output-v0",
     output,
-  };
+  } satisfies EthokoOutputArtifact;
 
-  const ethokoArtifactResult = EthokoArtifactSchema.safeParse(ethokoArtifact);
-  if (!ethokoArtifactResult.success) {
+  const inputArtifactResult =
+    EthokoInputArtifactSchema.safeParse(inputArtifact);
+  if (!inputArtifactResult.success) {
     throw new Error(
-      `Failed to parse the reconstructed EthokoArtifact from the Forge build info default format. Error: ${ethokoArtifactResult.error}`,
+      `Failed to parse the reconstructed Ethoko input artifact from the Forge build info default format. Error: ${inputArtifactResult.error}`,
+    );
+  }
+  const outputArtifactResult =
+    EthokoOutputArtifactSchema.safeParse(outputArtifact);
+  if (!outputArtifactResult.success) {
+    throw new Error(
+      `Failed to parse the reconstructed Ethoko output artifact from the Forge build info default format. Error: ${outputArtifactResult.error}`,
     );
   }
 
   return {
-    artifact: ethokoArtifactResult.data,
+    inputArtifact: inputArtifactResult.data,
+    outputArtifact: outputArtifactResult.data,
     additionalArtifactsPaths,
   };
 }
