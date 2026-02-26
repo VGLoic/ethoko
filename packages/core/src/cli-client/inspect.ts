@@ -14,7 +14,6 @@ export type InspectResult = {
   project: string;
   tag: string | null;
   id: string;
-  fileSize: number;
   origin: {
     id: string;
     format: "forge" | "hardhat-v2" | "hardhat-v3";
@@ -33,7 +32,16 @@ export type InspectResult = {
     sourcePath: string;
     contracts: string[];
   }>;
-  artifactPath: string;
+  artifacts: {
+    input: {
+      path: string;
+      size: number;
+    };
+    output: {
+      path: string;
+      size: number;
+    };
+  };
 };
 
 /**
@@ -70,9 +78,6 @@ export async function inspectArtifact(
             artifact.project,
             artifact.search.tag,
           ),
-          Promise.resolve(
-            `${localStorage.rootPath}/${artifact.project}/tags/${artifact.search.tag}.json`,
-          ),
         ])
       : Promise.all([
           localStorage.retrieveInputArtifactById(
@@ -83,9 +88,6 @@ export async function inspectArtifact(
             artifact.project,
             artifact.search.id,
           ),
-          Promise.resolve(
-            `${localStorage.rootPath}/${artifact.project}/ids/${artifact.search.id}/input.json`,
-          ),
         ]),
     { debug: opts.debug },
   );
@@ -94,16 +96,21 @@ export async function inspectArtifact(
       "Unable to retrieve the artifact content, please ensure it exists locally. Run with debug mode for more info",
     );
   }
-  const [inputArtifact, outputArtifact, artifactPath] = artifactResult.value;
+  const [inputArtifact, outputArtifact] = artifactResult.value;
 
-  const fileStatResult = await toAsyncResult(fs.stat(artifactPath), {
-    debug: opts.debug,
-  });
+  const inputArtifactPath = `${localStorage.rootPath}/${artifact.project}/ids/${inputArtifact.id}/input.json`;
+  const outputArtifactPath = `${localStorage.rootPath}/${artifact.project}/ids/${inputArtifact.id}/output.json`;
+
+  const fileStatResult = await toAsyncResult(
+    Promise.all([fs.stat(inputArtifactPath), fs.stat(outputArtifactPath)]),
+    { debug: opts.debug },
+  );
   if (!fileStatResult.success) {
     throw new CliError(
-      "Unable to read the artifact file size, please ensure it exists locally. Run with debug mode for more info",
+      "Unable to read the artifact files size, please ensure they exist locally. Run with debug mode for more info",
     );
   }
+  const [inputStat, outputStat] = fileStatResult.value;
 
   const compilerSettings = deriveCompilerSettings(inputArtifact);
 
@@ -114,12 +121,10 @@ export async function inspectArtifact(
         ? "hardhat-v2"
         : "forge";
 
-  // REMIND ME: reword the size and the paths
   return {
     project: artifact.project,
     tag: artifact.search.type === "tag" ? artifact.search.tag : null,
     id: inputArtifact.id,
-    fileSize: fileStatResult.value.size,
     origin: {
       id: inputArtifact.origin.id,
       format: originFormat,
@@ -127,7 +132,16 @@ export async function inspectArtifact(
     compiler: compilerSettings,
     sourceFiles: Object.keys(inputArtifact.input.sources).sort(),
     contractsBySource: deriveContractsBySource(outputArtifact),
-    artifactPath,
+    artifacts: {
+      input: {
+        path: inputArtifactPath,
+        size: inputStat.size,
+      },
+      output: {
+        path: outputArtifactPath,
+        size: outputStat.size,
+      },
+    },
   };
 }
 
