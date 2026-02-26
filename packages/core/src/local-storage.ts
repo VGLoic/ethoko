@@ -1,8 +1,6 @@
 import fs from "fs/promises";
 import { Stream } from "stream";
 import {
-  EthokoContractArtifact,
-  EthokoContractArtifactSchema,
   EthokoInputArtifact,
   EthokoInputArtifactSchema,
   EthokoOutputArtifact,
@@ -10,7 +8,6 @@ import {
   TagManifest,
   TagManifestSchema,
 } from "./utils/artifacts-schemas/ethoko-v0";
-type CompilerOutput = EthokoOutputArtifact["output"];
 
 /**
  * Local storage implementation for storing artifacts on the local filesystem.
@@ -282,164 +279,4 @@ export class LocalStorage {
       .then(() => true)
       .catch(() => false);
   }
-
-  /**
-   * Creates per-contract artifacts for a given compilation output.
-   * @param project The project name.
-   * @param id The artifact ID.
-   * @param outputArtifact The output artifact.
-   */
-  public async createContractArtifacts(
-    project: string,
-    id: string,
-    outputArtifact: EthokoOutputArtifact,
-  ): Promise<void> {
-    const artifacts = buildContractArtifacts(outputArtifact.output);
-    for (const [contractKey, artifact] of artifacts) {
-      const contractPieces = contractKey.split(":");
-      const contractName = contractPieces.at(-1);
-      const contractPath = contractPieces.slice(0, -1).join(":");
-      if (!contractName || !contractPath) {
-        continue;
-      }
-      const contractDir = `${this.rootPath}/${project}/ids/${id}/contracts/${contractPath}`;
-      await fs.mkdir(contractDir, { recursive: true });
-      await fs.writeFile(
-        `${contractDir}/${contractName}.json`,
-        JSON.stringify(artifact, null, 2),
-      );
-    }
-  }
-
-  /**
-   * Retrieves a per-contract artifact for a given compilation output.
-   * @param project The project name.
-   * @param id The artifact ID.
-   * @param contractKey The contract key in format "path/to/Contract.sol:Contract".
-   * @returns The contract artifact.
-   */
-  public async retrieveContractArtifact(
-    project: string,
-    id: string,
-    contractKey: string,
-  ): Promise<EthokoContractArtifact> {
-    const contractPieces = contractKey.split(":");
-    const contractName = contractPieces.at(-1);
-    const contractPath = contractPieces.slice(0, -1).join(":");
-    if (!contractName || !contractPath) {
-      throw new Error(
-        `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
-      );
-    }
-    const artifactPath = `${this.rootPath}/${project}/ids/${id}/contracts/${contractPath}/${contractName}.json`;
-    const artifactContent = await fs.readFile(artifactPath, "utf-8");
-    const rawArtifact = JSON.parse(artifactContent);
-    return EthokoContractArtifactSchema.parse(rawArtifact);
-  }
-
-  /**
-   * Lists all contract keys for a given compilation output.
-   * @param project The project name.
-   * @param id The artifact ID.
-   * @returns The list of contract keys.
-   */
-  public async listContractArtifacts(
-    project: string,
-    id: string,
-  ): Promise<string[]> {
-    const contractsDir = `${this.rootPath}/${project}/ids/${id}/contracts`;
-    const contractKeys: string[] = [];
-    const exists = await this.exists(contractsDir);
-    if (!exists) {
-      return contractKeys;
-    }
-
-    const walkDir = async (dir: string, basePath = ""): Promise<void> => {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = `${dir}/${entry.name}`;
-        const relativePath = basePath
-          ? `${basePath}/${entry.name}`
-          : entry.name;
-        if (entry.isDirectory()) {
-          await walkDir(fullPath, relativePath);
-        } else if (entry.isFile() && entry.name.endsWith(".json")) {
-          const contractName = entry.name.replace(".json", "");
-          const contractPath = basePath;
-          contractKeys.push(`${contractPath}:${contractName}`);
-        }
-      }
-    };
-
-    await walkDir(contractsDir);
-    return contractKeys;
-  }
-}
-
-function buildContractArtifacts(
-  output: CompilerOutput,
-): Map<string, EthokoContractArtifact> {
-  const artifacts = new Map<string, EthokoContractArtifact>();
-  for (const contractPath in output.contracts) {
-    const contracts = output.contracts[contractPath];
-    if (!contracts) {
-      continue;
-    }
-    for (const contractName in contracts) {
-      const contract = contracts[contractName];
-      if (!contract) {
-        continue;
-      }
-      const contractKey = `${contractPath}:${contractName}`;
-      artifacts.set(contractKey, {
-        _format: "ethoko-contract-artifact-v0",
-        abi: contract.abi,
-        metadata: contract.metadata || "",
-        bytecode: prefixWith0x(contract.evm.bytecode.object),
-        deployedBytecode: contract.evm.deployedBytecode?.object
-          ? prefixWith0x(contract.evm.deployedBytecode.object)
-          : "0x",
-        linkReferences: contract.evm.bytecode.linkReferences,
-        deployedLinkReferences: contract.evm.deployedBytecode
-          ? contract.evm.deployedBytecode.linkReferences
-          : {},
-        contractName,
-        sourceName: contractPath,
-        userdoc: contract.userdoc,
-        devdoc: contract.devdoc,
-        storageLayout: contract.storageLayout,
-        evm: {
-          assembly: contract.evm.assembly,
-          bytecode: {
-            functionDebugData: contract.evm.bytecode.functionDebugData,
-            object: contract.evm.bytecode.object,
-            opcodes: contract.evm.bytecode.opcodes,
-            sourceMap: contract.evm.bytecode.sourceMap,
-            generatedSources: contract.evm.bytecode.generatedSources,
-            linkReferences: contract.evm.bytecode.linkReferences,
-          },
-          deployedBytecode: contract.evm.deployedBytecode
-            ? {
-                functionDebugData:
-                  contract.evm.deployedBytecode.functionDebugData,
-                object: contract.evm.deployedBytecode.object,
-                opcodes: contract.evm.deployedBytecode.opcodes,
-                sourceMap: contract.evm.deployedBytecode.sourceMap,
-                generatedSources:
-                  contract.evm.deployedBytecode.generatedSources,
-                linkReferences: contract.evm.deployedBytecode.linkReferences,
-              }
-            : undefined,
-          gasEstimates: contract.evm.gasEstimates,
-          methodIdentifiers: contract.evm.methodIdentifiers,
-        },
-      });
-    }
-  }
-  return artifacts;
-}
-
-function prefixWith0x(s: string): `0x${string}` {
-  if (s.startsWith("0x")) return s as `0x${string}`;
-  return `0x${s}`;
 }

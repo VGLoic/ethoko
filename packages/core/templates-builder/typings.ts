@@ -140,7 +140,7 @@ async function getArtifact(
   project: string,
   tag: string,
   contractKey: string,
-): Promise<ContractArtifact> {
+): Promise<EthokoContractArtifact> {
   const buildInfoResult = await toAsyncResult(
     getCompilationArtifact(project, tag),
   );
@@ -160,7 +160,7 @@ function getArtifactSync(
   project: string,
   tag: string,
   contractKey: string,
-): ContractArtifact {
+): EthokoContractArtifact {
   const buildInfo = getCompilationArtifactSync(project, tag);
 
   return buildInfoToContractArtifact(project, tag, contractKey, buildInfo);
@@ -171,7 +171,7 @@ function buildInfoToContractArtifact(
   tag: string,
   contractKey: string,
   buildInfo: EthokoBuildInfo,
-): ContractArtifact {
+): EthokoContractArtifact {
   const contractPieces = contractKey.split(":");
   const contractName = contractPieces.at(-1);
   if (!contractName) {
@@ -205,6 +205,7 @@ function buildInfoToContractArtifact(
   }
   return {
     _format: "ethoko-contract-artifact-v0",
+    id: buildInfo.id,
     abi: contractArtifact.abi,
     metadata: contractArtifact.metadata || "",
     bytecode: prefixWith0x(contractArtifact.evm.bytecode.object),
@@ -465,11 +466,15 @@ interface LinkReferences {
  *
  * It is meant to integrate in a smoother way with external dependencies.
  */
-export interface ContractArtifact {
+export interface EthokoContractArtifact {
   /**
    * Format, hardcoded to `ethoko-contract-artifact-v0` for now
    */
   readonly _format: "ethoko-contract-artifact-v0";
+  /**
+   * Ethoko artifact ID
+   */
+  readonly id: string;
   /**
    * ABI of the artifact
    */

@@ -192,24 +192,6 @@ export async function pull(
         throw new PullTagError(tag);
       }
 
-      const outputArtifactResult = await toAsyncResult(
-        localStorage.retrieveOutputArtifactById(
-          project,
-          downloadResult.value.id,
-        ),
-        { debug: opts.debug },
-      );
-      if (outputArtifactResult.success) {
-        await toAsyncResult(
-          localStorage.createContractArtifacts(
-            project,
-            downloadResult.value.id,
-            outputArtifactResult.value,
-          ),
-          { debug: opts.debug },
-        );
-      }
-
       return { tag, id: downloadResult.value.id };
     });
 
@@ -260,21 +242,6 @@ export async function pull(
       );
       if (!createResult.success) {
         throw new PullIdError(id);
-      }
-
-      const outputArtifactResult = await toAsyncResult(
-        localStorage.retrieveOutputArtifactById(project, id),
-        { debug: opts.debug },
-      );
-      if (outputArtifactResult.success) {
-        await toAsyncResult(
-          localStorage.createContractArtifacts(
-            project,
-            id,
-            outputArtifactResult.value,
-          ),
-          { debug: opts.debug },
-        );
       }
 
       return { id };

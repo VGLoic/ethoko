@@ -81,10 +81,11 @@ const ContractBytecodeSchema = z.object({
 });
 
 /**
- * Contract artifact schema for Ethoko storage
+ * Contract artifact schema for export
  */
 export const EthokoContractArtifactSchema = z.object({
   _format: z.literal("ethoko-contract-artifact-v0"),
+  id: z.string(),
   abi: z.array(z.unknown()),
   metadata: z.string(),
   bytecode: HexPrefixedStringSchema,
