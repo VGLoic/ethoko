@@ -13,7 +13,8 @@
     "deploy-contracts": "hardhat deploy --no-compile",
     "hardhat": "hardhat",
     "check-types": "pnpm run ethoko-typings && tsc --noEmit",
-    "test:e2e:apps": "vitest run e2e-test"
+    "test:e2e:apps": "vitest run e2e-test",
+    "reset-example": "./ethoko-scripts/reset-example.sh"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15.16",

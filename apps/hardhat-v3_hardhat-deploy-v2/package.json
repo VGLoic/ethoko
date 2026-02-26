@@ -11,7 +11,8 @@
     "format": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
     "check-types": "tsc --noEmit",
     "compile": "pnpm format-contracts && hardhat compile --build-profile production",
-    "test:e2e:apps": "vitest run e2e-test"
+    "test:e2e:apps": "vitest run e2e-test",
+    "reset-example": "./ethoko-scripts/reset-example.sh"
   },
   "devDependencies": {
     "@ethoko/eslint-config": "workspace:*",

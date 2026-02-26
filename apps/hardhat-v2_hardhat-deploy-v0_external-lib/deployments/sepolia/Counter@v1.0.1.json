@@ -1,48 +1,48 @@
 {
-  "address": "0x54D22fb299AFC7DeF4a6d206f089593D2b7A19c6",
+  "address": "0xfFAb909cCBaA5f749529FD37e69aB02Df3B8055f",
   "abi": [
     {
-      "inputs": [],
+      "type": "function",
       "name": "counter",
+      "inputs": [],
       "outputs": [
         {
-          "internalType": "uint256",
           "name": "",
-          "type": "uint256"
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
-      "stateMutability": "view",
-      "type": "function"
+      "stateMutability": "view"
     },
     {
-      "inputs": [],
+      "type": "function",
       "name": "increment",
+      "inputs": [],
       "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+      "stateMutability": "nonpayable"
     }
   ],
-  "transactionHash": "0xe7869fe3ec681687acc5080bbc150705b006f4451ef7a48454c7d40e989f0781",
+  "transactionHash": "0x5d44d81ab7ba7e7dd26c9f1112bfb845f8172164e2e2a48e8f9dfaf5ba148997",
   "receipt": {
     "to": null,
     "from": "0x25371B936fD45e67F00dfEa1cd6A3e77105DD0FA",
-    "contractAddress": "0x54D22fb299AFC7DeF4a6d206f089593D2b7A19c6",
-    "transactionIndex": 73,
+    "contractAddress": "0xfFAb909cCBaA5f749529FD37e69aB02Df3B8055f",
+    "transactionIndex": 95,
     "gasUsed": "138169",
     "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "blockHash": "0xd18ce7dd78e77b76002984efd678a31e87ae00d5c23cbccefb97a6310de15560",
-    "transactionHash": "0xe7869fe3ec681687acc5080bbc150705b006f4451ef7a48454c7d40e989f0781",
+    "blockHash": "0xba0e37a857e5892a5358b6aa450a74e56856361248b390e7c35633864d88288d",
+    "transactionHash": "0x5d44d81ab7ba7e7dd26c9f1112bfb845f8172164e2e2a48e8f9dfaf5ba148997",
     "logs": [],
-    "blockNumber": 10169753,
-    "cumulativeGasUsed": "5963338",
+    "blockNumber": 10341710,
+    "cumulativeGasUsed": "11330367",
     "status": 1,
     "byzantium": true
   },
   "args": [],
   "numDeployments": 1,
   "metadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"counter\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/Counter.sol\":\"Counter\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"src/Counter.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.28;\\n\\nimport {IncrementOracle} from \\\"./IncrementOracle.sol\\\";\\n\\ncontract Counter {\\n    uint256 public counter;\\n\\n    function increment() public {\\n        uint256 incrementAmount = IncrementOracle.getIncrement();\\n        counter += incrementAmount * 1;\\n    }\\n}\\n\",\"keccak256\":\"0x4ac3431d1ebbbcf884579d19b331345950b2594a0db7a1706090ce88de415f3e\",\"license\":\"MIT\"},\"src/IncrementOracle.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.28;\\n\\nlibrary IncrementOracle {\\n    function getIncrement() external pure returns (uint256) {\\n        return 1;\\n    }\\n}\\n\",\"keccak256\":\"0xfb993c34b4aa26dd6fff8e874d605972b463afd90748f4e6f62cf88f4eacae65\",\"license\":\"MIT\"}},\"version\":1}",
-  "bytecode": "6080604052348015600f57600080fd5b506101898061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806361bc221a1461003b578063d09de08a14610056575b600080fd5b61004460005481565b60405190815260200160405180910390f35b61005e610060565b005b6000732fA37532d2Ab063E7a122aaD089dD58bb6607195636ac4691f6040518163ffffffff1660e01b8152600401602060405180830381865af41580156100ab573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906100cf91906100f4565b90506100dc816001610123565b6000808282546100ec9190610140565b909155505050565b60006020828403121561010657600080fd5b5051919050565b634e487b7160e01b600052601160045260246000fd5b808202811582820484141761013a5761013a61010d565b92915050565b8082018082111561013a5761013a61010d56fea26469706673582212208dfff9d841089ea9978d0a4aef4f6b1b76bfb7c643399cf8a0bf641b0495324864736f6c634300081c0033",
+  "bytecode": "6080604052348015600f57600080fd5b506101898061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806361bc221a1461003b578063d09de08a14610056575b600080fd5b61004460005481565b60405190815260200160405180910390f35b61005e610060565b005b6000734320b35682464704b6c7dFc8F46f8Ea22d1501C8636ac4691f6040518163ffffffff1660e01b8152600401602060405180830381865af41580156100ab573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906100cf91906100f4565b90506100dc816001610123565b6000808282546100ec9190610140565b909155505050565b60006020828403121561010657600080fd5b5051919050565b634e487b7160e01b600052601160045260246000fd5b808202811582820484141761013a5761013a61010d565b92915050565b8082018082111561013a5761013a61010d56fea26469706673582212208dfff9d841089ea9978d0a4aef4f6b1b76bfb7c643399cf8a0bf641b0495324864736f6c634300081c0033",
   "libraries": {
-    "src/IncrementOracle.sol:IncrementOracle": "0x2fA37532d2Ab063E7a122aaD089dD58bb6607195"
+    "src/IncrementOracle.sol:IncrementOracle": "0x4320b35682464704b6c7dFc8F46f8Ea22d1501C8"
   }
 }
