@@ -32,7 +32,7 @@ const OriginSchema = z.discriminatedUnion("format", [
  */
 export const EthokoInputArtifactSchema = z.object({
   id: z.string(),
-  __format: z.literal("ethoko-input-v0"),
+  _format: z.literal("ethoko-input-v0"),
   origin: OriginSchema,
   solcLongVersion: z.string(),
   input: SolcJsonInputSchema,
@@ -43,7 +43,7 @@ export const EthokoInputArtifactSchema = z.object({
  */
 export const EthokoOutputArtifactSchema = z.object({
   id: z.string(),
-  __format: z.literal("ethoko-output-v0"),
+  _format: z.literal("ethoko-output-v0"),
   output: SolcJsonOutputSchema,
 });
 
