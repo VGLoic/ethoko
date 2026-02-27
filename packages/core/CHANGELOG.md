@@ -1,5 +1,13 @@
 # @ethoko/core
 
+## 0.8.0
+
+### Minor Changes
+
+- 7ea6b60: Update generated typings with ID and format
+- f4c21bf: Fix format field
+- 190301d: Rework export command to export full contract artifact instead of only ABI
+
 ## 0.7.0
 
 ### Minor Changes

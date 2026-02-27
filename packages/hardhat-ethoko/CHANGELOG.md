@@ -1,5 +1,14 @@
 # hardhat-ethoko
 
+## 0.4.4
+
+### Patch Changes
+
+- Updated dependencies [7ea6b60]
+- Updated dependencies [f4c21bf]
+- Updated dependencies [190301d]
+  - @ethoko/core@0.8.0
+
 ## 0.4.3
 
 ### Patch Changes
