@@ -54,7 +54,13 @@ Pull the project artifacts from Ethoko locally
 
 <br />
 
-In Typescript environment, generate typings for the pulled artifacts
+Export the artifact for a specific contract and tag for local use, e.g. ABI retrieving, deployment, etc...
+
+<picture>
+  <img alt="Export example" src="images/export-example.png">
+</picture>
+
+Alternatively, if in a Typescript environment, generate typings for the pulled artifacts
 
 <picture>
   <img alt="Typings example" src="images/typings-example.png">
@@ -66,21 +72,38 @@ Write scripts in a fully typed and transparent manner
 
 ```ts
 ...
-import { project } from "../.ethoko-typings";
 import { deploy } from "my-favorite-deploy-lib";
 
-async function deployFoo() {
+// ~~~~~~~~~~ Using the exported artifact directly ~~~~~~~~~~
+import CounterArtifact from "../my-releases/forge-counter/2026-02-04/counter.json";
+
+async function deployCounterFromArtifact() {
+    // Deploy `Counter` using the static artifact
+    // `deploy` is an arbitrary util, "À la Hardhat Deploy"
+    await deploy("Counter@2026-02-04", {
+      contract: {
+        abi: CounterArtifact.abi,
+        bytecode: CounterArtifact.bytecode,
+        metadata: CounterArtifact.metadata,
+      },
+    })
+}
+
+// ~~~~~~~~~~ Or using the generated typings ~~~~~~~~~~
+import { project } from "../.ethoko-typings";
+
+async function deployCounter() {
     // Get project utilities for the target tag
     const projectUtils = project("forge-counter").tag("2026-02-04");
 
-    // Get `Foo` static artifact for the target release
+    // Get `Counter` static artifact for the target release
     const myContractArtifact = await projectUtils.getContractArtifact(
-      "src/Foo.sol:Foo",
+      "src/Counter.sol:Counter",
     );
 
-    // Deploy `Foo` using the static artifact
+    // Deploy `Counter` using the static artifact
     // `deploy` is an arbitrary util, "À la Hardhat Deploy"
-    await deploy("Foo@2026-02-04", {
+    await deploy("Counter@2026-02-04", {
       contract: {
         abi: myContractArtifact.abi,
         bytecode: myContractArtifact.bytecode,
@@ -89,13 +112,6 @@ async function deployFoo() {
     })
 }
 ```
-
-Export the ABI of a specific contract for a given tag
-
-<picture>
-  <img alt="Export example" src="images/export-example.png">
-</picture>
-
 
 The original compilation artifacts are never lost and always available for restoration
 
