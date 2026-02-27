@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import { describe, expect } from "vitest";
-import { pull, push, exportContractAbi } from "@/cli-client/index";
+import { pull, push, exportContractArtifact } from "@/cli-client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -14,7 +14,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     storageProviderTest.scoped({ storageProviderFactory });
 
     storageProviderTest(
-      "export contract ABI by tag",
+      "export contract artifact by tag",
       async ({ storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
@@ -49,7 +49,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const exportFixture = artifactFixture.exportExpectedResult;
 
-        const exportResult = await exportContractAbi(
+        const exportResult = await exportContractArtifact(
           { project, search: { type: "tag", tag } },
           exportFixture.name,
           localStorage,
@@ -62,12 +62,20 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.project).toBe(project);
         expect(exportResult.tag).toBe(tag);
         expect(exportResult.id).toBe(artifactId);
-        expect(exportResult.contract.name).toBe(exportFixture.name);
-        expect(exportResult.contract.path).toBe(exportFixture.path);
+        expect(exportResult.contractName).toBe(exportFixture.name);
+        expect(exportResult.sourceName).toBe(exportFixture.path);
+        expect(exportResult._format).toBe("ethoko-contract-artifact-v0");
+        expect(exportResult.project).toBe(project);
+        expect(exportResult.bytecode.startsWith("0x")).toBe(true);
+        expect(exportResult.deployedBytecode.startsWith("0x")).toBe(true);
+        expect(exportResult.metadata).toEqual(expect.any(String));
+        expect(exportResult.linkReferences).toEqual(expect.any(Object));
+        expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
+        expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = await fs
           .readFile(exportFixture.abiPath, "utf-8")
           .then(JSON.parse);
-        expect(exportResult.contract.abi).toEqual(expectedAbi);
+        expect(exportResult.abi).toEqual(expectedAbi);
       },
     );
 
@@ -79,7 +87,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await localStorage.ensureProjectSetup(project);
 
         await expect(
-          exportContractAbi(
+          exportContractArtifact(
             { project, search: { type: "tag", tag: "non-existent-tag" } },
             "Counter",
             localStorage,
@@ -93,7 +101,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     );
 
     storageProviderTest(
-      "export contract ABI by ID",
+      "export contract artifact by ID",
       async ({ storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const artifactFixture =
@@ -127,7 +135,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const exportFixture = artifactFixture.exportExpectedResult;
 
-        const exportResult = await exportContractAbi(
+        const exportResult = await exportContractArtifact(
           { project, search: { type: "id", id: artifactId } },
           exportFixture.name,
           localStorage,
@@ -140,12 +148,20 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.project).toBe(project);
         expect(exportResult.tag).toBe(null);
         expect(exportResult.id).toBe(artifactId);
-        expect(exportResult.contract.name).toBe(exportFixture.name);
-        expect(exportResult.contract.path).toBe(exportFixture.path);
+        expect(exportResult.contractName).toBe(exportFixture.name);
+        expect(exportResult.sourceName).toBe(exportFixture.path);
+        expect(exportResult._format).toBe("ethoko-contract-artifact-v0");
+        expect(exportResult.project).toBe(project);
+        expect(exportResult.bytecode.startsWith("0x")).toBe(true);
+        expect(exportResult.deployedBytecode.startsWith("0x")).toBe(true);
+        expect(exportResult.metadata).toEqual(expect.any(String));
+        expect(exportResult.linkReferences).toEqual(expect.any(Object));
+        expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
+        expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = await fs
           .readFile(exportFixture.abiPath, "utf-8")
           .then(JSON.parse);
-        expect(exportResult.contract.abi).toEqual(expectedAbi);
+        expect(exportResult.abi).toEqual(expectedAbi);
       },
     );
 
@@ -184,7 +200,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         );
 
         await expect(
-          exportContractAbi(
+          exportContractArtifact(
             { project, search: { type: "id", id: artifactId } },
             "NonExistentContract",
             localStorage,

@@ -206,6 +206,7 @@ function buildInfoToContractArtifact(
   return {
     _format: "ethoko-contract-artifact-v0",
     id: buildInfo.id,
+    project,
     abi: contractArtifact.abi,
     metadata: contractArtifact.metadata || "",
     bytecode: prefixWith0x(contractArtifact.evm.bytecode.object),
@@ -475,6 +476,10 @@ export interface EthokoContractArtifact {
    * Ethoko artifact ID
    */
   readonly id: string;
+  /**
+   * Ethoko project name
+   */
+  readonly project: string;
   /**
    * ABI of the artifact
    */

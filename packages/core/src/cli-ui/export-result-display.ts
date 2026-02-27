@@ -1,5 +1,7 @@
-import type { ExportAbiResult } from "../cli-client/export-abi";
+import type { ExportContractArtifactResult } from "../cli-client/export-contract-artifact";
 
-export function displayExportResult(result: ExportAbiResult): void {
-  console.log(JSON.stringify(result.contract.abi, null, 2));
+export function displayExportResult(
+  result: ExportContractArtifactResult,
+): void {
+  console.log(JSON.stringify(result, null, 2));
 }

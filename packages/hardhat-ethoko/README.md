@@ -166,20 +166,20 @@ npx hardhat ethoko inspect --tag 2026-02-02 --json
 
 ### Export
 
-Export a contract ABI from a locally pulled artifact.
+Export a contract artifact from a locally pulled artifact.
 
 ```bash
 npx hardhat ethoko export --tag 2026-02-02 --contract Counter
 npx hardhat ethoko export --id b5e41181986a --contract contracts/Counter.sol:Counter
 ```
 
-Write the ABI to a file (overwrites if it exists):
+Write the contract artifact to a file (overwrites if it exists):
 
 ```bash
-npx hardhat ethoko export --tag 2026-02-02 --contract Counter --output ./Counter.abi.json
+npx hardhat ethoko export --tag 2026-02-02 --contract Counter --output ./Counter.json
 ```
 
-Pipe the ABI to another tool:
+Pipe the artifact to another tool:
 
 ```bash
 npx hardhat ethoko export --tag 2026-02-02 --contract Counter | jq
@@ -188,7 +188,7 @@ npx hardhat ethoko export --tag 2026-02-02 --contract Counter | jq
 Export the ABI as a TypeScript `const`:
 
 ```bash
-echo "export const MY_ABI = $(npx hardhat ethoko export --tag 2026-02-02 --contract Counter) as const;" > ./my-abi.ts
+echo "export const MY_ABI = $(npx hardhat ethoko export --tag 2026-02-02 --contract Counter | jq .abi) as const;" > ./my-abi.ts
 ```
 
 ### Restore

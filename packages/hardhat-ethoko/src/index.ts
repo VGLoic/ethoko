@@ -155,7 +155,10 @@ const hardhatEthoko: HardhatPlugin = {
       // @ts-ignore - Dynamic import type inference limitation with tsup
       .setAction(() => import("./tasks/inspect.js"))
       .build(),
-    task(["ethoko", "export"], "Export contract ABI from a pulled artifact.")
+    task(
+      ["ethoko", "export"],
+      "Export contract artifact from a pulled artifact.",
+    )
       .addOption({
         name: "contract",
         description:

@@ -9,5 +9,8 @@ export {
   type ListArtifactsResult,
   type ArtifactItem,
 } from "./list-pulled-artifacts";
-export { exportContractAbi, type ExportAbiResult } from "./export-abi";
+export {
+  exportContractArtifact,
+  type ExportContractArtifactResult,
+} from "./export-contract-artifact";
 export { restore, type RestoreResult } from "./restore";

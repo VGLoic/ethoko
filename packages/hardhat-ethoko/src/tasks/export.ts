@@ -4,8 +4,11 @@ import { styleText } from "node:util";
 import { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import { z } from "zod";
 import { boxHeader, error as cliError, LOG_COLORS } from "@ethoko/core/cli-ui";
-import { exportContractAbi, CliError } from "@ethoko/core/cli-client";
-import type { ExportAbiResult } from "@ethoko/core/cli-client";
+import {
+  exportContractArtifact,
+  type ExportContractArtifactResult,
+  CliError,
+} from "@ethoko/core/cli-client";
 import { LocalStorage } from "@ethoko/core/local-storage";
 
 interface ExportTaskArguments {
@@ -68,14 +71,14 @@ export default async function (
 
   if (optsParsingResult.data.output) {
     boxHeader(
-      `Exporting ABI for "${optsParsingResult.data.contract}" from "${optsParsingResult.data.project}:${search.type === "tag" ? search.tag : search.id}"`,
+      `Exporting contract artifact for "${optsParsingResult.data.contract}" from "${optsParsingResult.data.project}:${search.type === "tag" ? search.tag : search.id}"`,
       optsParsingResult.data.silent,
     );
   }
 
   const localStorage = new LocalStorage(ethokoConfig.pulledArtifactsPath);
 
-  await exportContractAbi(
+  await exportContractArtifact(
     { project: optsParsingResult.data.project, search },
     optsParsingResult.data.contract,
     localStorage,
@@ -84,9 +87,9 @@ export default async function (
       silent: optsParsingResult.data.silent,
     },
   )
-    .then(async (result: ExportAbiResult) => {
+    .then(async (result: ExportContractArtifactResult) => {
       if (optsParsingResult.data.output) {
-        const abiJson = JSON.stringify(result.contract.abi, null, 2);
+        const artifactJson = JSON.stringify(result, null, 2);
 
         try {
           await fs.access(optsParsingResult.data.output);
@@ -99,27 +102,32 @@ export default async function (
             );
           }
         } catch {
-          // File does not exist.
+          // File does not exist. We create the necessary directories if they don't exist, and then create the file.
+          const dir = optsParsingResult.data.output
+            .split("/")
+            .slice(0, -1)
+            .join("/");
+          await fs.mkdir(dir, { recursive: true });
         }
 
-        await fs.writeFile(optsParsingResult.data.output, `${abiJson}\n`);
+        await fs.writeFile(optsParsingResult.data.output, `${artifactJson}\n`);
 
         if (!optsParsingResult.data.silent) {
-          const contractIdentifier = `${result.contract.path}:${result.contract.name}`;
+          const contractIdentifier = `${result.sourceName}:${result.contractName}`;
           const artifactLabel = result.tag
             ? `${result.project}:${result.tag}`
             : `${result.project}:${result.id}`;
           console.error(
             styleText(
               LOG_COLORS.success,
-              `\n✔ Exported ABI for ${contractIdentifier} from ${artifactLabel} to ${optsParsingResult.data.output}`,
+              `\n✔ Exported contract artifact for ${contractIdentifier} from ${artifactLabel} to ${optsParsingResult.data.output}`,
             ),
           );
         }
         return;
       }
 
-      console.log(JSON.stringify(result.contract.abi, null, 2));
+      console.log(JSON.stringify(result, null, 2));
     })
     .catch((err: unknown) => {
       if (err instanceof CliError) {
