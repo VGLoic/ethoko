@@ -60,6 +60,8 @@ Export the artifact for a specific contract and tag for local use, e.g. ABI retr
   <img alt="Export example" src="images/export-example.png">
 </picture>
 
+<br />
+
 Alternatively, if in a Typescript environment, generate typings for the pulled artifacts
 
 <picture>
