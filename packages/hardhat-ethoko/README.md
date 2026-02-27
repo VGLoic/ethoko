@@ -188,7 +188,7 @@ npx hardhat ethoko export --tag 2026-02-02 --contract Counter | jq
 Export the ABI as a TypeScript `const`:
 
 ```bash
-echo "export const MY_ABI = $(npx hardhat ethoko export --tag 2026-02-02 --contract Counter | jq -c .abi) as const;" > ./my-abi.ts
+echo "export const MY_ABI = $(npx hardhat ethoko export --tag 2026-02-02 --contract Counter | jq .abi) as const;" > ./my-abi.ts
 ```
 
 ### Restore
