@@ -47,7 +47,7 @@ export async function hardhatV3ArtifactsToEthokoArtifact(
   const firstInputArtifact = await readInputArtifact(firstPair.input);
   const firstOutputArtifact = await readOutputArtifact(firstPair.output);
 
-  const solcVersion = firstInputArtifact.solcLongVersion;
+  const solcVersion = firstInputArtifact.solcVersion;
   const solcLongVersion = firstInputArtifact.solcLongVersion;
   const userSourceNameMap = firstInputArtifact.userSourceNameMap;
   const originPairs: Extract<
