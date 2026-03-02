@@ -58,9 +58,9 @@ importers:
       hardhat-ethoko:
         specifier: workspace:*
         version: link:../../packages/hardhat-ethoko
-      prettier-plugin-solidity:
-        specifier: ^2.2.1
-        version: 2.2.1(prettier@3.7.4)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ~5.8.0
         version: 5.8.3

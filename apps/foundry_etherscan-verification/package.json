@@ -13,7 +13,8 @@
     "compile": "forge build --skip test --skip script --force",
     "check-types": "pnpm run ethoko-typings && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
-    "reset-example": "./ethoko-scripts/reset-example.sh"
+    "reset-example": "./ethoko-scripts/reset-example.sh",
+    "verify-2026-02-02": "tsx ./scripts/verify-2026-02-02.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.7",
@@ -27,6 +28,7 @@
     "eslint": "^9.39.1",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.1.7",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.0",
     "vitest": "^4.0.17",
     "viem": "^2.43.0"
