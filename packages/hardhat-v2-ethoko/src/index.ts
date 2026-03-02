@@ -383,6 +383,31 @@ The typings will be generated in the configured typings path.
         silent: parsingResult.data.silent,
       },
     )
+      .then(async () => {
+        // We path the `import { ... } from "./summary-exports.js" to `import { ... } from "./summary-exports"` in the generated typings files to avoid issues with different module resolutions (commonjs vs es modules) in different projects.
+        // This is a bit of a hack but it works and avoids having to configure the module resolution in each project.
+        try {
+          const indexFileContent = await fs.readFile(
+            `${ethokoConfig.typingsPath}/index.ts`,
+            "utf-8",
+          );
+          const updatedIndexFileContent = indexFileContent.replace(
+            /from "\.\/summary-exports\.js"/g,
+            'from "./summary-exports"',
+          );
+          await fs.writeFile(
+            `${ethokoConfig.typingsPath}/index.ts`,
+            updatedIndexFileContent,
+          );
+        } catch (err) {
+          if (ethokoConfig.debug || parsingResult.data.debug) {
+            console.error(err);
+          }
+          throw new CliError(
+            "An error occurred while updating the generated index.ts file, please check the error details and try again",
+          );
+        }
+      })
       .then(() => {
         if (!parsingResult.data.silent) {
           console.error(
