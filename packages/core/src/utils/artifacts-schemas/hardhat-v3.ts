@@ -26,12 +26,15 @@ export const HardhatV3CompilerOutputPieceSchema = z.object({
 // This is a smaller schema used for format inference
 export const FormatInferenceHardhatV3CompilerInputPieceSchema = z.object({
   _format: z.literal(HARDHAT_V3_COMPILER_INPUT_FORMAT),
+  solcLongVersion: z.string(),
+  id: z.string(),
   input: z.any(),
 });
 
 // This is a smaller schema used for format inference
 export const FormatInferenceHardhatV3CompilerOutputPieceSchema = z.object({
   _format: z.literal(HARDHAT_V3_COMPILER_OUTPUT_FORMAT),
+  id: z.string(),
   output: z.any(),
 });
 

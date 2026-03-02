@@ -8,7 +8,7 @@ Deployments are managed using [Hardhat Ignition](https://hardhat.org/docs/guides
 
 ### Content
 
-In this example, we implement a a simple `Counter` contract, see [Counter.sol](./contracts/Counter.sol).
+In this example, we implement a a simple `Counter` contract, see [Counter.sol](./contracts/Counter.sol) linked to another contract `Oracle` in [Oracle.sol](./contracts/Oracle.sol) and relying on an external library `ExternalMath` in [ExternalMath.sol](./contracts/ExternalMath.sol).
 
 ### Development phase
 
@@ -44,7 +44,7 @@ Then, generates the typings in order to write a type-safe deployment script:
 npx hardhat ethoko typings
 ```
 
-Finally, the deployer can create an Hardhat Ignition module, e.g. [counter-2026-02-02.ts](./ignition/modules/counter-2026-02-02.ts), that will retrieve the compilation artifacts from `Ethoko` and deploy the contract accordingly.
+Finally, the deployer can create an Hardhat Ignition module, e.g. [release-2026-02-02.ts](./ignition/modules/release-2026-02-02.ts), that will retrieve the compilation artifacts from `Ethoko` and deploy the contracts accordingly.
 
 ```ts
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
@@ -54,26 +54,40 @@ const TARGET_RELEASE_TAG = "2026-02-02";
 // Hardhat Ignition likes alphanumeric and underscores
 const MODULE_SUFFIX = TARGET_RELEASE_TAG.replaceAll("-", "_");
 
-export default buildModule(`CounterModule_${MODULE_SUFFIX}`, (m) => {
-  const projectUtils = project("ignited-counter");
+export default buildModule(`release_${MODULE_SUFFIX}`, (m) => {
+  const projectUtils = project("verified-counter");
+
+  const oracleArtifact = projectUtils
+    .tag(TARGET_RELEASE_TAG)
+    // Hardhat Ignition module does not support promises => we use the `sync` variant of artifact retrieval
+    .getContractArtifactSync("project/contracts/Oracle.sol:Oracle");
+
+  const oracle = m.contract("Oracle", oracleArtifact);
+
+  const externalMathLibArtifact = projectUtils
+    .tag(TARGET_RELEASE_TAG)
+    .getContractArtifactSync("project/contracts/ExternalMath.sol:ExternalMath");
+
+  const externalMathLib = m.library("ExternalMath", externalMathLibArtifact);
 
   const counterArtifact = projectUtils
     .tag(TARGET_RELEASE_TAG)
-    // Hardhat Ignition module does not support promises => we use the `sync` variant of artifact retrieval
     .getContractArtifactSync("project/contracts/Counter.sol:Counter");
 
-  const counter = m.contract("Counter", counterArtifact);
+  const counter = m.contract("Counter", counterArtifact, [oracle], {
+    libraries: {
+      ExternalMath: externalMathLib,
+    },
+  });
 
-  m.call(counter, "incBy", [5n]);
-
-  return { counter };
+  return { counter, oracle, externalMathLib };
 });
 ```
 
 The deployment script can be executed using the Hardhat Ignition command:
 
 ```bash
-npx hardhat ignition deploy ./ignition/modules/counter-2026-02-02.ts --network <network-name>
+npx hardhat ignition run --module release_2026_02_02 --network <target_network>
 ```
 
 No additional compilation step is needed since the deployment script directly uses the static artifacts from `Ethoko`.

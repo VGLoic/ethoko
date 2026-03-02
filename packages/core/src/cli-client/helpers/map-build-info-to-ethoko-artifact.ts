@@ -12,13 +12,9 @@ import {
 } from "@/utils/artifacts-schemas/forge-v1";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import type { BuildInfoPath } from "./look-for-build-info-json-file";
-import {
-  HardhatV3CompilerInputPieceSchema,
-  HardhatV3CompilerOutputPieceSchema,
-} from "@/utils/artifacts-schemas/hardhat-v3";
 import { forgeArtifactsToEthokoArtifact } from "./format-specific-mappers/forge-artifacts-to-ethoko-artifact";
-import { retrieveHardhatv3ContractArtifactsPaths } from "./format-specific-mappers/retrieve-hhv3-contract-artifacts-paths";
 import { retrieveForgeContractArtifactsPaths } from "./format-specific-mappers/retrieve-forge-contract-artifacts-paths";
+import { hardhatV3ArtifactsToEthokoArtifact } from "./format-specific-mappers/hardhat-v3-artifacts-to-ethoko-artifact";
 
 /**
  * Given a path to a candidate build info JSON file, try to output Ethoko artifacts.
@@ -44,98 +40,22 @@ export async function mapBuildInfoToEthokoArtifact(
   outputArtifact: EthokoOutputArtifact;
   originalContentPaths: string[];
 }> {
+  // Hardhat v3 is not using a single build info JSON file so we take it as a special case
   if (buildInfoPath.format === "hardhat-v3") {
-    // @dev readJsonFile throws a CliError so it is safe to use it directly without wrapping it in a try catch block
-    const inputJsonContent = await readJsonFile(
-      buildInfoPath.inputPath,
-      "build info input",
-      debug,
-    );
-
-    const inputParsingResult =
-      HardhatV3CompilerInputPieceSchema.safeParse(inputJsonContent);
-    if (!inputParsingResult.success) {
-      if (debug) {
-        console.error(
-          `Failed to parse the build info input file "${buildInfoPath.inputPath}" as a Hardhat V3 compiler input piece. Error: ${inputParsingResult.error}`,
-        );
-      }
-      throw new CliError(
-        `The provided build info input file "${buildInfoPath.inputPath}" seems to be in the Hardhat V3 compiler input piece format but we failed to validate it. Please provide a valid Hardhat V3 compiler input piece JSON file. Run with debug mode for more info.`,
-      );
-    }
-
-    // @dev readJsonFile throws a CliError so it is safe to use it directly without wrapping it in a try catch block
-    const outputJsonContent = await readJsonFile(
-      buildInfoPath.outputPath,
-      "build info output",
-      debug,
-    );
-
-    const outputParsingResult =
-      HardhatV3CompilerOutputPieceSchema.safeParse(outputJsonContent);
-    if (!outputParsingResult.success) {
-      if (debug) {
-        console.error(
-          `Failed to parse the build info output file "${buildInfoPath.outputPath}" as a Hardhat V3 compiler output piece. Error: ${outputParsingResult.error}`,
-        );
-      }
-      throw new CliError(
-        `The provided build info output file "${buildInfoPath.outputPath}" seems to be in the Hardhat V3 compiler output piece format but we failed to validate it. Please provide a valid Hardhat V3 compiler output piece JSON file. Run with debug mode for more info.`,
-      );
-    }
-
-    if (inputParsingResult.data.id !== outputParsingResult.data.id) {
-      if (debug) {
-        console.error(
-          `The input and output files provided do not seem to belong together, their ids are different. Input id: "${inputParsingResult.data.id}", output id: "${outputParsingResult.data.id}". Please provide matching input and output files. Run with debug mode for more info.`,
-        );
-      }
-      throw new CliError(
-        `The input and output files provided do not seem to belong together, their ids are different. Please provide matching input and output files. Run with debug mode for more info.`,
-      );
-    }
-
-    const contractArtifactsPathsResult = await toAsyncResult(
-      retrieveHardhatv3ContractArtifactsPaths(
-        buildInfoPath.inputPath,
-        inputParsingResult.data.id,
-        inputParsingResult.data.userSourceNameMap,
-        debug,
-      ),
+    const mappingResult = await toAsyncResult(
+      hardhatV3ArtifactsToEthokoArtifact(buildInfoPath.paths, debug),
       { debug },
     );
-    if (!contractArtifactsPathsResult.success) {
+    if (!mappingResult.success) {
       throw new CliError(
-        `Failed to identify the contract artifacts related to the compilation. Please provide valid compilation files or contact us. Run with debug mode for more info.`,
+        `Hardhat v3 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.`,
       );
     }
 
-    const id = deriveEthokoArtifactId(inputParsingResult.data.input);
-    const inputArtifact: EthokoInputArtifact = {
-      id,
-      origin: {
-        id: inputParsingResult.data.id,
-        format: inputParsingResult.data._format,
-        outputFormat: outputParsingResult.data._format,
-      },
-      _format: "ethoko-input-v0",
-      input: inputParsingResult.data.input,
-      solcLongVersion: inputParsingResult.data.solcLongVersion,
-    };
-    const outputArtifact: EthokoOutputArtifact = {
-      id,
-      _format: "ethoko-output-v0",
-      output: outputParsingResult.data.output,
-    };
     return {
-      inputArtifact,
-      outputArtifact,
-      originalContentPaths: [
-        buildInfoPath.inputPath,
-        buildInfoPath.outputPath,
-        ...contractArtifactsPathsResult.value,
-      ],
+      inputArtifact: mappingResult.value.inputArtifact,
+      outputArtifact: mappingResult.value.outputArtifact,
+      originalContentPaths: mappingResult.value.originalArtifactPaths,
     };
   }
 
@@ -147,7 +67,6 @@ export async function mapBuildInfoToEthokoArtifact(
   );
 
   // We validate the content and map it to the Ethoko artifact format based on the previously detected format
-
   if (buildInfoPath.format === "hardhat-v2") {
     const parsingResult = HardhatV2CompilerOutputSchema.safeParse(jsonContent);
     if (!parsingResult.success) {
@@ -165,6 +84,7 @@ export async function mapBuildInfoToEthokoArtifact(
       id,
       _format: "ethoko-input-v0",
       origin: {
+        type: "hardhat-v2",
         id: parsingResult.data.id,
         format: parsingResult.data._format,
       },
@@ -216,6 +136,7 @@ export async function mapBuildInfoToEthokoArtifact(
       id,
       _format: "ethoko-input-v0",
       origin: {
+        type: "forge-v1.6-build-info",
         id: parsingResult.data.id,
         format: parsingResult.data._format,
       },

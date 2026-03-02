@@ -8,10 +8,10 @@ import { BuildInfoPath } from "./helpers/look-for-build-info-json-file";
 
 function buildInfoPathToSuccessText(buildInfoPath: BuildInfoPath): string {
   if (buildInfoPath.format === "hardhat-v3") {
-    return `Hardhat V3 compilation artifact found at ${buildInfoPath.inputPath}`;
+    return `Hardhat v3 compilation artifact found`;
   }
   if (buildInfoPath.format === "hardhat-v2") {
-    return `Hardhat V2 compilation artifact input file found at ${buildInfoPath.path}`;
+    return `Hardhat v2 compilation artifact found`;
   }
   if (
     buildInfoPath.format === "forge-default" ||

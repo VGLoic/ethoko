@@ -290,10 +290,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         "Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER,
         [
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.buildInfoPath,
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.buildInfoPath.replace(
-            ".json",
-            ".output.json",
+          ...TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.buildInfoPaths.flatMap(
+            (buildInfoPath) => [
+              buildInfoPath,
+              buildInfoPath.replace(".json", ".output.json"),
+            ],
           ),
           path.resolve(
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.folderPath,
@@ -304,13 +305,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       [
         "Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER,
-        [TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER.buildInfoPath],
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER.buildInfoPaths,
       ],
       [
         "Forge default",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER,
         [
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER.buildInfoPath,
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER.buildInfoPaths[0],
           path.resolve(
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER.folderPath,
             "Counter.sol/Counter.json",
@@ -322,7 +323,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER,
         [
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER
-            .buildInfoPath,
+            .buildInfoPaths[0],
           path.resolve(
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER
               .folderPath,
@@ -387,10 +388,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         "Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER,
         [
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.buildInfoPath,
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.buildInfoPath.replace(
-            ".json",
-            ".output.json",
+          ...TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.buildInfoPaths.flatMap(
+            (buildInfoPath) => [
+              buildInfoPath,
+              buildInfoPath.replace(".json", ".output.json"),
+            ],
           ),
           path.resolve(
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER.folderPath,
@@ -401,13 +403,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       [
         "Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER,
-        [TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER.buildInfoPath],
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER.buildInfoPaths,
       ],
       [
         "Forge default",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER,
         [
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER.buildInfoPath,
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER.buildInfoPaths[0],
           path.resolve(
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER.folderPath,
             "Counter.sol/Counter.json",
@@ -419,7 +421,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER,
         [
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER
-            .buildInfoPath,
+            .buildInfoPaths[0],
           path.resolve(
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER
               .folderPath,

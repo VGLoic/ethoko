@@ -84,13 +84,29 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           project,
           artifactId,
         );
-        const originalContent = await fs.readFile(
-          artifactFixture.buildInfoPath,
-          "utf-8",
-        );
-        const originalJson = JSON.parse(originalContent) as { id: string };
 
-        expect(localArtifact.origin.id).toBe(originalJson.id);
+        if (localArtifact.origin.type === "hardhat-v3") {
+          // Hardhat v3 has a list of IDs
+          const originalIds = await Promise.all(
+            artifactFixture.buildInfoPaths.map((path) => {
+              const content = fs
+                .readFile(path, "utf-8")
+                .then((c) => JSON.parse(c) as { id: string });
+              return content.then((json) => json.id);
+            }),
+          );
+          expect(originalIds).toEqual(
+            localArtifact.origin.pairs.map((p) => p.id),
+          );
+        } else {
+          const originalContent = await fs.readFile(
+            artifactFixture.buildInfoPaths[0],
+            "utf-8",
+          );
+          const originalJson = JSON.parse(originalContent) as { id: string };
+
+          expect(localArtifact.origin.id).toBe(originalJson.id);
+        }
       },
     );
 

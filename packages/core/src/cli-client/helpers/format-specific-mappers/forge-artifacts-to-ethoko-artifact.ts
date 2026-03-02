@@ -4,10 +4,7 @@ import {
   EthokoOutputArtifact,
   EthokoOutputArtifactSchema,
 } from "@/utils/artifacts-schemas/ethoko-v0";
-import {
-  FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT,
-  ForgeCompilerDefaultOutputSchema,
-} from "@/utils/artifacts-schemas/forge-v1";
+import { ForgeCompilerDefaultOutputSchema } from "@/utils/artifacts-schemas/forge-v1";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import z from "zod";
 import path from "path";
@@ -216,8 +213,8 @@ export async function forgeArtifactsToEthokoArtifact(
     _format: "ethoko-input-v0",
     solcLongVersion: solcLongVersion ?? "unknown",
     origin: {
+      type: "forge-v1.6-default",
       id: forgeBuildInfo.id,
-      format: FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT,
     },
     input: inputParsingResult.data,
   } satisfies EthokoInputArtifact;

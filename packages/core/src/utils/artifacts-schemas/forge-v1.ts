@@ -13,8 +13,6 @@ import { ContractMetadataSchema } from "./solc-v0.8.33/contract-metadata-json";
 export const FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT =
   "ethers-rs-sol-build-info-1";
 
-export const FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT = "forge-v1.6-default";
-
 export const ForgeCompilerOutputWithBuildInfoOptionSchema = z.object({
   id: z.string(),
   // Mapping from contract ID as number (e.g. "0", "1", etc.) to the source file path

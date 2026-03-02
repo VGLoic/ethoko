@@ -24,10 +24,12 @@ export const TEST_CONSTANTS = {
         process.cwd(),
         "test/fixtures/hardhat-v2-counter",
       ),
-      buildInfoPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/hardhat-v2-counter/build-info/sample-artifact.json",
-      ),
+      buildInfoPaths: [
+        path.resolve(
+          process.cwd(),
+          "test/fixtures/hardhat-v2-counter/build-info/sample-artifact.json",
+        ),
+      ],
       fullyQualifiedContractPaths: [
         "src/Counter.sol:Counter",
         "src/IncrementOracle.sol:IncrementOracle",
@@ -46,10 +48,12 @@ export const TEST_CONSTANTS = {
         process.cwd(),
         "test/fixtures/hardhat-v3-counter",
       ),
-      buildInfoPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/hardhat-v3-counter/build-info/sample-artifact.json",
-      ),
+      buildInfoPaths: [
+        path.resolve(
+          process.cwd(),
+          "test/fixtures/hardhat-v3-counter/build-info/sample-artifact.json",
+        ),
+      ],
       fullyQualifiedContractPaths: ["project/contracts/Counter.sol:Counter"],
       exportExpectedResult: {
         path: "project/contracts/Counter.sol",
@@ -62,10 +66,12 @@ export const TEST_CONSTANTS = {
     },
     FOUNDRY_COUNTER: {
       folderPath: path.resolve(process.cwd(), "test/fixtures/foundry-counter"),
-      buildInfoPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/foundry-counter/build-info/sample-artifact.json",
-      ),
+      buildInfoPaths: [
+        path.resolve(
+          process.cwd(),
+          "test/fixtures/foundry-counter/build-info/sample-artifact.json",
+        ),
+      ],
       fullyQualifiedContractPaths: ["src/Counter.sol:Counter"],
       exportExpectedResult: {
         path: "src/Counter.sol",
@@ -81,10 +87,12 @@ export const TEST_CONSTANTS = {
         process.cwd(),
         "test/fixtures/foundry-build-info-counter",
       ),
-      buildInfoPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/foundry-build-info-counter/build-info/sample-artifact.json",
-      ),
+      buildInfoPaths: [
+        path.resolve(
+          process.cwd(),
+          "test/fixtures/foundry-build-info-counter/build-info/sample-artifact.json",
+        ),
+      ],
       fullyQualifiedContractPaths: ["src/Counter.sol:Counter"],
       exportExpectedResult: {
         path: "src/Counter.sol",

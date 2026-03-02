@@ -7,17 +7,20 @@ import type {
   EthokoInputArtifact,
   EthokoOutputArtifact,
 } from "../utils/artifacts-schemas/ethoko-v0";
-import { HARDHAT_V3_COMPILER_INPUT_FORMAT } from "@/utils/artifacts-schemas/hardhat-v3";
-import { HARDHAT_V2_COMPILER_OUTPUT_FORMAT } from "@/utils/artifacts-schemas/hardhat-v2";
 
 export type InspectResult = {
   project: string;
   tag: string | null;
   id: string;
-  origin: {
-    id: string;
-    format: "forge" | "hardhat-v2" | "hardhat-v3";
-  };
+  origin:
+    | {
+        id: string;
+        format: "forge" | "hardhat-v2";
+      }
+    | {
+        format: "hardhat-v3";
+        ids: string[];
+      };
   compiler: {
     solcLongVersion: string;
     evmVersion: string;
@@ -114,21 +117,25 @@ export async function inspectArtifact(
 
   const compilerSettings = deriveCompilerSettings(inputArtifact);
 
-  const originFormat =
-    inputArtifact.origin.format === HARDHAT_V3_COMPILER_INPUT_FORMAT
-      ? "hardhat-v3"
-      : inputArtifact.origin.format === HARDHAT_V2_COMPILER_OUTPUT_FORMAT
-        ? "hardhat-v2"
-        : "forge";
+  const origin =
+    inputArtifact.origin.type === "hardhat-v3"
+      ? {
+          format: "hardhat-v3" as const,
+          ids: inputArtifact.origin.pairs.map((pair) => pair.id),
+        }
+      : {
+          format:
+            inputArtifact.origin.type === "hardhat-v2"
+              ? ("hardhat-v2" as const)
+              : ("forge" as const),
+          id: inputArtifact.origin.id,
+        };
 
   return {
     project: artifact.project,
     tag: artifact.search.type === "tag" ? artifact.search.tag : null,
     id: inputArtifact.id,
-    origin: {
-      id: inputArtifact.origin.id,
-      format: originFormat,
-    },
+    origin,
     compiler: compilerSettings,
     sourceFiles: Object.keys(inputArtifact.input.sources).sort(),
     contractsBySource: deriveContractsBySource(outputArtifact),

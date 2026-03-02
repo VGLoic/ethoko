@@ -188,6 +188,54 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
 
+  apps/hardhat-v3_etherscan-verification:
+    devDependencies:
+      '@ethoko/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@nomicfoundation/hardhat-ignition':
+        specifier: ^3.0.7
+        version: 3.0.7(@nomicfoundation/hardhat-verify@3.0.9(hardhat@3.1.7))(hardhat@3.1.7)
+      '@nomicfoundation/hardhat-network-helpers':
+        specifier: ^3.0.0
+        version: 3.0.3(hardhat@3.1.7)
+      '@nomicfoundation/hardhat-toolbox-viem':
+        specifier: ^5.0.2
+        version: 5.0.2(02fef8f6ee7b4154aeddbfc7395cf23e)
+      '@nomicfoundation/hardhat-verify':
+        specifier: ^3.0.0
+        version: 3.0.9(hardhat@3.1.7)
+      '@types/node':
+        specifier: ^22.8.5
+        version: 22.15.3
+      dotenv:
+        specifier: ^17.2.4
+        version: 17.2.4
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1
+      forge-std:
+        specifier: github:foundry-rs/forge-std#v1.9.4
+        version: https://codeload.github.com/foundry-rs/forge-std/tar.gz/1eea5bae12ae557d589f9f0f0edae2faa47cb262
+      hardhat:
+        specifier: ^3.1.7
+        version: 3.1.7
+      hardhat-ethoko:
+        specifier: workspace:*
+        version: link:../../packages/hardhat-ethoko
+      prettier-plugin-solidity:
+        specifier: ^2.2.1
+        version: 2.2.1(prettier@3.7.4)
+      typescript:
+        specifier: ~5.8.0
+        version: 5.8.3
+      viem:
+        specifier: ^2.43.0
+        version: 2.45.1(typescript@5.8.3)(zod@4.3.6)
+      vitest:
+        specifier: ^4.0.17
+        version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
+
   apps/hardhat-v3_hardhat-deploy-v2:
     devDependencies:
       '@ethoko/eslint-config':

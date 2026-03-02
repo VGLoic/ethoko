@@ -3,13 +3,6 @@ import { styleText } from "node:util";
 import type { InspectResult } from "../cli-client/inspect";
 import { boxSummary, LOG_COLORS } from "./utils";
 
-const ORIGIN_FORMAT_LABELS: Record<InspectResult["origin"]["format"], string> =
-  {
-    "hardhat-v2": "Hardhat v2",
-    "hardhat-v3": "Hardhat v3",
-    forge: "Forge",
-  };
-
 export function displayInspectResult(
   result: InspectResult,
   silent = false,
@@ -25,10 +18,7 @@ export function displayInspectResult(
   summaryLines.push(styleText(LOG_COLORS.log, `Artifact: ${artifactLabel}`));
   summaryLines.push(styleText(LOG_COLORS.log, `ID: ${result.id}`));
   summaryLines.push(
-    styleText(
-      LOG_COLORS.log,
-      `Origin: ${ORIGIN_FORMAT_LABELS[result.origin.format]} (${result.origin.id})}`,
-    ),
+    styleText(LOG_COLORS.log, `Origin: ${originToLabel(result.origin)}`),
   );
   // One line for input and one line for output, since they can differ significantly in size and path
   summaryLines.push(
@@ -116,4 +106,13 @@ function countContracts(result: InspectResult): number {
     (total, entry) => total + entry.contracts.length,
     0,
   );
+}
+
+function originToLabel(origin: InspectResult["origin"]): string {
+  if (origin.format === "hardhat-v3") {
+    return `Hardhat v3 (${origin.ids.join(", ")})`;
+  }
+  return origin.format === "hardhat-v2"
+    ? `Hardhat v2 (${origin.id})`
+    : `Forge (${origin.id})`;
 }

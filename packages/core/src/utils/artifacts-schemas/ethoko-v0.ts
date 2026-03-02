@@ -1,31 +1,41 @@
 import z from "zod";
 import { SolcJsonInputSchema } from "./solc-v0.8.33/input-json";
 import { SolcJsonOutputSchema } from "./solc-v0.8.33/output-json";
-import {
-  FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT,
-  FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT,
-} from "./forge-v1";
+import { FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT } from "./forge-v1";
 import { HARDHAT_V2_COMPILER_OUTPUT_FORMAT } from "./hardhat-v2";
 import {
   HARDHAT_V3_COMPILER_OUTPUT_FORMAT,
   HARDHAT_V3_COMPILER_INPUT_FORMAT,
 } from "./hardhat-v3";
 
-const OriginSchema = z.discriminatedUnion("format", [
+const EthokoArtifactOriginSchema = z.discriminatedUnion("type", [
   z.object({
     id: z.string(),
-    format: z.enum([
-      FORGE_COMPILER_DEFAULT_OUTPUT_FORMAT,
-      FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT,
-      HARDHAT_V2_COMPILER_OUTPUT_FORMAT,
-    ]),
+    type: z.literal("forge-v1.6-default"),
   }),
   z.object({
     id: z.string(),
-    format: z.literal(HARDHAT_V3_COMPILER_INPUT_FORMAT),
-    outputFormat: z.literal(HARDHAT_V3_COMPILER_OUTPUT_FORMAT),
+    type: z.literal("forge-v1.6-build-info"),
+    format: z.literal(FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal("hardhat-v2"),
+    format: z.literal(HARDHAT_V2_COMPILER_OUTPUT_FORMAT),
+  }),
+  z.object({
+    type: z.literal("hardhat-v3"),
+    pairs: z.array(
+      z.object({
+        id: z.string(),
+        inputFormat: z.literal(HARDHAT_V3_COMPILER_INPUT_FORMAT),
+        outputFormat: z.literal(HARDHAT_V3_COMPILER_OUTPUT_FORMAT),
+      }),
+    ),
   }),
 ]);
+
+export type EthokoArtifactOrigin = z.infer<typeof EthokoArtifactOriginSchema>;
 
 /**
  * Input artifact schema for Ethoko storage
@@ -33,7 +43,7 @@ const OriginSchema = z.discriminatedUnion("format", [
 export const EthokoInputArtifactSchema = z.object({
   id: z.string(),
   _format: z.literal("ethoko-input-v0"),
-  origin: OriginSchema,
+  origin: EthokoArtifactOriginSchema,
   solcLongVersion: z.string(),
   input: SolcJsonInputSchema,
 });
