@@ -6,7 +6,7 @@ import "dotenv/config";
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
   ethoko: {
-    project: "ignited-counter",
+    project: "verified-counter",
     pulledArtifactsPath: "./.ethoko-e2e/.ethoko",
     typingsPath: "./.ethoko-typings",
     compilationOutputPath: "./artifacts",
