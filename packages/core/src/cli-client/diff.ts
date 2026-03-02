@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { StepTracker } from "../cli-ui/utils";
+import { createSpinner } from "../cli-ui/utils";
 import { LocalStorage } from "../local-storage";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
@@ -123,17 +123,18 @@ export async function generateDiffWithTargetRelease(
   localStorage: LocalStorage,
   opts: { debug: boolean; silent?: boolean; isCI?: boolean },
 ): Promise<Difference[]> {
-  const steps = new StepTracker(4, opts.silent);
-
   // Step 1: Check if target artifact exists locally
 
-  steps.start("Checking local artifact existence...");
+  const spinner1 = createSpinner(
+    "Checking local artifact existence...",
+    opts.silent,
+  );
   const ensureResult = await toAsyncResult(
     localStorage.ensureProjectSetup(artifact.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    steps.fail("Failed to setup local storage");
+    spinner1.fail("Failed to setup local storage");
     throw new CliError(
       "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
@@ -145,13 +146,13 @@ export async function generateDiffWithTargetRelease(
       { debug: opts.debug },
     );
     if (!hasTagResult.success) {
-      steps.fail("Failed to check local artifacts");
+      spinner1.fail("Failed to check local artifacts");
       throw new CliError(
         "Error checking local storage, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
     if (!hasTagResult.value) {
-      steps.fail("Local artifact not found");
+      spinner1.fail("Local artifact not found");
       throw new CliError(
         `The artifact "${artifact.project}:${artifact.search.tag}" has not been found locally. Please, make sure to have the artifact locally before running the diff command. Run with debug mode for more info`,
       );
@@ -162,62 +163,68 @@ export async function generateDiffWithTargetRelease(
       { debug: opts.debug },
     );
     if (!hasIdResult.success) {
-      steps.fail("Failed to check local artifacts");
+      spinner1.fail("Failed to check local artifacts");
       throw new CliError(
         "Error checking local storage, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
     if (!hasIdResult.value) {
-      steps.fail("Local artifact not found");
+      spinner1.fail("Local artifact not found");
       throw new CliError(
         `The artifact "${artifact.project}:${artifact.search.id}" has not been found locally. Please, make sure to have the artifact locally before running the diff command. Run with debug mode for more info`,
       );
     }
   }
-  steps.succeed("Local artifact found");
+  spinner1.succeed("Local artifact found");
 
   // Step 2: Look for compilation artifact
-  steps.start("Looking for compilation artifact...");
+  const spinner2 = createSpinner(
+    "Looking for compilation artifact...",
+    opts.silent,
+  );
   const buildInfoPathResult = await toAsyncResult(
-    lookForBuildInfoJsonFile(artifactPath, steps, {
+    lookForBuildInfoJsonFile(artifactPath, spinner2, {
       debug: opts.debug,
       silent: opts.silent,
       isCI: opts.isCI,
     }),
   );
   if (!buildInfoPathResult.success) {
-    steps.fail("Failed to find compilation artifact");
+    spinner2.fail("Failed to find compilation artifact");
     // @dev the lookForBuildInfoJsonFile function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
     throw buildInfoPathResult.error;
   }
-  steps.succeed(buildInfoPathToSuccessText(buildInfoPathResult.value));
+  spinner2.succeed(buildInfoPathToSuccessText(buildInfoPathResult.value));
 
   // Step 3: Parse the compilation artifact, mapping it to the Ethoko format
-  steps.start("Analyzing compilation artifact...");
+  const spinner3 = createSpinner(
+    "Analyzing compilation artifact...",
+    opts.silent,
+  );
   const ethokoArtifactParsingResult = await toAsyncResult(
     mapBuildInfoToEthokoArtifact(buildInfoPathResult.value, opts.debug),
   );
   if (!ethokoArtifactParsingResult.success) {
-    steps.fail("Unable to handle the provided compilation artifact");
+    spinner3.fail("Unable to handle the provided compilation artifact");
     // @dev the mapBuildInfoToEthokoArtifact function throws an Error with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
     throw ethokoArtifactParsingResult.error;
   }
   const { outputArtifact } = ethokoArtifactParsingResult.value;
-  steps.succeed("Compilation artifact is valid");
+  spinner3.succeed("Compilation artifact is valid");
 
   const virtualReleaseContractHashesResult = await toAsyncResult(
     generateContractHashes(outputArtifact),
     { debug: opts.debug },
   );
   if (!virtualReleaseContractHashesResult.success) {
-    steps.fail("Failed to analyze compilation artifact");
+    spinner3.fail("Failed to analyze compilation artifact");
     throw new CliError(
       "Error generating contract hashes from the fresh compilation artifact. Run with debug mode for more info",
     );
   }
-  steps.succeed("Fresh artifact loaded");
+  spinner3.succeed("Fresh artifact loaded");
 
-  steps.start("Reading target artifact...");
+  const spinner4 = createSpinner("Reading target artifact...", opts.silent);
   const artifactContentResult = await toAsyncResult(
     artifact.search.type === "tag"
       ? localStorage.retrieveOutputArtifactByTag(
@@ -231,7 +238,7 @@ export async function generateDiffWithTargetRelease(
     { debug: opts.debug },
   );
   if (!artifactContentResult.success) {
-    steps.fail("Failed to read target artifact");
+    spinner4.fail("Failed to read target artifact");
     throw new CliError(
       "Unable to retrieve the target artifact content, please ensure it exists locally. Run with debug mode for more info",
     );
@@ -242,14 +249,14 @@ export async function generateDiffWithTargetRelease(
     { debug: opts.debug },
   );
   if (!targetReleaseContractHashesResult.success) {
-    steps.fail("Failed to analyze target artifact");
+    spinner4.fail("Failed to analyze target artifact");
     throw new CliError(
       "Error generating contract hashes for the target artifact. Run with debug mode for more info",
     );
   }
-  steps.succeed("Target artifact loaded");
+  spinner4.succeed("Target artifact loaded");
 
-  steps.start("Computing differences...");
+  const spinner5 = createSpinner("Computing differences...", opts.silent);
   const differences: Difference[] = [];
   for (const [
     contractKey,
@@ -283,7 +290,7 @@ export async function generateDiffWithTargetRelease(
       });
     }
   }
-  steps.succeed("Differences computed");
+  spinner5.succeed("Differences computed");
 
   return differences;
 }

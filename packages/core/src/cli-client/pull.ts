@@ -1,6 +1,6 @@
 import { LocalStorage } from "../local-storage";
 import { StorageProvider } from "../storage-provider";
-import { StepTracker } from "@/cli-ui/utils";
+import { createSpinner } from "@/cli-ui/utils";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 
@@ -40,24 +40,25 @@ export async function pull(
   localStorage: LocalStorage,
   opts: { force: boolean; debug: boolean; silent?: boolean },
 ): Promise<PullResult> {
-  const steps = new StepTracker(4, opts.silent);
-
   // Step 1: Set up local storage
-  steps.start("Setting up local storage...");
+  const spinner1 = createSpinner("Setting up local storage...", opts.silent);
   const ensureResult = await toAsyncResult(
     localStorage.ensureProjectSetup(project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    steps.fail("Failed to setup local storage");
+    spinner1.fail("Failed to setup local storage");
     throw new CliError(
       "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
-  steps.succeed("Local storage ready");
+  spinner1.succeed("Local storage ready");
 
   // Step 2: Fetch remote artifacts
-  steps.start("Fetching remote artifact list...");
+  const spinner2 = createSpinner(
+    "Fetching remote artifact list...",
+    opts.silent,
+  );
   const remoteListingResult = await toAsyncResult(
     Promise.all([
       storageProvider.listTags(project),
@@ -66,13 +67,13 @@ export async function pull(
     { debug: opts.debug },
   );
   if (!remoteListingResult.success) {
-    steps.fail("Failed to fetch remote artifacts");
+    spinner2.fail("Failed to fetch remote artifacts");
     throw new CliError(
       "Error interacting with the storage, please check the configuration or run with debug mode for more info",
     );
   }
   const [remoteTags, remoteIds] = remoteListingResult.value;
-  steps.succeed("Fetched remote artifact list");
+  spinner2.succeed("Fetched remote artifact list");
 
   let tagsToDownload: string[];
   let idsToDownload: string[];
@@ -84,7 +85,7 @@ export async function pull(
       tagsToDownload = [];
       idsToDownload = [search.id];
     } else {
-      steps.fail("The tag or ID does not exist in the storage");
+      spinner2.fail("The tag or ID does not exist in the storage");
       throw new CliError(
         `The tag or ID "${search.type === "tag" ? search.tag : search.id}" does not exist in the storage`,
       );
@@ -104,13 +105,13 @@ export async function pull(
   }
 
   // Step 3: Check local artifacts
-  steps.start("Checking local artifacts...");
+  const spinner3 = createSpinner("Checking local artifacts...", opts.silent);
   let filteredTagsToDownload: string[] = [];
   let filteredIdsToDownload: string[] = [];
   if (opts.force) {
     filteredTagsToDownload = tagsToDownload;
     filteredIdsToDownload = idsToDownload;
-    steps.succeed("Local artifacts check skipped (force mode)");
+    spinner3.succeed("Local artifacts check skipped (force mode)");
   } else {
     const localListingResult = await toAsyncResult(
       Promise.all([
@@ -130,7 +131,7 @@ export async function pull(
       { debug: opts.debug },
     );
     if (!localListingResult.success) {
-      steps.fail("Failed to check local artifacts");
+      spinner3.fail("Failed to check local artifacts");
       throw new CliError(
         "Error checking local storage, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
@@ -142,7 +143,7 @@ export async function pull(
       (tag) => !localTags.has(tag),
     );
     filteredIdsToDownload = idsToDownload.filter((id) => !localIds.has(id));
-    steps.succeed("Checked local artifacts");
+    spinner3.succeed("Checked local artifacts");
   }
 
   // Step 4: Download artifacts
@@ -150,8 +151,8 @@ export async function pull(
     filteredTagsToDownload.length === 0 &&
     filteredIdsToDownload.length === 0
   ) {
-    steps.start("Checking for updates...");
-    steps.succeed("All artifacts are up to date");
+    const spinner4 = createSpinner("Checking for updates...", opts.silent);
+    spinner4.succeed("All artifacts are up to date");
     return {
       remoteTags,
       remoteIds,
@@ -164,8 +165,9 @@ export async function pull(
 
   const missingArtifactCount =
     filteredTagsToDownload.length + filteredIdsToDownload.length;
-  steps.start(
+  const spinner4 = createSpinner(
     `Downloading ${missingArtifactCount} missing artifact${missingArtifactCount > 1 ? "s" : ""}...`,
+    opts.silent,
   );
 
   const tagsPromises: Promise<{ tag: string; id: string }>[] =
@@ -208,7 +210,7 @@ export async function pull(
       if (settlement.reason instanceof PullTagError) {
         failedTags.push(settlement.reason.tag);
       } else {
-        steps.fail("Failed to download artifacts");
+        spinner4.fail("Failed to download artifacts");
         throw new CliError(
           "Unexpected error while pulling tags, please fill an issue",
         );
@@ -258,7 +260,7 @@ export async function pull(
       if (settlement.reason instanceof PullIdError) {
         failedIds.push(settlement.reason.id);
       } else {
-        steps.fail("Failed to download artifacts");
+        spinner4.fail("Failed to download artifacts");
         throw new CliError(
           "Unexpected error while pulling IDs, please fill an issue",
         );
@@ -270,11 +272,11 @@ export async function pull(
   const totalFailed = failedTags.length + failedIds.length;
 
   if (totalFailed > 0) {
-    steps.fail(
+    spinner4.fail(
       `Downloaded ${totalPulled} artifact${totalPulled > 1 ? "s" : ""}, ${totalFailed} failed`,
     );
   } else {
-    steps.succeed(
+    spinner4.succeed(
       `Downloaded ${totalPulled} artifact${totalPulled > 1 ? "s" : ""} successfully`,
     );
   }

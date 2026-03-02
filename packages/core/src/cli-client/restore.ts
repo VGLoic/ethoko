@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { StepTracker } from "@/cli-ui/utils";
+import { createSpinner } from "@/cli-ui/utils";
 import { LocalStorage } from "@/local-storage";
 import { StorageProvider } from "@/storage-provider";
 import { toAsyncResult } from "@/utils/result";
@@ -24,15 +24,13 @@ export async function restore(
   localStorage: LocalStorage,
   opts: { force: boolean; debug: boolean; silent?: boolean },
 ): Promise<RestoreResult> {
-  const steps = new StepTracker(4, opts.silent);
-
-  steps.start("Identifying artifact...");
+  const spinner1 = createSpinner("Identifying artifact...", opts.silent);
   const ensureResult = await toAsyncResult(
     localStorage.ensureProjectSetup(artifact.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    steps.fail("Failed to setup local storage");
+    spinner1.fail("Failed to setup local storage");
     throw new CliError(
       "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
@@ -45,7 +43,7 @@ export async function restore(
       { debug: opts.debug },
     );
     if (!artifactIdResult.success) {
-      steps.fail("Failed to resolve artifact ID");
+      spinner1.fail("Failed to resolve artifact ID");
       throw new CliError(
         "Unable to retrieve the artifact ID, please ensure the artifact is pulled locally. Run with debug mode for more info",
       );
@@ -57,29 +55,29 @@ export async function restore(
       { debug: opts.debug },
     );
     if (!hasIdResult.success) {
-      steps.fail("Failed to verify artifact ID");
+      spinner1.fail("Failed to verify artifact ID");
       throw new CliError(
         "Unable to verify the artifact ID, please ensure the artifact is pulled locally. Run with debug mode for more info",
       );
     }
     if (!hasIdResult.value) {
-      steps.fail("Artifact ID not found");
+      spinner1.fail("Artifact ID not found");
       throw new CliError(
         "Artifact ID not found locally, please ensure the artifact is pulled before restoring",
       );
     }
     artifactId = artifact.search.id;
   }
-  steps.succeed("Artifact identified");
+  spinner1.succeed("Artifact identified");
 
-  steps.start("Checking output directory...");
+  const spinner2 = createSpinner("Checking output directory...", opts.silent);
   const resolvedOutputPath = path.resolve(outputPath);
   const outputStatResult = await toAsyncResult(fs.stat(resolvedOutputPath), {
     debug: opts.debug,
   });
   if (outputStatResult.success) {
     if (!outputStatResult.value.isDirectory()) {
-      steps.fail("Output path is not a directory");
+      spinner2.fail("Output path is not a directory");
       throw new CliError(
         `Output path "${resolvedOutputPath}" exists but is not a directory`,
       );
@@ -91,13 +89,13 @@ export async function restore(
       },
     );
     if (!outputEntriesResult.success) {
-      steps.fail("Failed to read output directory");
+      spinner2.fail("Failed to read output directory");
       throw new CliError(
         `Unable to read output directory "${resolvedOutputPath}". Run with debug mode for more info`,
       );
     }
     if (outputEntriesResult.value.length > 0 && !opts.force) {
-      steps.fail("Output directory is not empty");
+      spinner2.fail("Output directory is not empty");
       throw new CliError(
         `Output directory "${resolvedOutputPath}" is not empty. Use the --force flag to overwrite`,
       );
@@ -108,7 +106,7 @@ export async function restore(
         { debug: opts.debug },
       );
       if (!removeResult.success) {
-        steps.fail("Failed to clear output directory");
+        spinner2.fail("Failed to clear output directory");
         throw new CliError(
           `Unable to clear output directory "${resolvedOutputPath}". Run with debug mode for more info`,
         );
@@ -122,7 +120,7 @@ export async function restore(
       outputStatResult.error.code === "ENOENT"
     )
   ) {
-    steps.fail("Failed to access output directory");
+    spinner2.fail("Failed to access output directory");
     throw new CliError(
       `Unable to access output directory "${resolvedOutputPath}". Run with debug mode for more info`,
     );
@@ -132,35 +130,36 @@ export async function restore(
     { debug: opts.debug },
   );
   if (!mkdirOutputResult.success) {
-    steps.fail("Failed to create output directory");
+    spinner2.fail("Failed to create output directory");
     throw new CliError(
       `Unable to create output directory "${resolvedOutputPath}". Run with debug mode for more info`,
     );
   }
-  steps.succeed("Output directory ready");
+  spinner2.succeed("Output directory ready");
 
-  steps.start("Listing original content...");
+  const spinner3 = createSpinner("Listing original content...", opts.silent);
   const originalContentResult = await toAsyncResult(
     storageProvider.listOriginalContent(artifact.project, artifactId),
     { debug: opts.debug },
   );
   if (!originalContentResult.success) {
-    steps.fail("Failed to list original content");
+    spinner3.fail("Failed to list original content");
     throw new CliError(
       "Unable to list original content files from the storage. Run with debug mode for more info",
     );
   }
   const originalContentPaths = originalContentResult.value;
   if (originalContentPaths.length === 0) {
-    steps.fail("No original content files found");
+    spinner3.fail("No original content files found");
     throw new CliError(
       "No original content files were found for this artifact. Run with debug mode for more info",
     );
   }
-  steps.succeed(`Found ${originalContentPaths.length} files`);
+  spinner3.succeed(`Found ${originalContentPaths.length} files`);
 
-  steps.start(
+  const spinner4 = createSpinner(
     `Downloading ${originalContentPaths.length} file${originalContentPaths.length > 1 ? "s" : ""}...`,
+    opts.silent,
   );
   const downloadResults = await Promise.all(
     originalContentPaths.map(async (relativePath) => {
@@ -203,7 +202,7 @@ export async function restore(
     }),
   );
 
-  steps.succeed(
+  spinner4.succeed(
     `Downloaded ${downloadResults.length} file${downloadResults.length > 1 ? "s" : ""}`,
   );
 

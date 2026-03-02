@@ -1,5 +1,5 @@
 import { StorageProvider } from "../storage-provider";
-import { StepTracker } from "@/cli-ui/utils";
+import { createSpinner } from "@/cli-ui/utils";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import { lookForBuildInfoJsonFile } from "./helpers/look-for-build-info-json-file";
@@ -51,67 +51,71 @@ export async function push(
   storageProvider: StorageProvider,
   opts: { force: boolean; debug: boolean; silent?: boolean; isCI?: boolean },
 ): Promise<string> {
-  const steps = new StepTracker(4, opts.silent);
-
   // Step 1: Look for compilation artifact
-  steps.start("Looking for compilation artifact...");
+  const spinner1 = createSpinner(
+    "Looking for compilation artifact...",
+    opts.silent,
+  );
   const buildInfoPathResult = await toAsyncResult(
-    lookForBuildInfoJsonFile(artifactPath, steps, {
+    lookForBuildInfoJsonFile(artifactPath, spinner1, {
       debug: opts.debug,
       silent: opts.silent,
       isCI: opts.isCI,
     }),
   );
   if (!buildInfoPathResult.success) {
-    steps.fail("Failed to find compilation artifact");
+    spinner1.fail("Failed to find compilation artifact");
     // @dev the lookForBuildInfoJsonFile function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
     throw buildInfoPathResult.error;
   }
-  steps.succeed(buildInfoPathToSuccessText(buildInfoPathResult.value));
+  spinner1.succeed(buildInfoPathToSuccessText(buildInfoPathResult.value));
 
   // Step 2: Parse the compilation artifact, mapping it to the Ethoko format
-  steps.start("Analyzing compilation artifact...");
+  const spinner2 = createSpinner(
+    "Analyzing compilation artifact...",
+    opts.silent,
+  );
   const ethokoArtifactParsingResult = await toAsyncResult(
     mapBuildInfoToEthokoArtifact(buildInfoPathResult.value, opts.debug),
   );
   if (!ethokoArtifactParsingResult.success) {
-    steps.fail("Unable to handle the provided compilation artifact");
+    spinner2.fail("Unable to handle the provided compilation artifact");
     // @dev the mapBuildInfoToEthokoArtifact function throws an Error with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
     throw ethokoArtifactParsingResult.error;
   }
-  steps.succeed("Compilation artifact is valid");
+  spinner2.succeed("Compilation artifact is valid");
 
   // Step 3: Check if tag exists
-  steps.start("Checking if tag exists...");
+  const spinner3 = createSpinner("Checking if tag exists...", opts.silent);
   if (!tag) {
-    steps.succeed("No tag provided, skipping tag existence check");
+    spinner3.succeed("No tag provided, skipping tag existence check");
   } else {
     const hasTagResult = await toAsyncResult(
       storageProvider.hasArtifactByTag(project, tag),
       { debug: opts.debug },
     );
     if (!hasTagResult.success) {
-      steps.fail("Failed to check tag existence");
+      spinner3.fail("Failed to check tag existence");
       throw new CliError(
         `Error checking if the tag "${tag}" exists on the storage, please check the storage configuration or run with debug mode for more info`,
       );
     }
     if (hasTagResult.value) {
       if (!opts.force) {
-        steps.fail("Tag already exists");
+        spinner3.fail("Tag already exists");
         throw new CliError(
           `The tag "${tag}" already exists on the storage. Please, make sure to use a different tag.`,
         );
       } else {
-        steps.warn(`Tag "${tag}" already exists, forcing push`);
+        spinner3.warn(`Tag "${tag}" already exists, forcing push`);
       }
     } else {
-      steps.succeed("Tag is available");
+      spinner3.succeed("Tag is available");
     }
   }
 
   // Step 4: Upload artifact
-  steps.start("Uploading artifact...");
+  const spinner4 = createSpinner("Uploading artifact...", opts.silent);
   const pushResult = await toAsyncResult(
     storageProvider.uploadArtifact(
       project,
@@ -124,12 +128,12 @@ export async function push(
   );
 
   if (!pushResult.success) {
-    steps.fail("Failed to upload artifact");
+    spinner4.fail("Failed to upload artifact");
     throw new CliError(
       `Error pushing the artifact "${project}:${tag || ethokoArtifactParsingResult.value.inputArtifact.id}" to the storage, please check the storage configuration or run with debug mode for more info`,
     );
   }
-  steps.succeed("Artifact uploaded successfully");
+  spinner4.succeed("Artifact uploaded successfully");
 
   return ethokoArtifactParsingResult.value.inputArtifact.id;
 }

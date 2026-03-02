@@ -1,6 +1,8 @@
+import { styleText } from "node:util";
+
 import { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 import { z } from "zod";
-import { boxHeader, error as cliError } from "@ethoko/core/cli-ui";
+import { boxHeader, error as cliError, LOG_COLORS } from "@ethoko/core/cli-ui";
 import {
   CliError,
   generateArtifactsSummariesAndTypings,
@@ -52,7 +54,14 @@ export default async function (
     },
   )
     .then(() => {
-      console.error("");
+      if (!parsingResult.data.silent) {
+        console.error(
+          styleText(
+            LOG_COLORS.success,
+            `\n✔ Typings generated at ${ethokoConfig.typingsPath}`,
+          ),
+        );
+      }
     })
     .catch((err) => {
       if (err instanceof CliError) {

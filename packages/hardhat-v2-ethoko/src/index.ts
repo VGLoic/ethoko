@@ -390,7 +390,14 @@ The typings will be generated in the configured typings path.
       },
     )
       .then(() => {
-        console.error("");
+        if (!parsingResult.data.silent) {
+          console.error(
+            styleText(
+              LOG_COLORS.success,
+              `\n✔ Typings generated at ${ethokoConfig.typingsPath}`,
+            ),
+          );
+        }
       })
       .catch((err) => {
         if (err instanceof CliError) {

@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import { createInterface } from "node:readline/promises";
 import { styleText } from "util";
-import { type StepTracker, LOG_COLORS } from "@/cli-ui/utils";
+import { type Ora, LOG_COLORS } from "@/cli-ui/utils";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
 import { FormatInferenceHardhatV2CompilerOutputSchema } from "@/utils/artifacts-schemas/hardhat-v2";
@@ -79,7 +79,7 @@ type SupportedBuildInfoFormat = BuildInfoPath["format"];
  */
 export async function lookForBuildInfoJsonFile(
   inputPath: string,
-  steps: StepTracker,
+  spinner: Ora,
   opts: { debug: boolean; silent?: boolean; isCI?: boolean },
 ): Promise<BuildInfoPath> {
   const { debug, isCI = false } = opts;
@@ -323,7 +323,7 @@ export async function lookForBuildInfoJsonFile(
     );
   }
 
-  steps.stop();
+  spinner.stop();
 
   const selectedOption = await promptUserSelection(
     `Multiple JSON files found in "${finalFolderPath}" (${ignoredFilesCount} ignored). Please select which build info file to use:`,

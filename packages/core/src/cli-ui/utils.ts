@@ -14,76 +14,6 @@ export const LOG_COLORS = {
  */
 
 /**
- * Creates a step tracker for multi-step operations
- */
-export class StepTracker {
-  private currentStep: number;
-  private readonly totalSteps: number;
-  private spinner: Ora | undefined;
-  private readonly silent: boolean;
-
-  constructor(totalSteps: number, silent = false) {
-    this.currentStep = 0;
-    this.totalSteps = totalSteps;
-    this.silent = silent;
-  }
-
-  /**
-   * Start a new step with a spinner
-   */
-  start(message: string): Ora {
-    this.currentStep++;
-    const prefix = styleText(
-      "cyan",
-      `[${this.currentStep}/${this.totalSteps}]`,
-    );
-    this.spinner = ora({
-      text: message,
-      prefixText: prefix,
-      stream: process.stderr,
-      isSilent: this.silent,
-    }).start();
-    return this.spinner;
-  }
-
-  /**
-   * Mark the current step as successful
-   */
-  succeed(message?: string): void {
-    if (this.spinner) {
-      this.spinner.succeed(message);
-    }
-  }
-
-  /**
-   * Mark the current step as failed
-   */
-  fail(message?: string): void {
-    if (this.spinner) {
-      this.spinner.fail(message);
-    }
-  }
-
-  /**
-   * Mark the current step as warning
-   */
-  warn(message?: string): void {
-    if (this.spinner) {
-      this.spinner.warn(message);
-    }
-  }
-
-  /**
-   * Stop the current spinner without success/fail
-   */
-  stop(): void {
-    if (this.spinner) {
-      this.spinner.stop();
-    }
-  }
-}
-
-/**
  * Creates a simple spinner without step tracking
  */
 export function createSpinner(message: string, silent = false): Ora {
@@ -157,3 +87,5 @@ export function info(message: string, silent = false): void {
   if (silent) return;
   console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
 }
+
+export type { Ora };
