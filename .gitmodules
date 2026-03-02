@@ -1,6 +1,9 @@
 [submodule "apps/foundry_hardhat-deploy-v2/lib/forge-std"]
 	path = apps/foundry_hardhat-deploy-v2/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "apps/foundry_etherscan-verification/lib/forge-std"]
+	path = apps/foundry_etherscan-verification/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
 [submodule "apps/uniswap-v4-core/lib/forge-std"]
 	path = apps/uniswap-v4-core/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
