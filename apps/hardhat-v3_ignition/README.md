@@ -8,7 +8,7 @@ Deployments are managed using [Hardhat Ignition](https://hardhat.org/docs/guides
 
 ### Content
 
-In this example, we implement a a simple `Counter` contract, see [Counter.sol](./artifacts/Counter.sol).
+In this example, we implement a a simple `Counter` contract, see [Counter.sol](./contracts/Counter.sol).
 
 ### Development phase
 

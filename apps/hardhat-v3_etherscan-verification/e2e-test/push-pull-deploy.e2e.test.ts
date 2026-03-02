@@ -23,11 +23,10 @@ describe("[Hardhat v3 - Etherscan Verification] Push artifact, pull artifact, de
 
   test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
 
-  // REMIND ME
-  // test("it deploys", () =>
-  //   asyncExec(
-  //     "npx hardhat ignition deploy ./ignition/modules/counter-2026-02-02.ts --config ./hardhat.config.e2e.ts ",
-  //   ));
+  test("it deploys", () =>
+    asyncExec(
+      "npx hardhat ignition deploy ./ignition/modules/release-2026-02-02.ts --config ./hardhat.config.e2e.ts ",
+    ));
 
   test("it restores the original artifacts", async () => {
     await asyncExec(
