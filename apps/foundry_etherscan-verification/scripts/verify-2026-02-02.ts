@@ -1,5 +1,5 @@
 import SepoliaDeployedAddresses from "./../ignition/deployments/chain-11155111/deployed_addresses.json" with { type: "json" };
-import { EthokoBuildInfo, project } from "./../.ethoko-typings/index.js";
+import { EthokoBuildInfoInput, project } from "./../.ethoko-typings/index.js";
 import "dotenv/config";
 
 async function main() {
@@ -20,22 +20,22 @@ async function main() {
   }
   const etherscanClient = new EtherscanVerificationClient(ETHERSCAN_API_KEY);
 
-  const fullCompilationArtifact = await project("verified-forge-counter")
+  const inputCompilationArtifact = await project("verified-forge-counter")
     .tag("2026-02-02")
-    .getCompilationArtifact();
+    .getInputCompilationArtifact();
 
   const verificationPayload = {
-    compilerVersion: fullCompilationArtifact.solcLongVersion,
+    compilerVersion: inputCompilationArtifact.solcLongVersion,
     optimizationUsed:
-      fullCompilationArtifact.input.settings?.optimizer?.enabled ?? false,
+      inputCompilationArtifact.input.settings?.optimizer?.enabled ?? false,
     optimizationRuns:
-      fullCompilationArtifact.input.settings?.optimizer?.runs ?? 0,
-    evmVersion: fullCompilationArtifact.input.settings?.evmVersion ?? "london",
+      inputCompilationArtifact.input.settings?.optimizer?.runs ?? 0,
+    evmVersion: inputCompilationArtifact.input.settings?.evmVersion ?? "london",
     licenseType: "UNLICENSED" as const,
   };
 
   const patchedSourceCodeInput = patchInputSources(
-    fullCompilationArtifact.input,
+    inputCompilationArtifact.input,
   );
   const stringifiedSourceCodeInput = JSON.stringify(
     patchedSourceCodeInput,
@@ -71,8 +71,8 @@ async function main() {
 }
 
 function patchInputSources(
-  input: EthokoBuildInfo["input"],
-): EthokoBuildInfo["input"] {
+  input: EthokoBuildInfoInput["input"],
+): EthokoBuildInfoInput["input"] {
   const updatedSources: Record<string, { content: string }> = {};
   for (const [key, source] of Object.entries(input.sources)) {
     const content = source.content;

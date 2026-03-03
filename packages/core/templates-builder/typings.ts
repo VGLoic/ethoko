@@ -122,7 +122,8 @@ export function project<TProject extends Project>(project: TProject) {
      * @example ```typescript
      * const v1_3_1Utils = project("my-project").tag("v1.3.1");
      * const availableContracts = v1_3_1Utils.getAvailableContracts();
-     * const compilationArtifact = await v1_3_1Utils.getCompilationArtifact();
+     * const inputCompilationArtifact = await v1_3_1Utils.getInputCompilationArtifact();
+     * const outputCompilationArtifact = await v1_3_1Utils.getOutputCompilationArtifact();
      * const incrementOracleArtifact = await v1_3_1Utils.getContractArtifact("src/IncrementOracle.sol:IncrementOracle");
      * ```
      */
@@ -169,11 +170,17 @@ export function project<TProject extends Project>(project: TProject) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return (PROJECTS as any)[project].tags[tag];
         },
-        getCompilationArtifact() {
-          return getCompilationArtifact(project, tag as string);
+        getInputCompilationArtifact() {
+          return getInputCompilationArtifact(project, tag as string);
         },
-        getCompilationArtifactSync() {
-          return getCompilationArtifactSync(project, tag as string);
+        getOutputCompilationArtifact() {
+          return getOutputCompilationArtifact(project, tag as string);
+        },
+        getInputCompilationArtifactSync() {
+          return getInputCompilationArtifactSync(project, tag as string);
+        },
+        getOutputCompilationArtifactSync() {
+          return getOutputCompilationArtifactSync(project, tag as string);
         },
       };
     },
@@ -185,18 +192,18 @@ async function getArtifact(
   tag: string,
   contractKey: string,
 ): Promise<EthokoContractArtifact> {
-  const buildInfoResult = await toAsyncResult(
-    getCompilationArtifact(project, tag),
+  const buildInfoOutputResult = await toAsyncResult(
+    getOutputCompilationArtifact(project, tag),
   );
-  if (!buildInfoResult.success) {
-    throw buildInfoResult.error;
+  if (!buildInfoOutputResult.success) {
+    throw buildInfoOutputResult.error;
   }
 
   return buildInfoToContractArtifact(
     project,
     tag,
     contractKey,
-    buildInfoResult.value,
+    buildInfoOutputResult.value,
   );
 }
 
@@ -205,16 +212,21 @@ function getArtifactSync(
   tag: string,
   contractKey: string,
 ): EthokoContractArtifact {
-  const buildInfo = getCompilationArtifactSync(project, tag);
+  const buildInfoOutput = getOutputCompilationArtifactSync(project, tag);
 
-  return buildInfoToContractArtifact(project, tag, contractKey, buildInfo);
+  return buildInfoToContractArtifact(
+    project,
+    tag,
+    contractKey,
+    buildInfoOutput,
+  );
 }
 
 function buildInfoToContractArtifact(
   project: string,
   tag: string,
   contractKey: string,
-  buildInfo: EthokoBuildInfo,
+  buildInfoOutput: EthokoBuildInfoOutput,
 ): EthokoContractArtifact {
   const contractPieces = contractKey.split(":");
   const contractName = contractPieces.at(-1);
@@ -229,7 +241,7 @@ function buildInfoToContractArtifact(
       `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
     );
   }
-  const output = buildInfo.output;
+  const output = buildInfoOutput.output;
   if (!output) {
     throw new Error(
       `Contracts output not found for artifact ${project}:${tag}`,
@@ -249,7 +261,7 @@ function buildInfoToContractArtifact(
   }
   return {
     _format: "ethoko-contract-artifact-v0",
-    id: buildInfo.id,
+    id: buildInfoOutput.id,
     project,
     abi: contractArtifact.abi,
     metadata: contractArtifact.metadata || "",
@@ -276,15 +288,92 @@ function prefixWith0x(s: string): `0x${string}` {
 }
 
 /**
- * Get a compilation artifact
+ * Get a compilation artifact output
  * @param project Related project
  * @param tag Tag of the compilation
- * @returns The compilation artifact
+ * @returns The compilation artifact output
  */
-async function getCompilationArtifact(
+async function getOutputCompilationArtifact(
   project: string,
   tag: string,
-): Promise<EthokoBuildInfo> {
+): Promise<EthokoBuildInfoOutput> {
+  const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
+  const buildInfoExists = await fs.stat(manifestPath).catch(() => false);
+  if (!buildInfoExists) {
+    throw new Error(`artifact not found for "${project}:${tag}". Skipping`);
+  }
+  const manifestContentResult = await toAsyncResult(
+    fs.readFile(manifestPath, "utf-8").then(JSON.parse),
+  );
+  if (!manifestContentResult.success) {
+    console.error(manifestContentResult.error);
+    throw manifestContentResult.error;
+  }
+  const manifest = manifestContentResult.value as { id: string };
+
+  const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
+
+  const outputResult = await toAsyncResult(
+    fs.readFile(outputPath, "utf-8").then(JSON.parse),
+  );
+
+  if (!outputResult.success) {
+    console.error(outputResult.error);
+    throw outputResult.error;
+  }
+
+  return {
+    id: manifest.id,
+    _format: outputResult.value._format,
+    output: outputResult.value.output,
+  };
+}
+
+/**
+ * Get a compilation artifact output
+ * @param project Related project
+ * @param tag Tag of the compilation
+ * @returns The compilation artifact output
+ */
+function getOutputCompilationArtifactSync(
+  project: string,
+  tag: string,
+): EthokoBuildInfoOutput {
+  try {
+    fsSync.statSync(`${ETHOKO_PATH}/${project}/tags/${tag}.json`);
+  } catch {
+    throw new Error(`artifact not found for "${project}:${tag}". Skipping`);
+  }
+
+  try {
+    const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
+    const manifestContent = fsSync.readFileSync(manifestPath, "utf-8");
+    const manifest = JSON.parse(manifestContent) as { id: string };
+
+    const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
+    const outputContent = fsSync.readFileSync(outputPath, "utf-8");
+    const output = JSON.parse(outputContent);
+    return {
+      id: manifest.id,
+      _format: output._format,
+      output: output.output,
+    };
+  } catch (e) {
+    console.error(e);
+    throw e;
+  }
+}
+
+/**
+ * Get a compilation artifact input
+ * @param project Related project
+ * @param tag Tag of the compilation
+ * @returns The compilation artifact input
+ */
+async function getInputCompilationArtifact(
+  project: string,
+  tag: string,
+): Promise<EthokoBuildInfoInput> {
   const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
   const buildInfoExists = await fs.stat(manifestPath).catch(() => false);
   if (!buildInfoExists) {
@@ -300,40 +389,35 @@ async function getCompilationArtifact(
   const manifest = manifestContentResult.value as { id: string };
 
   const inputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/input.json`;
-  const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
 
-  const [inputResult, outputResult] = await Promise.all([
-    toAsyncResult(fs.readFile(inputPath, "utf-8").then(JSON.parse)),
-    toAsyncResult(fs.readFile(outputPath, "utf-8").then(JSON.parse)),
-  ]);
+  const inputResult = await toAsyncResult(
+    fs.readFile(inputPath, "utf-8").then(JSON.parse),
+  );
+
   if (!inputResult.success) {
     console.error(inputResult.error);
     throw inputResult.error;
   }
-  if (!outputResult.success) {
-    console.error(outputResult.error);
-    throw outputResult.error;
-  }
 
   return {
     id: manifest.id,
+    _format: inputResult.value._format,
     solcLongVersion: inputResult.value.solcLongVersion,
     origin: inputResult.value.origin,
     input: inputResult.value.input,
-    output: outputResult.value.output,
   };
 }
 
 /**
- * Get a compilation artifact
+ * Get a compilation artifact input
  * @param project Related project
  * @param tag Tag of the compilation
- * @returns The compilation artifact
+ * @returns The compilation artifact input
  */
-function getCompilationArtifactSync(
+function getInputCompilationArtifactSync(
   project: string,
   tag: string,
-): EthokoBuildInfo {
+): EthokoBuildInfoInput {
   try {
     fsSync.statSync(`${ETHOKO_PATH}/${project}/tags/${tag}.json`);
   } catch {
@@ -346,17 +430,14 @@ function getCompilationArtifactSync(
     const manifest = JSON.parse(manifestContent) as { id: string };
 
     const inputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/input.json`;
-    const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
     const inputContent = fsSync.readFileSync(inputPath, "utf-8");
-    const outputContent = fsSync.readFileSync(outputPath, "utf-8");
     const input = JSON.parse(inputContent);
-    const output = JSON.parse(outputContent);
     return {
       id: manifest.id,
+      _format: input._format,
       solcLongVersion: input.solcLongVersion,
       origin: input.origin,
       input: input.input,
-      output: output.output,
     };
   } catch (e) {
     console.error(e);
@@ -384,15 +465,39 @@ function toAsyncResult<T, TError = Error>(
 // ##################### Compilation types #####################
 // #############################################################
 
-export interface EthokoBuildInfo {
+type EthokoArtifactOrigin =
+  | {
+      type: "forge-v1.6-default";
+      id: string;
+    }
+  | {
+      type: "forge-v1.6-build-info";
+      id: string;
+      format: string;
+    }
+  | {
+      type: "hardhat-v2";
+      id: string;
+      format: string;
+    }
+  | {
+      type: "hardhat-v3";
+      pairs: Array<{
+        id: string;
+        inputFormat: string;
+        outputFormat: string;
+      }>;
+    };
+export interface EthokoBuildInfoInput {
   id: string;
+  _format: "ethoko-input-v0";
   solcLongVersion: string;
-  origin: {
-    id: string;
-    format: string;
-    outputFormat?: string;
-  };
+  origin: EthokoArtifactOrigin;
   input: CompilerInput;
+}
+export interface EthokoBuildInfoOutput {
+  id: string;
+  _format: "ethoko-output-v0";
   output: CompilerOutput;
 }
 
