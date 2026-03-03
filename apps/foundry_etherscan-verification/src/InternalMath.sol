@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 library InternalMath {
-    function add(uint a, uint b) internal pure returns (uint) {
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
         return a + b;
     }
 }
