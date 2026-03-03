@@ -1,7 +1,8 @@
 import { assertType, test } from "vitest";
 import type {
   EthokoContractArtifact as TypingsEthokoContractArtifact,
-  EthokoBuildInfo,
+  EthokoBuildInfoInput,
+  EthokoBuildInfoOutput,
 } from "./typings";
 import type {
   EthokoContractArtifact,
@@ -9,10 +10,11 @@ import type {
   EthokoOutputArtifact,
 } from "@/utils/artifacts-schemas/ethoko-v0";
 
-test("EthokoBuildInfo in generated typings is ok with Ethoko artifacts", () => {
-  assertType<EthokoBuildInfo>(
-    {} as unknown as EthokoInputArtifact & EthokoOutputArtifact,
-  );
+test("EthokoBuildInfoInput in generated typings is ok with Ethoko artifacts", () => {
+  assertType<EthokoBuildInfoInput>({} as unknown as EthokoInputArtifact);
+});
+test("EthokoBuildInfoOutput in generated typings is ok with Ethoko artifacts", () => {
+  assertType<EthokoBuildInfoOutput>({} as unknown as EthokoOutputArtifact);
 });
 
 test("EthokoContractArtifact matches ContractArtifact in typings", () => {

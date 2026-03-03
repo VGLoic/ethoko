@@ -20,22 +20,22 @@ async function main() {
   }
   const etherscanClient = new EtherscanVerificationClient(ETHERSCAN_API_KEY);
 
-  const fullCompilationArtifact = await project("verified-counter")
+  const inputCompilationArtifact = await project("verified-counter")
     .tag("2026-02-02")
-    .getCompilationArtifact();
+    .getInputCompilationArtifact();
 
   const verificationPayload = {
-    compilerVersion: fullCompilationArtifact.solcLongVersion,
+    compilerVersion: inputCompilationArtifact.solcLongVersion,
     optimizationUsed:
-      fullCompilationArtifact.input.settings?.optimizer?.enabled ?? false,
+      inputCompilationArtifact.input.settings?.optimizer?.enabled ?? false,
     optimizationRuns:
-      fullCompilationArtifact.input.settings?.optimizer?.runs ?? 0,
-    evmVersion: fullCompilationArtifact.input.settings?.evmVersion ?? "london",
+      inputCompilationArtifact.input.settings?.optimizer?.runs ?? 0,
+    evmVersion: inputCompilationArtifact.input.settings?.evmVersion ?? "london",
     licenseType: "UNLICENSED" as const,
   };
 
   await etherscanClient.verifyContract({
-    sourceCode: JSON.stringify(fullCompilationArtifact.input),
+    sourceCode: JSON.stringify(inputCompilationArtifact.input),
     address: SepoliaDeployedAddresses["release_2026_02_02#ExternalMath"],
     fullyQualifiedContractName:
       "project/contracts/ExternalMath.sol:ExternalMath",
@@ -44,7 +44,7 @@ async function main() {
   });
 
   await etherscanClient.verifyContract({
-    sourceCode: JSON.stringify(fullCompilationArtifact.input),
+    sourceCode: JSON.stringify(inputCompilationArtifact.input),
     address: SepoliaDeployedAddresses["release_2026_02_02#Oracle"],
     fullyQualifiedContractName: "project/contracts/Oracle.sol:Oracle",
     constructorArguments: "", // No constructor arguments for this contract
@@ -52,7 +52,7 @@ async function main() {
   });
 
   await etherscanClient.verifyContract({
-    sourceCode: JSON.stringify(fullCompilationArtifact.input),
+    sourceCode: JSON.stringify(inputCompilationArtifact.input),
     address: SepoliaDeployedAddresses["release_2026_02_02#Counter"],
     fullyQualifiedContractName: "project/contracts/Counter.sol:Counter",
     constructorArguments: abiEncodeAddress(
