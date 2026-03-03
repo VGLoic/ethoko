@@ -11,7 +11,7 @@
     "format": "forge fmt",
     "deploy-contracts": "hardhat deploy --no-compile",
     "hardhat": "hardhat",
-    "compile": "forge build --skip test --skip script --force",
+    "compile": "forge build --skip test --skip script --use-literal-content --force",
     "check-types": "pnpm run ethoko-typings && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh"
