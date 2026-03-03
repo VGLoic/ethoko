@@ -1,5 +1,5 @@
 import { deployScript } from "../rocketh/deploy.js";
-import { EthokoContractArtifact, project } from "../.ethoko-typings";
+import { project } from "../.ethoko-typings";
 import * as RockethTypes from "rocketh/types";
 
 /**
@@ -38,34 +38,26 @@ export default deployScript(
 
     await deploy(`Counter@${TARGET_RELEASE}`, {
       account: deployer,
-      // Ethoko still needs refinement on types
-      // we use a dedicated function to cast to expected Rocketh's type
-      artifact: toRockethArtifact(counterArtifact),
+      artifact: {
+        abi: counterArtifact.abi,
+        bytecode: counterArtifact.bytecode,
+        metadata: counterArtifact.metadata,
+        // | | | | | | | | | | | | | |
+        // | | | Optional fields | | |
+        // v v v                 v v v
+        deployedBytecode: counterArtifact.deployedBytecode,
+        linkReferences: counterArtifact.linkReferences,
+        deployedLinkReferences: counterArtifact.deployedLinkReferences,
+        contractName: counterArtifact.contractName,
+        sourceName: counterArtifact.sourceName,
+        devdoc: counterArtifact.devdoc as RockethTypes.DevDoc | undefined,
+        evm: counterArtifact.evm,
+        storageLayout: counterArtifact.storageLayout as
+          | RockethTypes.StorageLayout
+          | undefined,
+        userdoc: counterArtifact.userdoc as RockethTypes.UserDoc | undefined,
+      },
     });
   },
   { tags: ["Counter", "Counter_deploy", TARGET_RELEASE] },
 );
-
-function toRockethArtifact(
-  artifact: EthokoContractArtifact,
-): RockethTypes.Artifact {
-  return {
-    abi: artifact.abi as RockethTypes.Abi,
-    bytecode: artifact.bytecode,
-    metadata: artifact.metadata,
-    // | | | | | | | | | | | | | |
-    // | | | Optional fields | | |
-    // v v v                 v v v
-    deployedBytecode: artifact.deployedBytecode,
-    linkReferences: artifact.linkReferences,
-    deployedLinkReferences: artifact.deployedLinkReferences,
-    contractName: artifact.contractName,
-    sourceName: artifact.sourceName,
-    devdoc: artifact.devdoc as RockethTypes.DevDoc | undefined,
-    evm: artifact.evm,
-    storageLayout: artifact.storageLayout as
-      | RockethTypes.StorageLayout
-      | undefined,
-    userdoc: artifact.userdoc as RockethTypes.UserDoc | undefined,
-  };
-}
