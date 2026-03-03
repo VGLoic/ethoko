@@ -8,8 +8,6 @@ import {
 } from "./solc-v0.8.33/output-json";
 import { ContractMetadataSchema } from "./solc-v0.8.33/contract-metadata-json";
 
-// Forge version at the time of writing: v1.6
-
 /**
  * Forge version at the time of writing: v1.6
  *
@@ -29,12 +27,12 @@ import { ContractMetadataSchema } from "./solc-v0.8.33/contract-metadata-json";
  * forge build --use-literal-content --force
  * ```
  *
- * It will output:
- * 1. one JSON file in `build-info` directory. This file is very small and only contains:
+ * It will output in the `out` directory by default:
+ * 1. one JSON file in `out/build-info` directory. This file is very small and only contains:
  *  - the `id` field, which is a string that probably uniquely identifies the compilation, it is a guess,
  *  - the `language` field, which is the programming language used,
  *  - the `source_id_to_path` field, which is a mapping from contract ID as number (e.g. "0", "1", etc.) to the source file path.
- * 2. one JSON file PER contract.
+ * 2. one JSON file PER contract, e.g. `out/Counter.sol/Counter.json`.
  *    The filename is the name of the contract, e.g. `Counter.json`.
  *    The contract file is contained a directory named as either:
  *     - either the filename containing the contract, e.g. `Counter.sol`. It will be the usual case when there is no conflict on the filename, e.g. `path/to/Counter.sol` and `path/to/other/Counter.sol`,
@@ -51,8 +49,8 @@ import { ContractMetadataSchema } from "./solc-v0.8.33/contract-metadata-json";
  * forge build --build-info --use-literal-content --force
  * ```
  *
- * It will output
- * 1. one JSON file in `build-info` directory.
+ * It will output in the `out` directory by default:
+ * 1. one JSON file in `out/build-info` directory.
  *    This file is much larger than the one in the `default` format and contains all the information about the compilation, including the input and output of the compiler, as well as additional information such as the solc version used for the compilation.
  *    See the `ForgeCompilerOutputWithBuildInfoOptionSchema` for the content of this JSON file.
  * 2. one JSON file PER contract, with the same format as in the `default` format.
