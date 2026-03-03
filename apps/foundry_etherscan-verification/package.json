@@ -10,7 +10,7 @@
     "format-contracts": "forge fmt",
     "format": "forge fmt",
     "hardhat": "hardhat",
-    "compile": "forge build --skip test --skip script --force",
+    "compile": "forge build --skip test --skip script --force --use-literal-content",
     "check-types": "pnpm run ethoko-typings && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh",

@@ -1,5 +1,5 @@
 import SepoliaDeployedAddresses from "./../ignition/deployments/chain-11155111/deployed_addresses.json" with { type: "json" };
-import { project } from "./../.ethoko-typings/index.js";
+import { EthokoBuildInfo, project } from "./../.ethoko-typings/index.js";
 import "dotenv/config";
 
 async function main() {
@@ -34,32 +34,60 @@ async function main() {
     licenseType: "UNLICENSED" as const,
   };
 
+  const patchedSourceCodeInput = patchInputSources(
+    fullCompilationArtifact.input,
+  );
+  const stringifiedSourceCodeInput = JSON.stringify(
+    patchedSourceCodeInput,
+    null,
+    2,
+  );
+
   await etherscanClient.verifyContract({
-    sourceCode: JSON.stringify(fullCompilationArtifact.input),
+    sourceCode: stringifiedSourceCodeInput,
     address: SepoliaDeployedAddresses["release_2026_02_02#ExternalMath"],
-    fullyQualifiedContractName:
-      "project/contracts/ExternalMath.sol:ExternalMath",
+    fullyQualifiedContractName: "src/ExternalMath.sol:ExternalMath",
     constructorArguments: "", // No constructor arguments for this contract
     ...verificationPayload,
   });
 
   await etherscanClient.verifyContract({
-    sourceCode: JSON.stringify(fullCompilationArtifact.input),
+    sourceCode: stringifiedSourceCodeInput,
     address: SepoliaDeployedAddresses["release_2026_02_02#Oracle"],
-    fullyQualifiedContractName: "project/contracts/Oracle.sol:Oracle",
+    fullyQualifiedContractName: "src/Oracle.sol:Oracle",
     constructorArguments: "", // No constructor arguments for this contract
     ...verificationPayload,
   });
 
   await etherscanClient.verifyContract({
-    sourceCode: JSON.stringify(fullCompilationArtifact.input),
+    sourceCode: stringifiedSourceCodeInput,
     address: SepoliaDeployedAddresses["release_2026_02_02#Counter"],
-    fullyQualifiedContractName: "project/contracts/Counter.sol:Counter",
+    fullyQualifiedContractName: "src/Counter.sol:Counter",
     constructorArguments: abiEncodeAddress(
       SepoliaDeployedAddresses["release_2026_02_02#Oracle"],
     ), // Address of the Oracle contract as constructor argument
     ...verificationPayload,
   });
+}
+
+function patchInputSources(
+  input: EthokoBuildInfo["input"],
+): EthokoBuildInfo["input"] {
+  const updatedSources: Record<string, { content: string }> = {};
+  for (const [key, source] of Object.entries(input.sources)) {
+    const content = source.content;
+    if (!content) {
+      throw new Error(
+        `Unexpected source format for ${key}: missing 'content' field`,
+      );
+    }
+    // Remove `urls` and `license` fields if they exist, and keep only the `content`
+    updatedSources[key] = { content };
+  }
+  return {
+    ...input,
+    sources: updatedSources,
+  };
 }
 
 function abiEncodeAddress(address: string): string {
@@ -89,6 +117,19 @@ class EtherscanVerificationClient {
       module: "contract",
       action: "verifysourcecode",
       contractaddress: payload.address,
+      /**
+       * Notes:
+       * - do not accept the `urls`, `license` fields in sources
+       * ```
+       * "src/Oracle.sol": {
+       *  "license": "UNLICENSED",
+       *  "keccak256": "0xa51dd1806d8690e1e744d9fdabb2cb09705f42c942c0adf165cb9a34ee41b7e0",
+       *  "urls": [],
+       *  "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity ^0.8.28;\n\ncontract Oracle {\n    uint public by;\n\n    event Updated(uint by);\n\n    function set(uint _by) public {\n        by = _by;\n        emit Updated(_by);\n    }\n}\n"
+       * }
+       * ```
+       * The `content` and `keccak256` are accepted
+       */
       sourceCode: payload.sourceCode,
       codeformat: "solidity-standard-json-input",
       contractname: payload.fullyQualifiedContractName,
