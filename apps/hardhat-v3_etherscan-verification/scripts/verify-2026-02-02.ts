@@ -1,5 +1,5 @@
 import SepoliaDeployedAddresses from "./../ignition/deployments/chain-11155111/deployed_addresses.json" with { type: "json" };
-import { project } from "./../.ethoko-typings/index.js";
+import { project } from "./../.ethoko-typings";
 import "dotenv/config";
 
 async function main() {
