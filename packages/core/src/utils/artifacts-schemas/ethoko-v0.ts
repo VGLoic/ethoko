@@ -1,12 +1,12 @@
 import z from "zod";
 import { SolcJsonInputSchema } from "./solc-v0.8.33/input-json";
 import { SolcJsonOutputSchema } from "./solc-v0.8.33/output-json";
-import { FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT } from "./forge-v1";
-import { HARDHAT_V2_COMPILER_OUTPUT_FORMAT } from "./hardhat-v2";
+import { FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT } from "./supported-origins/forge-v1";
+import { HARDHAT_V2_COMPILER_OUTPUT_FORMAT } from "./supported-origins/hardhat-v2";
 import {
   HARDHAT_V3_COMPILER_OUTPUT_FORMAT,
   HARDHAT_V3_COMPILER_INPUT_FORMAT,
-} from "./hardhat-v3";
+} from "./supported-origins/hardhat-v3";
 
 const EthokoArtifactOriginSchema = z.discriminatedUnion("type", [
   z.object({

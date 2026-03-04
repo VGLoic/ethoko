@@ -5,11 +5,11 @@ import {
 import fs from "fs/promises";
 import { CliError } from "../error";
 import { toAsyncResult, toResult } from "@/utils/result";
-import { HardhatV2CompilerOutputSchema } from "@/utils/artifacts-schemas/hardhat-v2";
+import { HardhatV2CompilerOutputSchema } from "@/utils/artifacts-schemas/supported-origins/hardhat-v2";
 import {
   ForgeCompilerDefaultOutputSchema,
   ForgeCompilerOutputWithBuildInfoOptionSchema,
-} from "@/utils/artifacts-schemas/forge-v1";
+} from "@/utils/artifacts-schemas/supported-origins/forge-v1";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import type { BuildInfoPath } from "./look-for-build-info-json-file";
 import { forgeArtifactsToEthokoArtifact } from "./format-specific-mappers/forge-artifacts-to-ethoko-artifact";

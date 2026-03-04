@@ -4,15 +4,15 @@ import { styleText } from "util";
 import { type Ora, LOG_COLORS } from "@/cli-ui/utils";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
-import { FormatInferenceHardhatV2CompilerOutputSchema } from "@/utils/artifacts-schemas/hardhat-v2";
+import { FormatInferenceHardhatV2CompilerOutputSchema } from "@/utils/artifacts-schemas/supported-origins/hardhat-v2";
 import {
   FormatInferenceHardhatV3CompilerInputPieceSchema,
   FormatInferenceHardhatV3CompilerOutputPieceSchema,
-} from "@/utils/artifacts-schemas/hardhat-v3";
+} from "@/utils/artifacts-schemas/supported-origins/hardhat-v3";
 import {
   FormatInferenceForgeCompilerOutputDefaultFormatSchema,
   FormatInferenceForgeCompilerOutputWithBuildInfoOptionSchema,
-} from "@/utils/artifacts-schemas/forge-v1";
+} from "@/utils/artifacts-schemas/supported-origins/forge-v1";
 
 export type BuildInfoPath =
   | {

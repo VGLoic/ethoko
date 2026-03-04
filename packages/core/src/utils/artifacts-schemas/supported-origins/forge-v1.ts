@@ -1,12 +1,12 @@
 import z from "zod";
 
-import { SolcJsonInputSchema } from "./solc-v0.8.33/input-json";
+import { SolcJsonInputSchema } from "../solc-v0.8.33/input-json";
 import {
   AbiItemSchema,
   BytecodeSchema,
   SolcJsonOutputSchema,
-} from "./solc-v0.8.33/output-json";
-import { ContractMetadataSchema } from "./solc-v0.8.33/contract-metadata-json";
+} from "../solc-v0.8.33/output-json";
+import { ContractMetadataSchema } from "../solc-v0.8.33/contract-metadata-json";
 
 /**
  * Forge version at the time of writing: v1.6
