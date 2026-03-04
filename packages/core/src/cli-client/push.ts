@@ -149,9 +149,9 @@ export async function push(
     // For Forge, we encourage users to use the `--use-literal-content` option to ensure the content is included in the artifact, which can help with later verification and debugging
     if (
       ethokoArtifactParsingResult.value.inputArtifact.origin.type ===
-        "forge-v1.6-build-info" ||
+        "forge-v1-with-build-info-option" ||
       ethokoArtifactParsingResult.value.inputArtifact.origin.type ===
-        "forge-v1.6-default"
+        "forge-v1-default"
     ) {
       warn(
         `The provided Forge compilation artifacts do not include the literal content of the sources. We recommend using the "--use-literal-content" option when generating the build info files with Forge to include the content in the artifact, which can help with later verification and debugging.`,

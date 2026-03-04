@@ -237,7 +237,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
     _format: "ethoko-input-v0",
     solcLongVersion: solcLongVersion ?? "unknown",
     origin: {
-      type: "forge-v1.6-default",
+      type: "forge-v1-default",
       id: forgeBuildInfo.id,
     },
     input: inputParsingResult.data,

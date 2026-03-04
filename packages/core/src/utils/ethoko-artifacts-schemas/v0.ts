@@ -8,15 +8,14 @@ import {
   HARDHAT_V3_COMPILER_INPUT_FORMAT,
 } from "../supported-origins/hardhat-v3/schemas";
 
-// REMIND ME: think about this origin
 const EthokoArtifactOriginSchema = z.discriminatedUnion("type", [
   z.object({
     id: z.string(),
-    type: z.literal("forge-v1.6-default"),
+    type: z.literal("forge-v1-default"),
   }),
   z.object({
     id: z.string(),
-    type: z.literal("forge-v1.6-build-info"),
+    type: z.literal("forge-v1-with-build-info-option"),
     format: z.literal(FORGE_COMPILER_OUTPUT_WITH_BUILD_INFO_OPTION_FORMAT),
   }),
   z.object({

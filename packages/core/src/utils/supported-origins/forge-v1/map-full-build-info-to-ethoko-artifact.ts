@@ -78,7 +78,7 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
     id,
     _format: "ethoko-input-v0",
     origin: {
-      type: "forge-v1.6-build-info",
+      type: "forge-v1-with-build-info-option",
       id: forgeBuildInfo.id,
       format: forgeBuildInfo._format,
     },
