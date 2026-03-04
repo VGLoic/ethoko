@@ -19,91 +19,98 @@ export const TEST_CONSTANTS = {
     LATEST: "latest",
   },
   ARTIFACTS_FIXTURES: {
-    HARDHAT_V2_COUNTER: {
-      folderPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/counter_hardhat-v2",
-      ),
-      buildInfoPaths: [
-        path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_hardhat-v2/build-info/sample-artifact.json",
-        ),
-      ],
-      fullyQualifiedContractPaths: [
-        "src/Counter.sol:Counter",
-        "src/IncrementOracle.sol:IncrementOracle",
-      ],
-      exportExpectedResult: {
-        path: "src/Counter.sol",
-        name: "Counter",
-        abiPath: path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_hardhat-v2/abis/counter.json",
-        ),
-      },
-    },
-    HARDHAT_V3_COUNTER: {
-      folderPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/counter_hardhat-v3",
-      ),
-      buildInfoPaths: [
-        path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_hardhat-v3/build-info/sample-artifact.json",
-        ),
-      ],
-      fullyQualifiedContractPaths: ["project/contracts/Counter.sol:Counter"],
-      exportExpectedResult: {
-        path: "project/contracts/Counter.sol",
-        name: "Counter",
-        abiPath: path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_hardhat-v3/abis/counter.json",
-        ),
-      },
-    },
-    FOUNDRY_COUNTER: {
-      folderPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/counter_foundry-default",
-      ),
-      buildInfoPaths: [
-        path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_foundry-default/build-info/sample-artifact.json",
-        ),
-      ],
-      fullyQualifiedContractPaths: ["src/Counter.sol:Counter"],
-      exportExpectedResult: {
-        path: "src/Counter.sol",
-        name: "Counter",
-        abiPath: path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_foundry-default/abis/counter.json",
-        ),
-      },
-    },
-    FOUNDRY_BUILD_INFO_COUNTER: {
-      folderPath: path.resolve(
-        process.cwd(),
-        "test/fixtures/counter_foundry-build-info",
-      ),
-      buildInfoPaths: [
-        path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_foundry-build-info/build-info/sample-artifact.json",
-        ),
-      ],
-      fullyQualifiedContractPaths: ["src/Counter.sol:Counter"],
-      exportExpectedResult: {
-        path: "src/Counter.sol",
-        name: "Counter",
-        abiPath: path.resolve(
-          process.cwd(),
-          "test/fixtures/counter_foundry-build-info/abis/counter.json",
-        ),
+    // Group #1: Unique Counter contract
+    COUNTER: {
+      TARGETS: {
+        HARDHAT_V2: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter_hardhat-v2",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_hardhat-v2/build-info/sample-artifact.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "src/Counter.sol:Counter",
+            "src/IncrementOracle.sol:IncrementOracle",
+          ],
+          exportExpectedResult: {
+            path: "src/Counter.sol",
+            name: "Counter",
+            abiPath: path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_hardhat-v2/abis/counter.json",
+            ),
+          },
+        },
+        HARDHAT_V3: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter_hardhat-v3",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_hardhat-v3/build-info/sample-artifact.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "project/contracts/Counter.sol:Counter",
+          ],
+          exportExpectedResult: {
+            path: "project/contracts/Counter.sol",
+            name: "Counter",
+            abiPath: path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_hardhat-v3/abis/counter.json",
+            ),
+          },
+        },
+        FOUNDRY_DEFAULT: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter_foundry-default",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_foundry-default/build-info/sample-artifact.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: ["src/Counter.sol:Counter"],
+          exportExpectedResult: {
+            path: "src/Counter.sol",
+            name: "Counter",
+            abiPath: path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_foundry-default/abis/counter.json",
+            ),
+          },
+        },
+        FOUNDRY_BUILD_INFO: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter_foundry-build-info",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_foundry-build-info/build-info/sample-artifact.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: ["src/Counter.sol:Counter"],
+          exportExpectedResult: {
+            path: "src/Counter.sol",
+            name: "Counter",
+            abiPath: path.resolve(
+              process.cwd(),
+              "test/fixtures/counter_foundry-build-info/abis/counter.json",
+            ),
+          },
+        },
       },
     },
   },

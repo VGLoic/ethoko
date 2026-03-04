@@ -16,16 +16,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     storageProviderTest.for([
       [
         "Hardhat V2 Counter",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V2_COUNTER,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
       ],
-      ["Foundry Counter", TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_COUNTER],
+      [
+        "Foundry Counter",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
+      ],
       [
         "Hardhat V3 Counter",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
       ],
       [
         "Foundry Build Info Counter",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.FOUNDRY_BUILD_INFO_COUNTER,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
       ],
     ] as const)(
       "push artifact [%s] without tag → pull by ID",
@@ -116,7 +119,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 
@@ -176,7 +179,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           TEST_CONSTANTS.PROJECTS.MULTI_ARTIFACT,
         );
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 
@@ -226,7 +229,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         );
         const tag = TEST_CONSTANTS.TAGS.LATEST;
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 
@@ -275,7 +278,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 

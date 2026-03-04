@@ -19,7 +19,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 
@@ -105,7 +105,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       async ({ storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 
@@ -173,7 +173,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await localStorage.ensureProjectSetup(project);
 
         const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.HARDHAT_V3_COUNTER;
+          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         const artifactId = await push(
           artifactFixture.folderPath,
