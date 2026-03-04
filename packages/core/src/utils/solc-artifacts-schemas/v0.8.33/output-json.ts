@@ -177,7 +177,8 @@ export const SolcContractSchema = z.object({
         external: z.record(z.string(), z.string()).optional(),
         internal: z.record(z.string(), z.string()).optional(),
       })
-      .optional(),
+      .optional()
+      .nullable(),
   }),
 });
 

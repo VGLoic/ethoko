@@ -1,8 +1,5 @@
 import z from "zod";
-import {
-  FormatInferenceHardhatV2CompilerOutputSchema,
-  HardhatV2CompilerOutputSchema,
-} from "./schemas";
+import { FormatInferenceHardhatV2CompilerOutputSchema } from "./schemas";
 
 export type InferredHardhatV2Artifacts = {
   "hardhat-v2": z.infer<typeof FormatInferenceHardhatV2CompilerOutputSchema>;
@@ -22,7 +19,7 @@ export function inferHardhatV2Artifact(data: unknown):
   | {
       recognized: false;
     } {
-  const result = HardhatV2CompilerOutputSchema.safeParse(data);
+  const result = FormatInferenceHardhatV2CompilerOutputSchema.safeParse(data);
   if (result.success) {
     return {
       recognized: true,

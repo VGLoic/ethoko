@@ -120,7 +120,8 @@ export const EthokoContractArtifactSchema = z.object({
         external: z.record(z.string(), z.string()).optional(),
         internal: z.record(z.string(), z.string()).optional(),
       })
-      .optional(),
+      .optional()
+      .nullable(),
     methodIdentifiers: z.record(z.string(), z.string()).optional(),
   }),
 });

@@ -14,20 +14,24 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest.for([
       [
-        "Hardhat V3",
+        "COUNTER - Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
       ],
       [
-        "Hardhat V2",
+        "COUNTER - Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
       ],
       [
-        "Forge default",
+        "COUNTER - Forge default",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
       ],
       [
-        "Forge with build-info",
+        "COUNTER - Forge with build-info",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+      ],
+      [
+        "MIX - Hardhat v2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
       ],
     ] as const)(
       "%s artifacts - inspect artifact by tag",
@@ -44,7 +48,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           {
             force: false,
-            debug: false,
+            debug: true,
             silent: true,
           },
         );
@@ -93,20 +97,24 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest.for([
       [
-        "Hardhat V3",
+        "COUNTER - Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
       ],
       [
-        "Hardhat V2",
+        "COUNTER - Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
       ],
       [
-        "Forge default",
+        "COUNTER - Forge default",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
       ],
       [
-        "Forge with build-info",
+        "COUNTER - Forge with build-info",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+      ],
+      [
+        "MIX - Hardhat v2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
       ],
     ] as const)(
       "%s artifacts - inspect artifact by ID",

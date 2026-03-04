@@ -17,22 +17,34 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       [
         "Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
       ],
       [
         "Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
       ],
       [
         "Forge default",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
       ],
       [
         "Forge with build-info",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
+      ],
+      [
+        "MIX - Hardhat v2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
       ],
     ] as const)(
       "%s artifacts - export contract artifact by tag",
-      async ([, artifactFixture], { storageProvider, localStorage }) => {
+      async (
+        [, artifactFixture, abiPath],
+        { storageProvider, localStorage },
+      ) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
 
@@ -88,7 +100,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
         expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = await fs
-          .readFile(TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI, "utf-8")
+          .readFile(abiPath, "utf-8")
           .then(JSON.parse);
         expect(exportResult.abi).toEqual(expectedAbi);
       },
@@ -98,22 +110,34 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       [
         "Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
       ],
       [
         "Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
       ],
       [
         "Forge default",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
       ],
       [
         "Forge with build-info",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
+      ],
+      [
+        "MIX - Hardhat v2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
       ],
     ] as const)(
       "%s artifacts - export contract artifact by ID",
-      async ([, artifactFixture], { storageProvider, localStorage }) => {
+      async (
+        [, artifactFixture, abiPath],
+        { storageProvider, localStorage },
+      ) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
         await localStorage.ensureProjectSetup(project);
@@ -168,7 +192,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
         expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = await fs
-          .readFile(TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI, "utf-8")
+          .readFile(abiPath, "utf-8")
           .then(JSON.parse);
         expect(exportResult.abi).toEqual(expectedAbi);
       },

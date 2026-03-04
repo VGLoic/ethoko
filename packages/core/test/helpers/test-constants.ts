@@ -95,6 +95,43 @@ export const TEST_CONSTANTS = {
         },
       },
     },
+    // Group #2: Mix
+    // InternalMath: internal library
+    // ExternalMath: external library
+    // Oracle: contract: depending of Ownable of OpenZeppelin
+    // Counter contract: depending of InternalMath, ExternalMath and Oracle contracts
+    MIX: {
+      COUNTER_ABI: path.resolve(
+        process.cwd(),
+        "test/fixtures/mix.counter.abi.json",
+      ),
+      TARGETS: {
+        HARDHAT_V2: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix_hardhat-v2",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_hardhat-v2/build-info/963d2d0b62f97ac589d652e367f38cfe.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
+            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "src/Counter.sol:Counter",
+            "src/ExternalMath.sol:ExternalMath",
+            "src/InternalMath.sol:InternalMath",
+            "src/Oracle.sol:Oracle",
+          ],
+          exportExpectedResult: {
+            path: "src/Counter.sol",
+            name: "Counter",
+          },
+        },
+      },
+    },
   },
   PATHS: {
     TEMP_DIR_PREFIX: "ethoko-test-",

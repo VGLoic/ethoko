@@ -15,20 +15,24 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest.for([
       [
-        "Hardhat V2 Counter",
+        "COUNTER - Hardhat V2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
       ],
       [
-        "Foundry Counter",
+        "COUNTER - Foundry",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
       ],
       [
-        "Hardhat V3 Counter",
+        "COUNTER - Hardhat V3",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
       ],
       [
-        "Foundry Build Info Counter",
+        "COUNTER - Foundry Build Info",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+      ],
+      [
+        "MIX - Hardhat v2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
       ],
     ] as const)(
       "push artifact [%s] without tag → pull by ID",
