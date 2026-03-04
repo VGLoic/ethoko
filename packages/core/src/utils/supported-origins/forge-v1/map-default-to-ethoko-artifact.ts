@@ -1,23 +1,23 @@
+import fs from "fs/promises";
+import path from "path";
+import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
   EthokoInputArtifact,
   EthokoInputArtifactSchema,
   EthokoOutputArtifact,
   EthokoOutputArtifactSchema,
-} from "@/utils/artifacts-schemas/ethoko-v0";
-import { ForgeCompilerDefaultOutputSchema } from "@/utils/artifacts-schemas/forge-v1";
-import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
+} from "@/utils/ethoko-artifacts-schemas/v0";
+import { ForgeCompilerDefaultOutputSchema } from "./schemas";
 import z from "zod";
-import path from "path";
 import {
   SettingsSchema,
   SolcJsonInputSchema,
-} from "@/utils/artifacts-schemas/solc-v0.8.33/input-json";
+} from "@/utils/solc-artifacts-schemas/v0.8.33/input-json";
 import {
   SolcContractSchema,
   SolcJsonOutputSchema,
-} from "@/utils/artifacts-schemas/solc-v0.8.33/output-json";
-import { lookForForgeContractArtifactPath } from "./retrieve-forge-contract-artifacts-paths";
-import { warn } from "@/cli-ui/utils";
+} from "@/utils/solc-artifacts-schemas/v0.8.33/output-json";
+import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-artifact-paths";
 
 /**
  * The default Forge build info format splits the contract output into multiple files, the build info file contains only the mapping to these files.
@@ -40,17 +40,41 @@ import { warn } from "@/cli-ui/utils";
  *    - we parse the content, we reconstruct the output and input parts
  * At the end, we compare the contracts we explored with the mapping in the build info file, if they match, we can be confident that we reconstructed the input and output correctly, and we can return the Ethoko artifacts.
  * @param buildInfoPath The path to the Forge build info JSON file (the one in the build-info folder)
- * @param forgeBuildInfo The parsed content of the Forge build info JSON file
+ * @param debug Whether to enable debug logging
  */
-export async function forgeArtifactsToEthokoArtifact(
+export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   buildInfoPath: string,
-  forgeBuildInfo: z.infer<typeof ForgeCompilerDefaultOutputSchema>,
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputArtifact: EthokoOutputArtifact;
-  additionalArtifactsPaths: string[];
+  originalContentPaths: string[];
 }> {
+  const jsonContent = await fs
+    .readFile(buildInfoPath, "utf-8")
+    .then(JSON.parse)
+    .catch((error) => {
+      if (debug) {
+        console.error(
+          `Failed to read or parse the build info file "${buildInfoPath}". Error: ${error}`,
+        );
+      }
+      throw error;
+    });
+
+  const buildInfoParsingResult =
+    ForgeCompilerDefaultOutputSchema.safeParse(jsonContent);
+  if (!buildInfoParsingResult.success) {
+    if (debug) {
+      console.error(
+        `Failed to parse the build info file "${buildInfoPath}" as a Forge v1 default compiler output format. Error: ${buildInfoParsingResult.error}`,
+      );
+    }
+    throw buildInfoParsingResult.error;
+  }
+
+  const forgeBuildInfo = buildInfoParsingResult.data;
+
   const expectedSourceIdToPath = new Map(
     Object.entries(forgeBuildInfo.source_id_to_path),
   );
@@ -184,7 +208,7 @@ export async function forgeArtifactsToEthokoArtifact(
     }
 
     if (debug) {
-      warn(
+      console.error(
         `Some contract artifact paths were not visited during the retrieval of Forge contract artifacts. This might be due to a change in the Forge output format or contract files containing pure types. Missing contract paths:\n${pathsNotVisited.join(
           ",\n",
         )}.`,
@@ -213,7 +237,7 @@ export async function forgeArtifactsToEthokoArtifact(
     _format: "ethoko-input-v0",
     solcLongVersion: solcLongVersion ?? "unknown",
     origin: {
-      type: "forge-v1.6-default",
+      type: "forge-v1-default",
       id: forgeBuildInfo.id,
     },
     input: inputParsingResult.data,
@@ -242,7 +266,7 @@ export async function forgeArtifactsToEthokoArtifact(
   return {
     inputArtifact: inputArtifactResult.data,
     outputArtifact: outputArtifactResult.data,
-    additionalArtifactsPaths,
+    originalContentPaths: additionalArtifactsPaths.concat(buildInfoPath),
   };
 }
 

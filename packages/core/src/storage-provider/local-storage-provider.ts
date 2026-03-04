@@ -9,7 +9,7 @@ import {
   EthokoOutputArtifact,
   TagManifest,
   TagManifestSchema,
-} from "../utils/artifacts-schemas/ethoko-v0";
+} from "../utils/ethoko-artifacts-schemas/v0";
 import { StorageProvider } from "./storage-provider.interface";
 
 type LocalStorageProviderConfig = {

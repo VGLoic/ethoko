@@ -467,11 +467,11 @@ function toAsyncResult<T, TError = Error>(
 
 type EthokoArtifactOrigin =
   | {
-      type: "forge-v1.6-default";
+      type: "forge-v1-default";
       id: string;
     }
   | {
-      type: "forge-v1.6-build-info";
+      type: "forge-v1-with-build-info-option";
       id: string;
       format: string;
     }

@@ -6,7 +6,7 @@ import { CliError } from "./error";
 import type {
   EthokoInputArtifact,
   EthokoOutputArtifact,
-} from "../utils/artifacts-schemas/ethoko-v0";
+} from "../utils/ethoko-artifacts-schemas/v0";
 
 export type InspectResult = {
   project: string;

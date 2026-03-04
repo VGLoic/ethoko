@@ -7,7 +7,7 @@ import {
   EthokoOutputArtifactSchema,
   TagManifest,
   TagManifestSchema,
-} from "./utils/artifacts-schemas/ethoko-v0";
+} from "./utils/ethoko-artifacts-schemas/v0";
 
 /**
  * Local storage implementation for storing artifacts on the local filesystem.

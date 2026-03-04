@@ -347,13 +347,17 @@ Note: Use `console.error()` for task output (not `console.log()`) to ensure prop
 
 ```
 packages/core/
-├── src/                      # Source backing package exports
-│   ├── cli-client/           # CLI client entrypoints (push/pull/diff/typings)
-│   ├── storage-provider/     # Storage provider interfaces and implementations
-│   ├── cli-ui/               # CLI UI primitives (spinners, output helpers)
-│   └── local-storage.ts      # Local artifact storage read/write utilities
-├── package.json              # Package metadata and exports map
-└── README.md                 # Public API overview and usage
+├── src/                               # Source backing package exports
+│   ├── cli-client/                    # CLI client entrypoints (push/pull/diff/typings)
+│   ├── cli-ui/                        # CLI UI primitives (spinners, output helpers)
+│   ├── storage-provider/              # Storage provider interfaces and implementations
+│   ├── utils/                         # Utility functions and helpers
+│   │   ├── supported-origins/         # Logic for mapping supported artifact formats to Ethoko format
+│   │   ├── ethoko-artifacts-schemas/  # Zod schemas for Ethoko artifact formats
+│   │   └── solc-artifact-schemas/     # Zod schemas for standard solc artifact formats
+│   └── local-storage.ts               # Local artifact storage read/write utilities
+├── package.json                       # Package metadata and exports map
+└── README.md                          # Public API overview and usage
 ```
 
 ## Best Practices

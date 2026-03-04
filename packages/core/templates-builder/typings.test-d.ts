@@ -8,7 +8,7 @@ import type {
   EthokoContractArtifact,
   EthokoInputArtifact,
   EthokoOutputArtifact,
-} from "@/utils/artifacts-schemas/ethoko-v0";
+} from "@/utils/ethoko-artifacts-schemas/v0";
 
 test("EthokoBuildInfoInput in generated typings is ok with Ethoko artifacts", () => {
   assertType<EthokoBuildInfoInput>({} as unknown as EthokoInputArtifact);

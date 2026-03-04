@@ -1,6 +1,6 @@
 import z from "zod";
 import crypto from "crypto";
-import { SolcJsonInputSchema } from "./artifacts-schemas/solc-v0.8.33/input-json";
+import { SolcJsonInputSchema } from "./solc-artifacts-schemas/v0.8.33/input-json";
 
 /**
  * We initialize a sha256 hash.

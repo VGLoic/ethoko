@@ -1,5 +1,5 @@
 import { LocalStorage } from "../local-storage";
-import { EthokoContractArtifact } from "../utils/artifacts-schemas/ethoko-v0";
+import { EthokoContractArtifact } from "../utils/ethoko-artifacts-schemas/v0";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 

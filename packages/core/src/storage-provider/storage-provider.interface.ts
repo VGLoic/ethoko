@@ -2,7 +2,7 @@ import { Stream } from "stream";
 import {
   EthokoInputArtifact,
   EthokoOutputArtifact,
-} from "../utils/artifacts-schemas/ethoko-v0";
+} from "../utils/ethoko-artifacts-schemas/v0";
 
 /**
  * Storage providers implement the persistence layer for Ethoko artifacts.
