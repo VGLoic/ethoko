@@ -3,26 +3,42 @@ import { createSpinner, warn } from "@/cli-ui/utils";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import { lookForBuildInfoJsonFile } from "./helpers/look-for-build-info-json-file";
-import { mapBuildInfoToEthokoArtifact } from "./helpers/map-build-info-to-ethoko-artifact";
-import { BuildInfoPath } from "./helpers/look-for-build-info-json-file";
+import {
+  mapOriginalArtifactToEthokoArtifact,
+  OriginalBuildInfoPaths,
+} from "@/utils/supported-origins/map-original-artifact-to-ethoko-artifact";
 
-function buildInfoPathToSuccessText(buildInfoPath: BuildInfoPath): string {
-  if (buildInfoPath.format === "hardhat-v3") {
+function buildInfoPathToSuccessText(paths: OriginalBuildInfoPaths): string {
+  if (paths.format === "hardhat-v3") {
     return `Hardhat v3 compilation artifact found`;
   }
-  if (buildInfoPath.format === "hardhat-v2") {
+  if (paths.format === "hardhat-v2") {
     return `Hardhat v2 compilation artifact found`;
   }
   if (
-    buildInfoPath.format === "forge-v1-default" ||
-    buildInfoPath.format === "forge-v1-with-build-info-option"
+    paths.format === "forge-v1-default" ||
+    paths.format === "forge-v1-with-build-info-option"
   ) {
-    return `Forge compilation artifact found at ${buildInfoPath.buildInfoPath}`;
+    return `Forge compilation artifact found at ${paths.buildInfoPath}`;
   }
   throw new Error(
-    `Unsupported build info format: ${buildInfoPath.format satisfies never}`,
+    `Unsupported build info format: ${paths.format satisfies never}`,
   );
 }
+
+const FORMAT_TO_ERROR_MESSAGE: Record<
+  OriginalBuildInfoPaths["format"],
+  string
+> = {
+  "hardhat-v3":
+    "Hardhat v3 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
+  "hardhat-v2":
+    "Hardhat v2 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Hardhat v2 build info JSON file or contact us. Run with debug mode for more info.",
+  "forge-v1-with-build-info-option":
+    "Forge v1 compilation artifacts with the build info option have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 build info JSON file or contact us. Run with debug mode for more info.",
+  "forge-v1-default":
+    "Forge v1 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 build info JSON file or contact us. Run with debug mode for more info.",
+};
 
 /**
  * Run the push command of the CLI client, it consists of three steps:
@@ -56,19 +72,21 @@ export async function push(
     "Looking for compilation artifact...",
     opts.silent,
   );
-  const buildInfoPathResult = await toAsyncResult(
+  const originalBuildInfoPathsResult = await toAsyncResult(
     lookForBuildInfoJsonFile(artifactPath, spinner1, {
       debug: opts.debug,
       silent: opts.silent,
       isCI: opts.isCI,
     }),
   );
-  if (!buildInfoPathResult.success) {
+  if (!originalBuildInfoPathsResult.success) {
     spinner1.fail("Failed to find compilation artifact");
     // @dev the lookForBuildInfoJsonFile function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
-    throw buildInfoPathResult.error;
+    throw originalBuildInfoPathsResult.error;
   }
-  spinner1.succeed(buildInfoPathToSuccessText(buildInfoPathResult.value));
+  spinner1.succeed(
+    buildInfoPathToSuccessText(originalBuildInfoPathsResult.value),
+  );
 
   // Step 2: Parse the compilation artifact, mapping it to the Ethoko format
   const spinner2 = createSpinner(
@@ -76,12 +94,18 @@ export async function push(
     opts.silent,
   );
   const ethokoArtifactParsingResult = await toAsyncResult(
-    mapBuildInfoToEthokoArtifact(buildInfoPathResult.value, opts.debug),
+    mapOriginalArtifactToEthokoArtifact(
+      originalBuildInfoPathsResult.value,
+      opts.debug,
+    ),
+    { debug: opts.debug },
   );
   if (!ethokoArtifactParsingResult.success) {
     spinner2.fail("Unable to handle the provided compilation artifact");
-    // @dev the mapBuildInfoToEthokoArtifact function throws an Error with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
-    throw ethokoArtifactParsingResult.error;
+    throw new CliError(
+      FORMAT_TO_ERROR_MESSAGE[originalBuildInfoPathsResult.value.format] ||
+        `An error occurred while mapping the build info to Ethoko artifacts. Please provide valid build info JSON files or contact us. Run with debug mode for more info.`,
+    );
   }
   spinner2.succeed("Compilation artifact is valid");
 

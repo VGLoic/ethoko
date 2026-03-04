@@ -8,25 +8,7 @@ import {
   inferOriginalArtifactFormat,
   InferredArtifact,
 } from "@/utils/supported-origins/infer-original-artifact-format";
-
-export type BuildInfoPath =
-  | {
-      format:
-        | "hardhat-v2"
-        | "forge-v1-default"
-        | "forge-v1-with-build-info-option";
-      buildInfoPath: string;
-    }
-  | {
-      // REMIND ME: distinguish isolated builds
-      format: "hardhat-v3";
-      buildInfoPaths: {
-        input: string;
-        output: string;
-      }[];
-    };
-
-type SupportedBuildInfoFormat = BuildInfoPath["format"];
+import { OriginalBuildInfoPaths } from "@/utils/supported-origins/map-original-artifact-to-ethoko-artifact";
 
 /**
  * Given the input path, look for a candidate compilation artifact (build info).
@@ -73,7 +55,7 @@ export async function lookForBuildInfoJsonFile(
   inputPath: string,
   spinner: Ora,
   opts: { debug: boolean; silent?: boolean; isCI?: boolean },
-): Promise<BuildInfoPath> {
+): Promise<OriginalBuildInfoPaths> {
   const { debug, isCI = false } = opts;
   const statResult = await toAsyncResult(fs.stat(inputPath), { debug });
   if (!statResult.success) {
@@ -423,7 +405,7 @@ function filesToOptions(files: FileSummary[]): SelectionOption[] {
   const hardhatV3OptionGroups: SelectionOption[] = hardhatV3PairsGroups.map(
     (group) => {
       const display = `${formatBuildInfoFormat("hardhat-v3")} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
-      const value: BuildInfoPath = {
+      const value: OriginalBuildInfoPaths = {
         format: "hardhat-v3",
         buildInfoPaths: group.pairs.map((pair) => ({
           input: pair.input.path,
@@ -444,7 +426,7 @@ function filesToOptions(files: FileSummary[]): SelectionOption[] {
 
 type SelectionOption = {
   display: string;
-  value: BuildInfoPath;
+  value: OriginalBuildInfoPaths;
 };
 
 /**
@@ -459,7 +441,7 @@ async function promptUserSelection(
   message: string,
   options: SelectionOption[],
   timeoutMs: number = 30_000,
-): Promise<BuildInfoPath> {
+): Promise<OriginalBuildInfoPaths> {
   const readline = createInterface({
     input: process.stdin,
     output: process.stderr,
@@ -602,7 +584,7 @@ function truncateFilename(filename: string, maxLength: number = 60): string {
 }
 
 const BUILD_INFO_FORMAT_TO_HUMAN_READABLE: Record<
-  SupportedBuildInfoFormat,
+  OriginalBuildInfoPaths["format"],
   string
 > = {
   "hardhat-v2": "Hardhat v2",
@@ -610,6 +592,8 @@ const BUILD_INFO_FORMAT_TO_HUMAN_READABLE: Record<
   "forge-v1-default": "Forge",
   "forge-v1-with-build-info-option": "Forge",
 };
-function formatBuildInfoFormat(format: SupportedBuildInfoFormat): string {
+function formatBuildInfoFormat(
+  format: OriginalBuildInfoPaths["format"],
+): string {
   return BUILD_INFO_FORMAT_TO_HUMAN_READABLE[format];
 }

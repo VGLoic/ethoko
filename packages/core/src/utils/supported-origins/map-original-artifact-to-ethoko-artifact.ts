@@ -7,7 +7,7 @@ import { mapForgeV1FullBuildInfoToEthokoArtifact } from "./forge-v1/map-full-bui
 import { mapHardhatV2ArtifactToEthokoArtifact } from "./hardhat-v2/map-to-ethoko-artifact";
 import { mapHardhatV3ArtifactsToEthokoArtifact } from "./hardhat-v3/map-isolated-build-to-ethoko-artifact";
 
-export type OriginalArtifactPaths =
+export type OriginalBuildInfoPaths =
   | {
       format:
         | "forge-v1-default"
@@ -30,7 +30,7 @@ export type OriginalArtifactPaths =
  * @returns The mapped Ethoko input and output artifacts, along with the paths to the original content files that were read during the mapping process
  */
 export function mapOriginalArtifactToEthokoArtifact(
-  paths: OriginalArtifactPaths,
+  paths: OriginalBuildInfoPaths,
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
