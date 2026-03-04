@@ -1,7 +1,8 @@
 import fs from "fs/promises";
+import path from "path";
 import { createInterface } from "node:readline/promises";
 import { styleText } from "util";
-import { type Ora, LOG_COLORS } from "@/cli-ui/utils";
+import { LOG_COLORS } from "@/cli-ui/utils";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
 import {
@@ -10,8 +11,13 @@ import {
 } from "@/utils/supported-origins/infer-original-artifact-format";
 import { OriginalBuildInfoPaths } from "@/utils/supported-origins/map-original-artifact-to-ethoko-artifact";
 
+type CandidateBuildInfoOption = {
+  display: string;
+  value: OriginalBuildInfoPaths;
+};
+
 /**
- * Given the input path, look for a candidate compilation artifact (build info).
+ * Given the input path, look for candidate compilation artifacts (build info).
  *
  * This function is meant to be used in other CLI client methods, since it throws a CliError, it can be used without any wrapping, i.e.
  * ```ts
@@ -39,24 +45,22 @@ import { OriginalBuildInfoPaths } from "@/utils/supported-origins/map-original-a
  *    - we gather the pairs,
  *    - we gather the pairs with the same Solc version and with creation window close (2 minutes, based on the mtime of the files) since they are more likely to be related to the same compilation,
  *    - an option is created for each of these set of pairs, with a display name containing the Solc version and the mtime of the files for the user to differentiate them.
- * - if no option is available, we throw an error,
- * - if a single option is available, we return it,
- * - if multiple options are available, we prompt the user to select one. In CI mode, we throw an error instead of prompting.
+ * The list of options is returned to the caller, as well as the count of ignored files (files that are not recognized as valid build info files) and the final folder path where the files are located (either the inputPath or the build-info directory if it exists).
  * @param inputPath The path to look for the build info JSON file
- * @param steps Step tracker to stop spinner during prompts
  * @param opts Options for the function
  * @param opts.debug Enable debug mode
- * @param opts.silent Suppress CLI output
- * @param opts.isCI Whether running in CI environment (disables prompts)
- * @returns The path to the build info JSON file
+ * @returns An object containing the candidate artifact options, the count of ignored files, and the final folder path
  * @throws A CliError
  */
-export async function lookForBuildInfoJsonFile(
+export async function lookForCandidateArtifacts(
   inputPath: string,
-  spinner: Ora,
-  opts: { debug: boolean; silent?: boolean; isCI?: boolean },
-): Promise<OriginalBuildInfoPaths> {
-  const { debug, isCI = false } = opts;
+  opts: { debug: boolean },
+): Promise<{
+  candidateBuildInfoOptions: CandidateBuildInfoOption[];
+  ignoredFilesCount: number;
+  finalFolderPath: string;
+}> {
+  const { debug } = opts;
   const statResult = await toAsyncResult(fs.stat(inputPath), { debug });
   if (!statResult.success) {
     throw new CliError(
@@ -117,8 +121,19 @@ export async function lookForBuildInfoJsonFile(
         );
       }
       return {
-        format: "hardhat-v3",
-        buildInfoPaths: [{ input: inputPath, output: matchingOutputPath }],
+        finalFolderPath: path.dirname(inputPath),
+        ignoredFilesCount: 0,
+        candidateBuildInfoOptions: [
+          {
+            display: "Input build info",
+            value: {
+              format: "hardhat-v3",
+              buildInfoPaths: [
+                { input: inputPath, output: matchingOutputPath },
+              ],
+            },
+          },
+        ],
       };
     }
     if (format.artifact.format === "hardhat-v3-output") {
@@ -151,14 +166,32 @@ export async function lookForBuildInfoJsonFile(
         );
       }
       return {
-        format: "hardhat-v3",
-        buildInfoPaths: [{ input: matchingInputPath, output: inputPath }],
+        finalFolderPath: path.dirname(inputPath),
+        ignoredFilesCount: 0,
+        candidateBuildInfoOptions: [
+          {
+            display: "Input build info",
+            value: {
+              format: "hardhat-v3",
+              buildInfoPaths: [{ input: matchingInputPath, output: inputPath }],
+            },
+          },
+        ],
       };
     }
 
     return {
-      buildInfoPath: inputPath,
-      format: format.artifact.format,
+      finalFolderPath: path.dirname(inputPath),
+      ignoredFilesCount: 0,
+      candidateBuildInfoOptions: [
+        {
+          display: "Input build info",
+          value: {
+            buildInfoPath: inputPath,
+            format: format.artifact.format,
+          },
+        },
+      ],
     };
   }
 
@@ -285,33 +318,11 @@ export async function lookForBuildInfoJsonFile(
 
   files.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-  const options = filesToOptions(files);
-
-  const firstOption = options[0];
-
-  if (!firstOption) {
-    throw new CliError(
-      `No valid JSON files found in "${finalFolderPath}". Please make sure the directory contains valid build info JSON files. Run with debug mode for more info.`,
-    );
-  }
-
-  if (options.length === 1) {
-    return firstOption.value;
-  }
-
-  if (isCI) {
-    throw new CliError(
-      `Multiple compilation artifacts found in "${finalFolderPath}". In CI environments, please make sure to have a unique compilation artifact in the directory. Alternatively, please specify a direct path to the build info file instead of a directory to avoid ambiguity.`,
-    );
-  }
-
-  spinner.stop();
-
-  const selectedOption = await promptUserSelection(
-    `Multiple JSON files found in "${finalFolderPath}" (${ignoredFilesCount} ignored). Please select which build info file to use:`,
-    options,
-  );
-  return selectedOption;
+  return {
+    candidateBuildInfoOptions: filesToOptions(files),
+    ignoredFilesCount,
+    finalFolderPath,
+  };
 }
 
 type FileSummary = {
@@ -321,8 +332,8 @@ type FileSummary = {
   size: number;
   artifact: InferredArtifact;
 };
-function filesToOptions(files: FileSummary[]): SelectionOption[] {
-  const options: SelectionOption[] = [];
+function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
+  const options: CandidateBuildInfoOption[] = [];
   const hardhatV3Pairs: {
     input: {
       path: string;
@@ -402,8 +413,8 @@ function filesToOptions(files: FileSummary[]): SelectionOption[] {
       });
     }
   }
-  const hardhatV3OptionGroups: SelectionOption[] = hardhatV3PairsGroups.map(
-    (group) => {
+  const hardhatV3OptionGroups: CandidateBuildInfoOption[] =
+    hardhatV3PairsGroups.map((group) => {
       const display = `${formatBuildInfoFormat("hardhat-v3")} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
       const value: OriginalBuildInfoPaths = {
         format: "hardhat-v3",
@@ -416,18 +427,12 @@ function filesToOptions(files: FileSummary[]): SelectionOption[] {
         display,
         value,
       };
-    },
-  );
+    });
 
   options.push(...hardhatV3OptionGroups);
 
   return options;
 }
-
-type SelectionOption = {
-  display: string;
-  value: OriginalBuildInfoPaths;
-};
 
 /**
  * Prompts the user to select one option from a list
@@ -437,9 +442,9 @@ type SelectionOption = {
  * @returns The selected option
  * @throws CliError when timeout is reached
  */
-async function promptUserSelection(
+export async function promptUserSelection(
   message: string,
-  options: SelectionOption[],
+  options: CandidateBuildInfoOption[],
   timeoutMs: number = 30_000,
 ): Promise<OriginalBuildInfoPaths> {
   const readline = createInterface({

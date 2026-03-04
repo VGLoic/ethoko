@@ -2,7 +2,10 @@ import { StorageProvider } from "../storage-provider";
 import { createSpinner, warn } from "@/cli-ui/utils";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
-import { lookForBuildInfoJsonFile } from "./helpers/look-for-build-info-json-file";
+import {
+  lookForCandidateArtifacts,
+  promptUserSelection,
+} from "./helpers/look-for-candidate-artifacts";
 import {
   mapOriginalArtifactToEthokoArtifact,
   OriginalBuildInfoPaths,
@@ -72,21 +75,52 @@ export async function push(
     "Looking for compilation artifact...",
     opts.silent,
   );
-  const originalBuildInfoPathsResult = await toAsyncResult(
-    lookForBuildInfoJsonFile(artifactPath, spinner1, {
+  const candidateArtifactsResult = await toAsyncResult(
+    lookForCandidateArtifacts(artifactPath, {
       debug: opts.debug,
-      silent: opts.silent,
-      isCI: opts.isCI,
     }),
   );
-  if (!originalBuildInfoPathsResult.success) {
+  if (!candidateArtifactsResult.success) {
     spinner1.fail("Failed to find compilation artifact");
     // @dev the lookForBuildInfoJsonFile function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
-    throw originalBuildInfoPathsResult.error;
+    throw candidateArtifactsResult.error;
   }
-  spinner1.succeed(
-    buildInfoPathToSuccessText(originalBuildInfoPathsResult.value),
-  );
+  const firstBuildInfoCandidate =
+    candidateArtifactsResult.value.candidateBuildInfoOptions[0];
+  if (!firstBuildInfoCandidate) {
+    spinner1.fail("No valid compilation artifacts found");
+    throw new CliError(
+      "No valid compilation artifacts were found in the provided path. Please provide a valid path to a compilation artifact (build info) or a directory containing it.",
+    );
+  }
+
+  let selectedBuildInfoPaths: OriginalBuildInfoPaths;
+  if (candidateArtifactsResult.value.candidateBuildInfoOptions.length === 1) {
+    selectedBuildInfoPaths = firstBuildInfoCandidate.value;
+  } else {
+    if (opts.isCI) {
+      spinner1.fail("Multiple compilation artifacts found");
+      throw new CliError(
+        "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
+      );
+    }
+    const userSelectionResult = await toAsyncResult(
+      promptUserSelection(
+        `Multiple JSON files found in "${candidateArtifactsResult.value.finalFolderPath}" (${candidateArtifactsResult.value.ignoredFilesCount} ignored). Please select which build info file to use:`,
+        candidateArtifactsResult.value.candidateBuildInfoOptions,
+        30_000,
+      ),
+      { debug: opts.debug },
+    );
+    if (!userSelectionResult.success) {
+      spinner1.fail("No compilation artifact selected");
+      // @dev the promptUserSelection function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
+      throw userSelectionResult.error;
+    }
+    selectedBuildInfoPaths = userSelectionResult.value;
+  }
+
+  spinner1.succeed(buildInfoPathToSuccessText(selectedBuildInfoPaths));
 
   // Step 2: Parse the compilation artifact, mapping it to the Ethoko format
   const spinner2 = createSpinner(
@@ -94,16 +128,13 @@ export async function push(
     opts.silent,
   );
   const ethokoArtifactParsingResult = await toAsyncResult(
-    mapOriginalArtifactToEthokoArtifact(
-      originalBuildInfoPathsResult.value,
-      opts.debug,
-    ),
+    mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
     { debug: opts.debug },
   );
   if (!ethokoArtifactParsingResult.success) {
     spinner2.fail("Unable to handle the provided compilation artifact");
     throw new CliError(
-      FORMAT_TO_ERROR_MESSAGE[originalBuildInfoPathsResult.value.format] ||
+      FORMAT_TO_ERROR_MESSAGE[selectedBuildInfoPaths.format] ||
         `An error occurred while mapping the build info to Ethoko artifacts. Please provide valid build info JSON files or contact us. Run with debug mode for more info.`,
     );
   }
