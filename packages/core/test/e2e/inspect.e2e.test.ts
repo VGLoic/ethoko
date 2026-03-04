@@ -12,13 +12,28 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
   ([, storageProviderFactory]) => {
     storageProviderTest.scoped({ storageProviderFactory });
 
-    storageProviderTest(
-      "inspect artifact by tag",
-      async ({ storageProvider, localStorage }) => {
+    storageProviderTest.for([
+      [
+        "Hardhat V3",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
+      ],
+      [
+        "Hardhat V2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
+      ],
+      [
+        "Forge default",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
+      ],
+      [
+        "Forge with build-info",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+      ],
+    ] as const)(
+      "%s artifacts - inspect artifact by tag",
+      async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
-        const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
         await localStorage.ensureProjectSetup(project);
 
@@ -76,12 +91,27 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       },
     );
 
-    storageProviderTest(
-      "inspect artifact by ID",
-      async ({ storageProvider, localStorage }) => {
+    storageProviderTest.for([
+      [
+        "Hardhat V3",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
+      ],
+      [
+        "Hardhat V2",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
+      ],
+      [
+        "Forge default",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
+      ],
+      [
+        "Forge with build-info",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
+      ],
+    ] as const)(
+      "%s artifacts - inspect artifact by ID",
+      async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-        const artifactFixture =
-          TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT;
 
         await localStorage.ensureProjectSetup(project);
 
