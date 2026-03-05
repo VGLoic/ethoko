@@ -34,6 +34,23 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         "MIX - Hardhat v2",
         TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
       ],
+      [
+        "MIX - Foundry",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.FOUNDRY_DEFAULT,
+      ],
+      [
+        "MIX - Foundry Build Info",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.FOUNDRY_BUILD_INFO,
+      ],
+      [
+        "MIX - Hardhat v3 isolated build",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V3_ISOLATED_BUILD,
+      ],
+      [
+        "MIX - Hardhat v3 non isolated build",
+        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS
+          .HARDHAT_V3_NON_ISOLATED_BUILD,
+      ],
     ] as const)(
       "push artifact [%s] without tag → pull by ID",
       async ([, artifactFixture], { storageProvider, localStorage }) => {
@@ -102,8 +119,8 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               return content.then((json) => json.id);
             }),
           );
-          expect(originalIds).toEqual(
-            localArtifact.origin.pairs.map((p) => p.id),
+          expect(originalIds.toSorted()).toEqual(
+            localArtifact.origin.pairs.map((p) => p.id).toSorted(),
           );
         } else {
           const originalContent = await fs.readFile(

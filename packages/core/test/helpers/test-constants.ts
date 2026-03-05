@@ -130,6 +130,114 @@ export const TEST_CONSTANTS = {
             name: "Counter",
           },
         },
+        HARDHAT_V3_ISOLATED_BUILD: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix_hardhat-v3-isolated-build",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_hardhat-v3-isolated-build/build-info/solc-0_8_28-4e42ef532fdb173e9eddc34630ce4d86ccb203dd.json",
+            ),
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_hardhat-v3-isolated-build/build-info/solc-0_8_28-8afaf307038808db8d330434581888d4fbb81ba8.json",
+            ),
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_hardhat-v3-isolated-build/build-info/solc-0_8_28-817f4fe5756a24b7504aef5aac4d207a8a0da81e.json",
+            ),
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_hardhat-v3-isolated-build/build-info/solc-0_8_28-d4c275219f030a8d49f94cff0b8ef3068e2ab70c.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
+            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "project/contracts/Counter.sol:Counter",
+            "project/contracts/ExternalMath.sol:ExternalMath",
+            "project/contracts/InternalMath.sol:InternalMath",
+            "project/contracts/Oracle.sol:Oracle",
+          ],
+          exportExpectedResult: {
+            path: "project/contracts/Counter.sol",
+            name: "Counter",
+          },
+        },
+        HARDHAT_V3_NON_ISOLATED_BUILD: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix_hardhat-v3-non-isolated-build",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_hardhat-v3-non-isolated-build/build-info/solc-0_8_28-c4872a952beaee6e8f60b34b8528a1e7717bfd07.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
+            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "project/contracts/Counter.sol:Counter",
+            "project/contracts/ExternalMath.sol:ExternalMath",
+            "project/contracts/InternalMath.sol:InternalMath",
+            "project/contracts/Oracle.sol:Oracle",
+          ],
+          exportExpectedResult: {
+            path: "project/contracts/Counter.sol",
+            name: "Counter",
+          },
+        },
+        FOUNDRY_DEFAULT: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix_foundry-default",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_foundry-default/build-info/e1a8f3879e440a4a.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
+            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "src/Counter.sol:Counter",
+            "src/ExternalMath.sol:ExternalMath",
+            "src/InternalMath.sol:InternalMath",
+            "src/Oracle.sol:Oracle",
+          ],
+          exportExpectedResult: {
+            name: "Counter",
+            path: "src/Counter.sol",
+          },
+        },
+        FOUNDRY_BUILD_INFO: {
+          folderPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix_foundry-build-info",
+          ),
+          buildInfoPaths: [
+            path.resolve(
+              process.cwd(),
+              "test/fixtures/mix_foundry-build-info/build-info/82714422012ad20c.json",
+            ),
+          ],
+          fullyQualifiedContractPaths: [
+            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
+            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "src/Counter.sol:Counter",
+            "src/ExternalMath.sol:ExternalMath",
+            "src/InternalMath.sol:InternalMath",
+            "src/Oracle.sol:Oracle",
+          ],
+          exportExpectedResult: {
+            name: "Counter",
+            path: "src/Counter.sol",
+          },
+        },
       },
     },
   },
