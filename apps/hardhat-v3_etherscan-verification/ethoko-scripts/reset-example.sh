@@ -20,5 +20,5 @@ npx hardhat ethoko pull
 
 npx hardhat ethoko typings
 
-npx hardhat ignition deploy ./ignition/modules/counter-2026-02-02.ts --network sepolia
+npx hardhat ignition deploy ./ignition/modules/release-2026-02-02.ts --network sepolia
 

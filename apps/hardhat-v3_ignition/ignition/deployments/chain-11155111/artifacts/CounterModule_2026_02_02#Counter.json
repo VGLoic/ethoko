@@ -1,5 +1,7 @@
 {
-  "_format": "ethoko-artifact-v0",
+  "_format": "ethoko-contract-artifact-v0",
+  "id": "e093b6f5b9c0",
+  "project": "ignited-counter",
   "abi": [
     {
       "type": "event",

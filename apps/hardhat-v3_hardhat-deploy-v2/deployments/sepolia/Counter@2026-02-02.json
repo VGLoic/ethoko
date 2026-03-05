@@ -1,42 +1,9 @@
 {
-  "address": "0x8f48fffc6fe6032063a8acae5cb9188ebb01d57a",
+  "address": "0xd12bee1c01fbd5ece35fa058d0c604d5751326b3",
   "abi": [
     {
-      "type": "event",
-      "name": "Increment",
-      "inputs": [
-        {
-          "name": "by",
-          "type": "uint256",
-          "internalType": "uint256",
-          "indexed": false
-        }
-      ],
-      "anonymous": false
-    },
-    {
       "type": "function",
-      "name": "inc",
-      "inputs": [],
-      "outputs": [],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "incBy",
-      "inputs": [
-        {
-          "name": "by",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "outputs": [],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "x",
+      "name": "counter",
       "inputs": [],
       "outputs": [
         {
@@ -46,11 +13,18 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "increment",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
     }
   ],
-  "bytecode": "0x6080604052348015600e575f5ffd5b506101ff8061001c5f395ff3fe608060405234801561000f575f5ffd5b506004361061003f575f3560e01c80630c55699c14610043578063371303c01461005d57806370119d0614610067575b5f5ffd5b61004b5f5481565b60405190815260200160405180910390f35b61006561007a565b005b61006561007536600461016d565b6100c3565b5f8054908061008883610198565b9091555050604051600181527f51af157c2eee40f68107a47a49c32fbbeb0a3c9e5cd37aa56e88e6be92368a819060200160405180910390a1565b5f81116101225760405162461bcd60e51b815260206004820152602360248201527f696e6342793a20696e6372656d656e742073686f756c6420626520706f73697460448201526269766560e81b606482015260840160405180910390fd5b805f5f82825461013291906101b0565b90915550506040518181527f51af157c2eee40f68107a47a49c32fbbeb0a3c9e5cd37aa56e88e6be92368a819060200160405180910390a150565b5f6020828403121561017d575f5ffd5b5035919050565b634e487b7160e01b5f52601160045260245ffd5b5f600182016101a9576101a9610184565b5060010190565b808201808211156101c3576101c3610184565b9291505056fea264697066735822122029473277b756e11e854117a50e1cccaa04c57b44379c0281aaae5a0f73d4774b64736f6c634300081c0033",
-  "metadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"by\",\"type\":\"uint256\"}],\"name\":\"Increment\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"inc\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"by\",\"type\":\"uint256\"}],\"name\":\"incBy\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"x\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project/contracts/Counter.sol\":\"Counter\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project/contracts/Counter.sol\":{\"content\":\"// SPDX-License-Identifier: UNLICENSED\\npragma solidity ^0.8.28;\\n\\ncontract Counter {\\n    uint public x;\\n\\n    event Increment(uint by);\\n\\n    function inc() public {\\n        x++;\\n        emit Increment(1);\\n    }\\n\\n    function incBy(uint by) public {\\n        require(by > 0, \\\"incBy: increment should be positive\\\");\\n        x += by;\\n        emit Increment(by);\\n    }\\n}\\n\",\"keccak256\":\"0xaaf95d05f25b1505011ceeef21f31c49bea3b9b7112a645ccfca451d5c029ce0\",\"license\":\"UNLICENSED\"}},\"version\":1}",
-  "deployedBytecode": "0x608060405234801561000f575f5ffd5b506004361061003f575f3560e01c80630c55699c14610043578063371303c01461005d57806370119d0614610067575b5f5ffd5b61004b5f5481565b60405190815260200160405180910390f35b61006561007a565b005b61006561007536600461016d565b6100c3565b5f8054908061008883610198565b9091555050604051600181527f51af157c2eee40f68107a47a49c32fbbeb0a3c9e5cd37aa56e88e6be92368a819060200160405180910390a1565b5f81116101225760405162461bcd60e51b815260206004820152602360248201527f696e6342793a20696e6372656d656e742073686f756c6420626520706f73697460448201526269766560e81b606482015260840160405180910390fd5b805f5f82825461013291906101b0565b90915550506040518181527f51af157c2eee40f68107a47a49c32fbbeb0a3c9e5cd37aa56e88e6be92368a819060200160405180910390a150565b5f6020828403121561017d575f5ffd5b5035919050565b634e487b7160e01b5f52601160045260245ffd5b5f600182016101a9576101a9610184565b5060010190565b808201808211156101c3576101c3610184565b9291505056fea264697066735822122029473277b756e11e854117a50e1cccaa04c57b44379c0281aaae5a0f73d4774b64736f6c634300081c0033",
+  "bytecode": "0x6080604052348015600e575f5ffd5b5060c580601a5f395ff3fe6080604052348015600e575f5ffd5b50600436106030575f3560e01c806361bc221a146034578063d09de08a14604d575b5f5ffd5b603b5f5481565b60405190815260200160405180910390f35b60536055565b005b60015f5f82825460649190606b565b9091555050565b80820180821115608957634e487b7160e01b5f52601160045260245ffd5b9291505056fea2646970667358221220287fa665cdd47beeb40b58ad78e66e8ada19579d99134bef6f8fe9e5c0ef63b864736f6c634300081c0033",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"counter\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project/contracts/Counter.sol\":\"Counter\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project/contracts/Counter.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.28;\\n\\ncontract Counter {\\n    uint256 public counter;\\n\\n    function increment() public {\\n        counter += 1;\\n    }\\n}\\n\",\"keccak256\":\"0xec19786e821024d420b672de1857be8c8043f3996870aefaac33ac510d34410e\",\"license\":\"MIT\"}},\"version\":1}",
+  "deployedBytecode": "0x6080604052348015600e575f5ffd5b50600436106030575f3560e01c806361bc221a146034578063d09de08a14604d575b5f5ffd5b603b5f5481565b60405190815260200160405180910390f35b60536055565b005b60015f5f82825460649190606b565b9091555050565b80820180821115608957634e487b7160e01b5f52601160045260245ffd5b9291505056fea2646970667358221220287fa665cdd47beeb40b58ad78e66e8ada19579d99134bef6f8fe9e5c0ef63b864736f6c634300081c0033",
   "linkReferences": {},
   "deployedLinkReferences": {},
   "contractName": "Counter",
@@ -63,14 +37,13 @@
   "evm": {
     "gasEstimates": {
       "creation": {
-        "codeDepositCost": "102200",
-        "executionCost": "145",
-        "totalCost": "102345"
+        "codeDepositCost": "39400",
+        "executionCost": "91",
+        "totalCost": "39491"
       },
       "external": {
-        "inc()": "25484",
-        "incBy(uint256)": "25620",
-        "x()": "2259"
+        "counter()": "2259",
+        "increment()": "24441"
       }
     }
   },
@@ -79,7 +52,7 @@
       {
         "astId": 3,
         "contract": "project/contracts/Counter.sol:Counter",
-        "label": "x",
+        "label": "counter",
         "offset": 0,
         "slot": "0",
         "type": "t_uint256"
@@ -100,13 +73,13 @@
   },
   "argsData": "0x",
   "transaction": {
-    "hash": "0x1da30d68c40fad765fefdc8d65e9b061d3b60c82746a60ad3ced06b3a26c8758",
-    "nonce": "0x27",
+    "hash": "0x286cb459f504db1bc4010d05250b3c0a49b3c0812acfd75991f311014f8edda5",
+    "nonce": "0x45",
     "origin": "0x25371b936fd45e67f00dfea1cd6a3e77105dd0fa"
   },
   "receipt": {
-    "blockHash": "0xeca7c6dd28fdc0f48323cfc489a73bd2251c67686a4e796b7e8bcce48d2a5ea4",
-    "blockNumber": "0x9dcd52",
-    "transactionIndex": "0x31"
+    "blockHash": "0x5c97e6f2d8e6cb1d3a2594f26c25d67a2e65830cba7e7c48d0335af10edf9d3d",
+    "blockNumber": "0x9e8567",
+    "transactionIndex": "0x3c"
   }
 }

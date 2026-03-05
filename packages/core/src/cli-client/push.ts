@@ -104,6 +104,7 @@ export async function push(
         "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
       );
     }
+    spinner1.stop();
     const userSelectionResult = await toAsyncResult(
       promptUserSelection(
         `Multiple JSON files found in "${candidateArtifactsResult.value.finalFolderPath}" (${candidateArtifactsResult.value.ignoredFilesCount} ignored). Please select which build info file to use:`,

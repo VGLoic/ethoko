@@ -39,11 +39,7 @@ async function main() {
   const patchedSourceCodeInput = patchInputSources(
     inputCompilationArtifact.input,
   );
-  const stringifiedSourceCodeInput = JSON.stringify(
-    patchedSourceCodeInput,
-    null,
-    2,
-  );
+  const stringifiedSourceCodeInput = JSON.stringify(patchedSourceCodeInput);
 
   await etherscanClient.verifyContract({
     sourceCode: stringifiedSourceCodeInput,
@@ -150,31 +146,33 @@ class EtherscanVerificationClient {
       },
     );
 
-    const data = await response.json();
-    if (
-      typeof data === "object" &&
-      data !== null &&
-      "status" in data &&
-      data.status === "0"
-    ) {
-      if (
-        "result" in data &&
-        data.result === "Contract source code already verified"
-      ) {
-        console.log(
-          `Contract ${payload.fullyQualifiedContractName} already verified\n`,
-        );
+    const rawResponse = await response.text();
+    try {
+      const data = JSON.parse(rawResponse);
+      if ("status" in data && data.status === "0") {
+        if (
+          "result" in data &&
+          data.result === "Contract source code already verified"
+        ) {
+          console.log(
+            `Contract ${payload.fullyQualifiedContractName} already verified\n`,
+          );
+        } else {
+          console.error(
+            `Verification failed for ${payload.fullyQualifiedContractName}:`,
+            data,
+          );
+        }
       } else {
-        console.error(
-          `Verification failed for ${payload.fullyQualifiedContractName}:`,
+        console.log(
+          `Verification submitted for ${payload.fullyQualifiedContractName}:\n`,
           data,
         );
       }
-    } else {
-      console.log(
-        `Verification submitted for ${payload.fullyQualifiedContractName}:\n`,
-        data,
-      );
+    } catch (error) {
+      console.error("Failed to parse Etherscan response as JSON:", error);
+      console.error("Raw response from Etherscan:", rawResponse);
+      return;
     }
   }
 }
