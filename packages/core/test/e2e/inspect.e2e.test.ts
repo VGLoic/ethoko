@@ -6,34 +6,14 @@ import {
   STORAGE_PROVIDER_STRATEGIES,
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
+import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Inspect E2E Tests (%s)",
   ([, storageProviderFactory]) => {
     storageProviderTest.scoped({ storageProviderFactory });
 
-    storageProviderTest.for([
-      [
-        "COUNTER - Hardhat V3",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
-      ],
-      [
-        "COUNTER - Hardhat V2",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
-      ],
-      [
-        "COUNTER - Forge default",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
-      ],
-      [
-        "COUNTER - Forge with build-info",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
-      ],
-      [
-        "MIX - Hardhat v2",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
-      ],
-    ] as const)(
+    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
       "%s artifacts - inspect artifact by tag",
       async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
@@ -95,28 +75,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       },
     );
 
-    storageProviderTest.for([
-      [
-        "COUNTER - Hardhat V3",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
-      ],
-      [
-        "COUNTER - Hardhat V2",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
-      ],
-      [
-        "COUNTER - Forge default",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
-      ],
-      [
-        "COUNTER - Forge with build-info",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
-      ],
-      [
-        "MIX - Hardhat v2",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
-      ],
-    ] as const)(
+    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
       "%s artifacts - inspect artifact by ID",
       async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);

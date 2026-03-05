@@ -21,7 +21,6 @@ export const TEST_CONSTANTS = {
   ARTIFACTS_FIXTURES: {
     // Group #1: Unique Counter contract
     COUNTER: {
-      ABI: path.resolve(process.cwd(), "test/fixtures/counter.abi.json"),
       TARGETS: {
         HARDHAT_V2: {
           folderPath: path.resolve(
@@ -39,6 +38,10 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter.abi.json",
+          ),
         },
         HARDHAT_V3: {
           folderPath: path.resolve(
@@ -58,6 +61,10 @@ export const TEST_CONSTANTS = {
             path: "project/contracts/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter.abi.json",
+          ),
         },
         FOUNDRY_DEFAULT: {
           folderPath: path.resolve(
@@ -75,6 +82,10 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter.abi.json",
+          ),
         },
         FOUNDRY_BUILD_INFO: {
           folderPath: path.resolve(
@@ -92,6 +103,10 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/counter.abi.json",
+          ),
         },
       },
     },
@@ -101,10 +116,6 @@ export const TEST_CONSTANTS = {
     // Oracle: contract: depending of Ownable of OpenZeppelin
     // Counter contract: depending of InternalMath, ExternalMath and Oracle contracts
     MIX: {
-      COUNTER_ABI: path.resolve(
-        process.cwd(),
-        "test/fixtures/mix.counter.abi.json",
-      ),
       TARGETS: {
         HARDHAT_V2: {
           folderPath: path.resolve(
@@ -129,6 +140,10 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix.counter.abi.json",
+          ),
         },
         HARDHAT_V3_ISOLATED_BUILD: {
           folderPath: path.resolve(
@@ -154,8 +169,8 @@ export const TEST_CONSTANTS = {
             ),
           ],
           fullyQualifiedContractPaths: [
-            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
-            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "npm/@openzeppelin/contracts@5.6.1/access/Ownable.sol:Ownable",
+            "npm/@openzeppelin/contracts@5.6.1/utils/Context.sol:Context",
             "project/contracts/Counter.sol:Counter",
             "project/contracts/ExternalMath.sol:ExternalMath",
             "project/contracts/InternalMath.sol:InternalMath",
@@ -165,6 +180,10 @@ export const TEST_CONSTANTS = {
             path: "project/contracts/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix.counter.abi.json",
+          ),
         },
         HARDHAT_V3_NON_ISOLATED_BUILD: {
           folderPath: path.resolve(
@@ -178,8 +197,8 @@ export const TEST_CONSTANTS = {
             ),
           ],
           fullyQualifiedContractPaths: [
-            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
-            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "npm/@openzeppelin/contracts@5.6.1/access/Ownable.sol:Ownable",
+            "npm/@openzeppelin/contracts@5.6.1/utils/Context.sol:Context",
             "project/contracts/Counter.sol:Counter",
             "project/contracts/ExternalMath.sol:ExternalMath",
             "project/contracts/InternalMath.sol:InternalMath",
@@ -189,6 +208,10 @@ export const TEST_CONSTANTS = {
             path: "project/contracts/Counter.sol",
             name: "Counter",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix.counter.abi.json",
+          ),
         },
         FOUNDRY_DEFAULT: {
           folderPath: path.resolve(
@@ -202,8 +225,8 @@ export const TEST_CONSTANTS = {
             ),
           ],
           fullyQualifiedContractPaths: [
-            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
-            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "lib/openzeppelin-contracts/contracts/access/Ownable.sol:Ownable",
+            "lib/openzeppelin-contracts/contracts/utils/Context.sol:Context",
             "src/Counter.sol:Counter",
             "src/ExternalMath.sol:ExternalMath",
             "src/InternalMath.sol:InternalMath",
@@ -213,6 +236,10 @@ export const TEST_CONSTANTS = {
             name: "Counter",
             path: "src/Counter.sol",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix.counter.abi.json",
+          ),
         },
         FOUNDRY_BUILD_INFO: {
           folderPath: path.resolve(
@@ -226,8 +253,8 @@ export const TEST_CONSTANTS = {
             ),
           ],
           fullyQualifiedContractPaths: [
-            "@openzeppelin/contracts/access/Ownable.sol:Ownable",
-            "@openzeppelin/contracts/utils/Context.sol:Context",
+            "lib/openzeppelin-contracts/contracts/access/Ownable.sol:Ownable",
+            "lib/openzeppelin-contracts/contracts/utils/Context.sol:Context",
             "src/Counter.sol:Counter",
             "src/ExternalMath.sol:ExternalMath",
             "src/InternalMath.sol:InternalMath",
@@ -237,6 +264,10 @@ export const TEST_CONSTANTS = {
             name: "Counter",
             path: "src/Counter.sol",
           },
+          abiPath: path.resolve(
+            process.cwd(),
+            "test/fixtures/mix.counter.abi.json",
+          ),
         },
       },
     },

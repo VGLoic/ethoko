@@ -7,51 +7,14 @@ import {
   STORAGE_PROVIDER_STRATEGIES,
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
+import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Push-Pull E2E Tests (%s)",
   ([, storageProviderFactory]) => {
     storageProviderTest.scoped({ storageProviderFactory });
 
-    storageProviderTest.for([
-      [
-        "COUNTER - Hardhat V2",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
-      ],
-      [
-        "COUNTER - Foundry",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
-      ],
-      [
-        "COUNTER - Hardhat V3",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
-      ],
-      [
-        "COUNTER - Foundry Build Info",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
-      ],
-      [
-        "MIX - Hardhat v2",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
-      ],
-      [
-        "MIX - Foundry",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.FOUNDRY_DEFAULT,
-      ],
-      [
-        "MIX - Foundry Build Info",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.FOUNDRY_BUILD_INFO,
-      ],
-      [
-        "MIX - Hardhat v3 isolated build",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V3_ISOLATED_BUILD,
-      ],
-      [
-        "MIX - Hardhat v3 non isolated build",
-        TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS
-          .HARDHAT_V3_NON_ISOLATED_BUILD,
-      ],
-    ] as const)(
+    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
       "push artifact [%s] without tag → pull by ID",
       async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);

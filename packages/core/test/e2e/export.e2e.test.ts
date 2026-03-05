@@ -7,66 +7,16 @@ import {
   STORAGE_PROVIDER_STRATEGIES,
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
-
-const ARTIFACTS_UNDER_TEST = [
-  [
-    "Hardhat V3",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
-  ],
-  [
-    "Hardhat V2",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V2,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
-  ],
-  [
-    "Forge default",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_DEFAULT,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
-  ],
-  [
-    "Forge with build-info",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.FOUNDRY_BUILD_INFO,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.ABI,
-  ],
-  [
-    "MIX - Hardhat v2",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V2,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
-  ],
-  [
-    "MIX - Foundry",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.FOUNDRY_DEFAULT,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
-  ],
-  [
-    "MIX - Foundry Build Info",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.FOUNDRY_BUILD_INFO,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
-  ],
-  [
-    "MIX - Hardhat v3 isolated build",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V3_ISOLATED_BUILD,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
-  ],
-  [
-    "MIX - Hardhat v3 non isolated build",
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.TARGETS.HARDHAT_V3_NON_ISOLATED_BUILD,
-    TEST_CONSTANTS.ARTIFACTS_FIXTURES.MIX.COUNTER_ABI,
-  ],
-] as const;
+import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Export E2E Tests (%s)",
   ([, storageProviderFactory]) => {
     storageProviderTest.scoped({ storageProviderFactory });
 
-    storageProviderTest.for(ARTIFACTS_UNDER_TEST)(
+    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
       "%s artifacts - export contract artifact by tag",
-      async (
-        [, artifactFixture, abiPath],
-        { storageProvider, localStorage },
-      ) => {
+      async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
 
@@ -122,7 +72,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
         expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = (await fs
-          .readFile(abiPath, "utf-8")
+          .readFile(artifactFixture.abiPath, "utf-8")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .then(JSON.parse)) as any[];
         expect(exportResult.abi.sort(sortAbiItem)).toEqual(
@@ -131,12 +81,9 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       },
     );
 
-    storageProviderTest.for(ARTIFACTS_UNDER_TEST)(
+    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
       "%s artifacts - export contract artifact by ID",
-      async (
-        [, artifactFixture, abiPath],
-        { storageProvider, localStorage },
-      ) => {
+      async ([, artifactFixture], { storageProvider, localStorage }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
         await localStorage.ensureProjectSetup(project);
@@ -191,7 +138,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
         expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = (await fs
-          .readFile(abiPath, "utf-8")
+          .readFile(artifactFixture.abiPath, "utf-8")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .then(JSON.parse)) as any[];
         expect(exportResult.abi.sort(sortAbiItem)).toEqual(
