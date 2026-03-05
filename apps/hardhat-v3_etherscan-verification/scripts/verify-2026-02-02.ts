@@ -2,6 +2,8 @@ import SepoliaDeployedAddresses from "./../ignition/deployments/chain-11155111/d
 import { project } from "./../.ethoko-typings/index.js";
 import "dotenv/config";
 
+const DEPLOYER_ADDRESS = "0x25371B936fD45e67F00dfEa1cd6A3e77105DD0FA";
+
 async function main() {
   console.log("\nStarting Etherscan verification for release 2026-02-02...\n");
 
@@ -47,7 +49,7 @@ async function main() {
     sourceCode: JSON.stringify(inputCompilationArtifact.input),
     address: SepoliaDeployedAddresses["release_2026_02_02#Oracle"],
     fullyQualifiedContractName: "project/contracts/Oracle.sol:Oracle",
-    constructorArguments: "", // No constructor arguments for this contract
+    constructorArguments: abiEncodeAddress(DEPLOYER_ADDRESS),
     ...verificationPayload,
   });
 

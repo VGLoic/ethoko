@@ -583,7 +583,7 @@ interface CompilerOutputContract {
       creation?: Record<string, string>;
       external?: Record<string, string>;
       internal?: Record<string, string>;
-    };
+    } | null;
   };
 }
 
@@ -681,7 +681,7 @@ export interface EthokoContractArtifact<
       readonly creation?: Record<string, string>;
       readonly external?: Record<string, string>;
       readonly internal?: Record<string, string>;
-    };
+    } | null;
     readonly methodIdentifiers?: {
       readonly [methodSignature: string]: string;
     };
