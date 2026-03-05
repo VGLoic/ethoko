@@ -10,6 +10,7 @@ import {
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
+import { deriveAllPathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Restore E2E Tests (%s)",
@@ -323,7 +324,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         expect(result.project).toBe(project);
         expect(result.tag).toBe(tag);
-        const expectedOriginalPaths = await allPathsInDirectory(
+        const expectedOriginalPaths = await deriveAllPathsInDirectory(
           artifactFixture.folderPath,
         );
         const expectedPaths = expectedOriginalPaths.map(sanitizePath);
@@ -381,7 +382,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(result.project).toBe(project);
         expect(result.tag).toBe(null);
         expect(result.id).toBe(artifactId);
-        const expectedOriginalPaths = await allPathsInDirectory(
+        const expectedOriginalPaths = await deriveAllPathsInDirectory(
           artifactFixture.folderPath,
         );
         const expectedPaths = expectedOriginalPaths.map(sanitizePath);
@@ -406,21 +407,4 @@ function sanitizePath(filePath: string): string {
     return filePath.substring(2);
   }
   return filePath;
-}
-
-async function allPathsInDirectory(dirPath: string): Promise<string[]> {
-  const paths: string[] = [];
-  async function walk(currentPath: string) {
-    const entries = await fs.readdir(currentPath, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(currentPath, entry.name);
-      if (entry.isDirectory()) {
-        await walk(fullPath);
-      } else {
-        paths.push(fullPath);
-      }
-    }
-  }
-  await walk(dirPath);
-  return paths;
 }
