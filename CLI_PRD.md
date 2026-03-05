@@ -1,7 +1,7 @@
 # Product Requirements Document: Ethoko Standalone CLI
 
 **Document Version:** 1.0  
-**Last Updated:** March 4, 2026  
+**Last Updated:** March 5, 2026  
 **Status:** Draft - Ready for Implementation  
 **Owner:** Engineering Team
 
@@ -871,8 +871,8 @@ COPY ethoko /usr/local/bin/ethoko
 
 ### Phase 1: CLI Package Structure + Integration Tests (11-12 hours)
 
-**Status:** ✅ Planning Complete - Ready for Implementation  
-**Last Updated:** March 4, 2026
+**Status:** ✅ Completed  
+**Last Updated:** March 5, 2026
 
 **Goal:** Create `@ethoko/cli` package with all commands runnable with Node.js, AND update all integration apps to test both Hardhat plugin and CLI in parallel.
 
@@ -982,6 +982,7 @@ COPY ethoko /usr/local/bin/ethoko
 - ✅ `packages/cli/` with full source code
 - ✅ All 8 commands functional with Node.js
 - ✅ Config loading from `ethoko.json` (upward search)
+- ✅ Config paths resolved relative to `ethoko.json` location
 - ✅ Full TypeScript type safety
 
 ---
@@ -1126,7 +1127,7 @@ describe("[App] Push/pull/deploy - CLI", async () => {
 
 **Files modified per app:**
 
-- `package.json` (add CLI dependency)
+- `package.json` (add CLI dependency + `ethoko` script)
 - `e2e-test/setup.ts` (add compilation)
 - `e2e-test/push-pull-deploy.e2e.test.ts` (remove compilation test, update tag)
 
@@ -1277,7 +1278,7 @@ Repeat for:
 
 **Files modified:**
 
-- `package.json`
+- `package.json` (add CLI dependency + `ethoko` script)
 - `e2e-test/foundry-describe.ts`
 - `e2e-test/push-pull-deploy.with-build-info.with-tests.e2e.test.ts`
 - `e2e-test/push-pull-deploy.with-build-info.without-tests.e2e.test.ts`
@@ -1334,6 +1335,10 @@ pnpm test:e2e:core
 pnpm test:e2e:apps
 ```
 
+**Results:**
+
+- ✅ `pnpm test:e2e:apps` (all 12 app test suites passed)
+
 ---
 
 #### Summary
@@ -1356,7 +1361,7 @@ pnpm test:e2e:apps
 - Part B2 (Foundry app): 1.5 hours
 - Part C (Validation): 0.75 hours
 
-**Expected Test Results:**
+**Actual Test Results:**
 
 - Each app runs TWO test suites (Hardhat plugin + CLI)
 - Both suites run in parallel (share compilation from `setup.ts`)
