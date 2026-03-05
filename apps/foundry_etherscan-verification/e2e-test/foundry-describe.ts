@@ -22,8 +22,8 @@ export function foundryDescribe(args: {
 
   const ethokoCommand =
     runner === "hardhat"
-      ? `npx hardhat --config ${hardhatConfigPath} ethoko`
-      : `npx ethoko --config ${cliConfigPath}`;
+      ? `pnpm hardhat --config ${hardhatConfigPath} ethoko`
+      : `pnpm ethoko --config ${cliConfigPath}`;
 
   describe(title, () => {
     beforeAll(async () => {

@@ -6,6 +6,7 @@
   "description": "Fork of Core smart contracts of Uniswap v4 - Meant for testing with Ethoko",
   "scripts": {
     "ethoko": "ethoko",
+    "hardhat": "hardhat",
     "test:e2e:apps": "vitest run e2e-test"
   },
   "devDependencies": {
