@@ -1,0 +1,8 @@
+{
+  "project": "ignited-counter",
+  "compilationOutputPath": "./artifacts",
+  "storage": {
+    "type": "local",
+    "path": "./ethoko-storage"
+  }
+}

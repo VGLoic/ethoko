@@ -1,18 +1,16 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
-import { configVariable, defineConfig } from "hardhat/config";
+import { defineConfig } from "hardhat/config";
 import HardhatEthoko from "hardhat-ethoko";
-import "dotenv/config";
 
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
   ethoko: {
     project: "ignited-counter",
-    pulledArtifactsPath: "./.ethoko-e2e/.ethoko",
-    typingsPath: "./.ethoko-typings",
-    compilationOutputPath: "./artifacts",
+    pulledArtifactsPath: "PULLED_ARTIFACTS_PATH",
+    typingsPath: "TYPINGS_PATH",
     storageConfiguration: {
       type: "local",
-      path: "./.ethoko-e2e/.storage",
+      path: "STORAGE_PATH",
     },
   },
   solidity: {
@@ -40,13 +38,9 @@ export default defineConfig({
       type: "edr-simulated",
       chainType: "op",
     },
-    sepolia: {
-      type: "http",
-      chainType: "l1",
-      url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: {
-        mnemonic: configVariable("SEPOLIA_MNEMONIC"),
-      },
-    },
+  },
+  paths: {
+    artifacts: "ARTIFACTS_PATH",
+    cache: "CACHE_PATH",
   },
 });
