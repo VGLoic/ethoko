@@ -5,7 +5,7 @@ import "hardhat-v2-ethoko";
 import { EthokoHardhatUserConfig } from "hardhat-v2-ethoko";
 
 const ethokoConfig: EthokoHardhatUserConfig = {
-  project: "dummy-counter",
+  project: "PROJECT_NAME",
   pulledArtifactsPath: "PULLED_ARTIFACTS_PATH",
   typingsPath: "TYPINGS_PATH",
   storageConfiguration: {
@@ -38,10 +38,6 @@ export const config: HardhatUserConfig & { ethoko?: EthokoHardhatUserConfig } =
           runs: 200,
         },
       },
-    },
-    paths: {
-      artifacts: "ARTIFACTS_PATH",
-      sources: "./src",
     },
   };
 
