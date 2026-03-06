@@ -424,6 +424,9 @@ importers:
 
   apps/uniswap-v4-core:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config

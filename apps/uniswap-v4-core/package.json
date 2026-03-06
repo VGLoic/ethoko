@@ -10,6 +10,7 @@
     "test:e2e:apps": "vitest run e2e-test"
   },
   "devDependencies": {
+    "@ethoko/cli": "workspace:*",
     "@ethoko/eslint-config": "workspace:*",
     "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.2",
