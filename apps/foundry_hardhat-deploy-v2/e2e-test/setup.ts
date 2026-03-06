@@ -1,14 +1,14 @@
 import fs from "fs/promises";
 import { COMPILATION_TARGETS } from "./compilation-targets.js";
 import { asyncExec } from "./helpers/async-exec.js";
-import { GlobalFolderHelper } from "./helpers/global-folder.js";
+import { GlobalFolder } from "./helpers/global-folder.js";
 
 export async function setup(): Promise<void> {
   console.log("\n========================================");
   console.log("🚀 Starting [Foundry - Hardhat-deploy v2] E2E Test Suite");
   console.log("========================================\n");
 
-  await GlobalFolderHelper.setup();
+  await GlobalFolder.setup();
 
   console.log("🔨 Compiling contracts...");
   await compileContracts();
@@ -22,7 +22,7 @@ export async function teardown(): Promise<void> {
   console.log("========================================\n");
 
   await cleanUpCompiledArtifacts();
-  await GlobalFolderHelper.teardown();
+  await GlobalFolder.teardown();
 
   console.log("\n✅ Cleanup complete!\n");
 }

@@ -12,5 +12,5 @@
     "types": ["node"],
     "resolveJsonModule": true
   },
-  "include": ["./hardhat.config.ts", "./e2e-test/*", "./scripts/*"]
+  "include": ["./hardhat.config.ts", "./e2e-test/**/*", "./scripts/*"]
 }

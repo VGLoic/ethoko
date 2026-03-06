@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import { asyncExec } from "./helpers/async-exec.js";
-import { GlobalFolderHelper } from "./helpers/global-folder.js";
+import { GlobalFolder } from "./helpers/global-folder.js";
 
 export function testPushPullDeploy(payload: {
   ethokoCommand: string;
@@ -29,10 +29,10 @@ export function testPushPullDeploy(payload: {
 
   test("it restores the original artifacts", async () => {
     await asyncExec(
-      `${payload.ethokoCommand} restore --tag ${payload.tag} --output ./${GlobalFolderHelper.path}/restored-artifacts-${payload.tag}`,
+      `${payload.ethokoCommand} restore --tag ${payload.tag} --output ./${GlobalFolder.path}/restored-artifacts-${payload.tag}`,
     );
     await asyncExec(
-      `ls -la ./${GlobalFolderHelper.path}/restored-artifacts-${payload.tag}`,
+      `ls -la ./${GlobalFolder.path}/restored-artifacts-${payload.tag}`,
     );
   });
 }

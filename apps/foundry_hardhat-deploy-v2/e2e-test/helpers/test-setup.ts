@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { GlobalFolderHelper } from "./global-folder.js";
+import { GlobalFolder } from "./global-folder.js";
 
 export const PROJECT_NAME = "forge-counter";
 
@@ -12,7 +12,7 @@ export class ConfigSetup {
 
   constructor(testId: string) {
     this.testId = testId;
-    this.testPath = `${GlobalFolderHelper.path}/test-${testId}`;
+    this.testPath = `${GlobalFolder.path}/test-${testId}`;
     this.storagePath = `${this.testPath}/storage`;
     this.pulledArtifactsPath = `${this.testPath}/pulled-artifacts`;
     this.typingsPath = `${this.testPath}/typings`;
@@ -79,9 +79,8 @@ export class HardhatConfigSetup {
     const hardhatConfigContent = hardhatConfigTemplate
       .replace("PROJECT_NAME", PROJECT_NAME)
       .replace("PULLED_ARTIFACTS_PATH", pulledArtifactsPath)
-      .replace("ARTIFACTS_PATH", `${this.config.testPath}/generated-artifacts`)
       .replace("TYPINGS_PATH", this.config.typingsPath)
-      .replace("STORAGE_PATH", `${this.config.testPath}/storage`);
+      .replace("STORAGE_PATH", `${this.config.storagePath}`);
     await fs.writeFile(this.hardhatConfigPath, hardhatConfigContent);
 
     return async () => {

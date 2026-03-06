@@ -1,36 +1,32 @@
 import fs from "fs/promises";
-
-export const E2E_FOLDER_PATH = ".ethoko-e2e";
-
-const outputPath = `${E2E_FOLDER_PATH}/out-2026-forge`;
-export const BUILD = {
-  command: `forge build --skip test/**/* --skip src/test/**/* --use-literal-content --out ${outputPath} --cache-path ${outputPath}-cache`,
-  outputPath,
-};
+import { GlobalFolder } from "./global-folder.js";
 
 export const PROJECT_NAME = "verified-forge-counter";
 
 export class ConfigSetup {
   public testId: string;
+  public testPath: string;
   public storagePath: string;
   public pulledArtifactsPath: string;
   public typingsPath: string;
 
   constructor(testId: string) {
     this.testId = testId;
-    this.storagePath = `${E2E_FOLDER_PATH}/storage-${testId}`;
-    this.pulledArtifactsPath = `${E2E_FOLDER_PATH}/pulled-artifacts-${testId}`;
-    this.typingsPath = `${E2E_FOLDER_PATH}/typings-${testId}`;
+    this.testPath = `${GlobalFolder.path}/test-${testId}`;
+    this.storagePath = `${this.testPath}/storage`;
+    this.pulledArtifactsPath = `${this.testPath}/pulled-artifacts`;
+    this.typingsPath = `${this.testPath}/typings`;
   }
 
-  async cleanup(): Promise<void> {
-    for (const folder of [
-      this.pulledArtifactsPath,
-      this.storagePath,
-      this.typingsPath,
-    ]) {
-      await fs.rm(folder, { recursive: true, force: true });
-    }
+  async setup(): Promise<() => Promise<void>> {
+    await fs.mkdir(this.testPath, { recursive: true });
+    await fs.mkdir(this.storagePath, { recursive: true });
+    await fs.mkdir(this.pulledArtifactsPath, { recursive: true });
+    await fs.mkdir(this.typingsPath, { recursive: true });
+
+    return async () => {
+      await fs.rm(this.testPath, { recursive: true, force: true });
+    };
   }
 }
 
@@ -40,27 +36,27 @@ export class CliConfigSetup {
 
   constructor(config: ConfigSetup) {
     this.config = config;
-    this.cliConfigPath = `${E2E_FOLDER_PATH}/ethoko.config.e2e.${config.testId}.json`;
+    this.cliConfigPath = `${config.testPath}/ethoko.json`;
   }
 
   async setup(): Promise<() => Promise<void>> {
-    // paths
-    const storagePath = `${E2E_FOLDER_PATH}/storage-${this.config.testId}`;
-    const pulledArtifactsPath = `${E2E_FOLDER_PATH}/pulled-artifacts-${this.config.testId}`;
     // CLI config
     const cliConfigTemplate = await fs.readFile(
-      "e2e-test/templates/ethoko.config.e2e.template.json",
+      "e2e-test/helpers/templates/ethoko.config.e2e.template.json",
       "utf-8",
     );
     const cliConfigContent = cliConfigTemplate
       .replace("PROJECT_NAME", PROJECT_NAME)
-      .replace("PULLED_ARTIFACTS_PATH", `./../${pulledArtifactsPath}`)
-      .replace("TYPINGS_PATH", `./../${this.config.typingsPath}`)
-      .replace("STORAGE_PATH", `./../${storagePath}`);
+      .replace(
+        "PULLED_ARTIFACTS_PATH",
+        `./../../${this.config.pulledArtifactsPath}`,
+      )
+      .replace("TYPINGS_PATH", `./../../${this.config.typingsPath}`)
+      .replace("STORAGE_PATH", `./../../${this.config.storagePath}`);
     await fs.writeFile(this.cliConfigPath, cliConfigContent);
 
     return async () => {
-      await fs.rm(this.cliConfigPath);
+      await fs.rm(this.cliConfigPath, { force: true });
     };
   }
 }
@@ -71,31 +67,24 @@ export class HardhatConfigSetup {
 
   constructor(config: ConfigSetup) {
     this.config = config;
-    this.hardhatConfigPath = `${E2E_FOLDER_PATH}/hardhat.config.e2e.${config.testId}.ts`;
+    this.hardhatConfigPath = `${config.testPath}/hardhat.config.e2e.ts`;
   }
 
   async setup(): Promise<() => Promise<void>> {
-    const pulledArtifactsPath = `${E2E_FOLDER_PATH}/pulled-artifacts-${this.config.testId}`;
+    const pulledArtifactsPath = `${this.config.testPath}/pulled-artifacts`;
     const hardhatConfigTemplate = await fs.readFile(
-      "e2e-test/templates/hardhat.config.e2e.template.ts",
+      "e2e-test/helpers/templates/hardhat.config.e2e.template.ts",
       "utf-8",
     );
     const hardhatConfigContent = hardhatConfigTemplate
       .replace("PROJECT_NAME", PROJECT_NAME)
       .replace("PULLED_ARTIFACTS_PATH", pulledArtifactsPath)
-      .replace(
-        "ARTIFACTS_PATH",
-        `${E2E_FOLDER_PATH}/generated-artifacts-${this.config.testId}`,
-      )
       .replace("TYPINGS_PATH", this.config.typingsPath)
-      .replace(
-        "STORAGE_PATH",
-        `${E2E_FOLDER_PATH}/storage-${this.config.testId}`,
-      );
+      .replace("STORAGE_PATH", `${this.config.storagePath}`);
     await fs.writeFile(this.hardhatConfigPath, hardhatConfigContent);
 
     return async () => {
-      await fs.rm(this.hardhatConfigPath);
+      await fs.rm(this.hardhatConfigPath, { force: true });
     };
   }
 }
@@ -121,7 +110,7 @@ export class IgnitionDeployScriptSetup {
     await fs.writeFile(this.ignitionDeployPath, updatedScriptContent);
 
     return async () => {
-      await fs.rm(this.ignitionDeployPath);
+      await fs.rm(this.ignitionDeployPath, { force: true });
     };
   }
 }

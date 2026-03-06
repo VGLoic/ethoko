@@ -1,9 +1,9 @@
-import { GlobalFolderHelper } from "./helpers/global-folder.js";
+import { GlobalFolder } from "./helpers/global-folder.js";
 
-const withBuildInfoWithTestPath = `${GlobalFolderHelper.path}/with-build-info-with-test`;
-const withBuildInfoWithoutTestPath = `${GlobalFolderHelper.path}/with-build-info-without-test`;
-const withoutBuildInfoWithTestPath = `${GlobalFolderHelper.path}/without-build-info-with-test`;
-const withoutBuildInfoWithoutTestPath = `${GlobalFolderHelper.path}/without-build-info-without-test`;
+const withBuildInfoWithTestPath = `${GlobalFolder.path}/with-build-info-with-test`;
+const withBuildInfoWithoutTestPath = `${GlobalFolder.path}/with-build-info-without-test`;
+const withoutBuildInfoWithTestPath = `${GlobalFolder.path}/without-build-info-with-test`;
+const withoutBuildInfoWithoutTestPath = `${GlobalFolder.path}/without-build-info-without-test`;
 export const COMPILATION_TARGETS = {
   WITH_BUILD_INFO_WITH_TEST: {
     command: `forge build --build-info --out ${withBuildInfoWithTestPath} --cache-path ${withBuildInfoWithTestPath}-cache`,
