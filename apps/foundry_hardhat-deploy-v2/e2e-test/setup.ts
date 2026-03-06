@@ -1,23 +1,17 @@
 import fs from "fs/promises";
-import { BUILDS, E2E_FOLDER_PATH } from "./config.js";
-import { asyncExec } from "./async-exec.js";
+import { COMPILATION_TARGETS } from "./compilation-targets.js";
+import { asyncExec } from "./helpers/async-exec.js";
+import { GlobalFolderHelper } from "./helpers/global-folder.js";
 
 export async function setup(): Promise<void> {
   console.log("\n========================================");
   console.log("🚀 Starting [Foundry - Hardhat-deploy v2] E2E Test Suite");
   console.log("========================================\n");
 
-  await cleanUpLocalEthokoStorage();
-
-  await fs.mkdir(E2E_FOLDER_PATH, { recursive: true });
+  await GlobalFolderHelper.setup();
 
   console.log("🔨 Compiling contracts...");
-  await Promise.all([
-    asyncExec(BUILDS.WITHOUT_BUILD_INFO_WITHOUT_TEST.command),
-    asyncExec(BUILDS.WITHOUT_BUILD_INFO_WITH_TEST.command),
-    asyncExec(BUILDS.WITH_BUILD_INFO_WITHOUT_TEST.command),
-    asyncExec(BUILDS.WITH_BUILD_INFO_WITH_TEST.command),
-  ]);
+  await compileContracts();
 
   console.log("\n✅ Test ready to be run!\n");
 }
@@ -27,17 +21,23 @@ export async function teardown(): Promise<void> {
   console.log("🧹 Cleaning Up Test Suite");
   console.log("========================================\n");
 
-  await cleanUpLocalEthokoStorage();
+  await cleanUpCompiledArtifacts();
+  await GlobalFolderHelper.teardown();
 
   console.log("\n✅ Cleanup complete!\n");
 }
 
-async function cleanUpLocalEthokoStorage() {
-  const doesExist = await fs
-    .stat(E2E_FOLDER_PATH)
-    .then(() => true)
-    .catch(() => false);
-  if (doesExist) {
-    await fs.rm(E2E_FOLDER_PATH, { recursive: true });
+async function compileContracts() {
+  await Promise.all([
+    asyncExec(COMPILATION_TARGETS.WITHOUT_BUILD_INFO_WITHOUT_TEST.command),
+    asyncExec(COMPILATION_TARGETS.WITHOUT_BUILD_INFO_WITH_TEST.command),
+    asyncExec(COMPILATION_TARGETS.WITH_BUILD_INFO_WITHOUT_TEST.command),
+    asyncExec(COMPILATION_TARGETS.WITH_BUILD_INFO_WITH_TEST.command),
+  ]);
+}
+
+async function cleanUpCompiledArtifacts() {
+  for (const target of Object.values(COMPILATION_TARGETS)) {
+    await fs.rm(target.outputPath, { recursive: true, force: true });
   }
 }

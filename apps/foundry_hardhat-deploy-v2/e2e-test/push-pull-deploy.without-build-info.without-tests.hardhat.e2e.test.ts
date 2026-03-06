@@ -1,11 +1,11 @@
 import { beforeAll, describe } from "vitest";
 import crypto from "crypto";
+import { COMPILATION_TARGETS } from "./compilation-targets.js";
 import {
-  BUILDS,
   ConfigSetup,
   HardhatConfigSetup,
   HardhatDeployScriptSetup,
-} from "./config.js";
+} from "./helpers/test-setup.js";
 import { testPushPullDeploy } from "./test-push-pull-deploy.js";
 
 describe("[Foundry Hardhat-deploy v2] - Compilation WITHOUT --build-info WITHOUT test and scripts - Push artifact, pull artifact, deploy - Hardhat Plugin", () => {
@@ -20,13 +20,14 @@ describe("[Foundry Hardhat-deploy v2] - Compilation WITHOUT --build-info WITHOUT
   const ethokoCommand = `pnpm hardhat ethoko --config ${hardhatConfigSetup.hardhatConfigPath}`;
 
   beforeAll(async () => {
+    const configCleanup = await config.setup();
     const hardhatCleanup = await hardhatConfigSetup.setup();
     const deploymentScriptCleanup = await deploymentScriptSetup.setup();
 
     return async () => {
-      await config.cleanup();
-      await hardhatCleanup();
       await deploymentScriptCleanup();
+      await hardhatCleanup();
+      await configCleanup();
     };
   });
 
@@ -34,6 +35,7 @@ describe("[Foundry Hardhat-deploy v2] - Compilation WITHOUT --build-info WITHOUT
     ethokoCommand,
     tag,
     hardhatConfigPath: hardhatConfigSetup.hardhatConfigPath,
-    outputArtifactsPath: BUILDS.WITHOUT_BUILD_INFO_WITHOUT_TEST.outputPath,
+    outputArtifactsPath:
+      COMPILATION_TARGETS.WITHOUT_BUILD_INFO_WITHOUT_TEST.outputPath,
   });
 });

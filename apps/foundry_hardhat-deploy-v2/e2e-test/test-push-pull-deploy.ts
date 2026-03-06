@@ -1,6 +1,6 @@
 import { test } from "vitest";
-import { asyncExec } from "./async-exec.js";
-import { E2E_FOLDER_PATH } from "./config.js";
+import { asyncExec } from "./helpers/async-exec.js";
+import { GlobalFolderHelper } from "./helpers/global-folder.js";
 
 export function testPushPullDeploy(payload: {
   ethokoCommand: string;
@@ -8,8 +8,6 @@ export function testPushPullDeploy(payload: {
   hardhatConfigPath: string;
   outputArtifactsPath: string;
 }) {
-  // We allow for retries because the newly created artifacts are not always discoverable by the plugin on the first try, which causes the push command to fail.
-  // This is likely due to some eventual consistency in the file system, but we haven't investigated further as allowing for retries is a simple workaround.
   test("it pushes the tag", () =>
     asyncExec(
       `${payload.ethokoCommand} push --tag ${payload.tag} --artifact-path ${payload.outputArtifactsPath}`,
@@ -31,10 +29,10 @@ export function testPushPullDeploy(payload: {
 
   test("it restores the original artifacts", async () => {
     await asyncExec(
-      `${payload.ethokoCommand} restore --tag ${payload.tag} --output ./${E2E_FOLDER_PATH}/restored-artifacts-${payload.tag}`,
+      `${payload.ethokoCommand} restore --tag ${payload.tag} --output ./${GlobalFolderHelper.path}/restored-artifacts-${payload.tag}`,
     );
     await asyncExec(
-      `ls -la ./${E2E_FOLDER_PATH}/restored-artifacts-${payload.tag}`,
+      `ls -la ./${GlobalFolderHelper.path}/restored-artifacts-${payload.tag}`,
     );
   });
 }
