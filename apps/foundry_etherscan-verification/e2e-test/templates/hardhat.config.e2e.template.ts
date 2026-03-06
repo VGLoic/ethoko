@@ -8,7 +8,7 @@ import HardhatEthoko from "hardhat-ethoko";
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
   ethoko: {
-    project: "verified-forge-counter",
+    project: "PROJECT_NAME",
     pulledArtifactsPath: "PULLED_ARTIFACTS_PATH",
     typingsPath: "TYPINGS_PATH",
     storageConfiguration: {
