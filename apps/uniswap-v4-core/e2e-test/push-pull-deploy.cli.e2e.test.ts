@@ -8,7 +8,7 @@ describe("[Uniswap v4 Core] - Default compilation without test - Push artifact, 
   const testId = crypto.randomBytes(16).toString("hex");
   const tag = testId;
   const cliConfigPath = `${E2E_FOLDER_PATH}/ethoko.config.e2e.${testId}.json`;
-  const ethokoCommand = `pnpm ethoko --config ${cliConfigPath}`;
+  const ethokoCommand = `sh ./node_modules/.bin/ethoko --config ${cliConfigPath}`;
 
   beforeAll(async () => {
     const cliConfigTemplate = await fs.readFile(
