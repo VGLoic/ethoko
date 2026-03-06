@@ -21,7 +21,7 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "test:e2e:core": "pnpm --filter @ethoko/core test:e2e",
-    "test:e2e:apps": "turbo run test:e2e:apps",
+    "test:e2e:apps": "turbo run check-types test:e2e:apps",
     "lint": "turbo run lint",
     "format": "turbo run format",
     "check-format": "turbo run check-format",
