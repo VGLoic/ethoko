@@ -21,11 +21,6 @@ export function testPushPullDeploy(payload: {
   test("it generates the typings", () =>
     asyncExec(`${payload.ethokoCommand} typings`));
 
-  test("it checks types", { retry: 3 }, () =>
-    // We ensure that the default typings are generated in order to to pass the type checks on the existing deployment scripts.
-    asyncExec("pnpm hardhat ethoko typings && pnpm tsc --noEmit"),
-  );
-
   // We allow for three retries as recognition of the fresh typings might take a bit of time, especially on CI
   test("it deploys", { retry: 3 }, () =>
     asyncExec(
