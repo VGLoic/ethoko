@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "ethoko": "ethoko",
     "hardhat": "hardhat",
     "lint": "hardhat ethoko typings && eslint . --max-warnings 0",
     "check-format": "prettier --check --ignore-unknown --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
@@ -16,6 +17,7 @@
     "verify-2026-02-02": "tsx ./scripts/verify-2026-02-02.ts"
   },
   "devDependencies": {
+    "@ethoko/cli": "workspace:*",
     "@ethoko/eslint-config": "workspace:*",
     "@nomicfoundation/hardhat-ignition": "^3.0.7",
     "@nomicfoundation/hardhat-network-helpers": "^3.0.0",

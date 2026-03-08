@@ -25,6 +25,9 @@ importers:
 
   apps/foundry_etherscan-verification:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -36,7 +39,7 @@ importers:
         version: 3.0.3(hardhat@3.1.7)
       '@nomicfoundation/hardhat-toolbox-viem':
         specifier: ^5.0.2
-        version: 5.0.2(02fef8f6ee7b4154aeddbfc7395cf23e)
+        version: 5.0.2(267547c3a543ce52cecea01309999ab8)
       '@nomicfoundation/hardhat-verify':
         specifier: ^3.0.0
         version: 3.0.9(hardhat@3.1.7)
@@ -66,13 +69,16 @@ importers:
         version: 5.8.3
       viem:
         specifier: ^2.43.0
-        version: 2.45.1(typescript@5.8.3)(zod@4.3.6)
+        version: 2.45.1(typescript@5.8.3)(zod@3.25.76)
       vitest:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
 
   apps/foundry_hardhat-deploy-v2:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -136,6 +142,9 @@ importers:
 
   apps/hardhat-v2_hardhat-deploy-v0:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -187,6 +196,9 @@ importers:
 
   apps/hardhat-v2_hardhat-deploy-v0_external-lib:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -238,6 +250,9 @@ importers:
 
   apps/hardhat-v3_etherscan-verification:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -249,7 +264,7 @@ importers:
         version: 3.0.3(hardhat@3.1.7)
       '@nomicfoundation/hardhat-toolbox-viem':
         specifier: ^5.0.2
-        version: 5.0.2(267547c3a543ce52cecea01309999ab8)
+        version: 5.0.2(02fef8f6ee7b4154aeddbfc7395cf23e)
       '@nomicfoundation/hardhat-verify':
         specifier: ^3.0.0
         version: 3.0.9(hardhat@3.1.7)
@@ -285,13 +300,16 @@ importers:
         version: 5.8.3
       viem:
         specifier: ^2.43.0
-        version: 2.45.1(typescript@5.8.3)(zod@3.25.76)
+        version: 2.45.1(typescript@5.8.3)(zod@4.3.6)
       vitest:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
 
   apps/hardhat-v3_hardhat-deploy-v2:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -355,6 +373,9 @@ importers:
 
   apps/hardhat-v3_ignition:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -403,6 +424,9 @@ importers:
 
   apps/uniswap-v4-core:
     devDependencies:
+      '@ethoko/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@ethoko/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -433,6 +457,37 @@ importers:
       vitest:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
+
+  packages/cli:
+    dependencies:
+      '@ethoko/core':
+        specifier: workspace:*
+        version: link:../core
+      commander:
+        specifier: ^12.1.0
+        version: 12.1.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@ethoko/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@ethoko/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.1.0
+        version: 22.15.3
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1
+      tsup:
+        specifier: ^8.2.4
+        version: 8.5.1(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.2)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
 
   packages/core:
     dependencies:
@@ -2589,6 +2644,10 @@ packages:
   command-line-usage@6.1.3:
     resolution: {integrity: sha512-sH5ZSPr+7UStsloltmDh7Ce5fb8XPlHyoPzTpyyMuYCtervL65+ubVZ6Q61cFtFl62UyJlc8/JwERRbAFPUqgw==}
     engines: {node: '>=8.0.0'}
+
+  commander@12.1.0:
+    resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
+    engines: {node: '>=18'}
 
   commander@14.0.3:
     resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
@@ -7924,6 +7983,8 @@ snapshots:
       chalk: 2.4.2
       table-layout: 1.0.2
       typical: 5.2.0
+
+  commander@12.1.0: {}
 
   commander@14.0.3: {}
 

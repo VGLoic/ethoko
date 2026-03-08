@@ -1,5 +1,7 @@
 import fs from "fs/promises";
-import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
+import { GlobalFolder } from "./helpers/global-folder.js";
+import { HardhatCompiler } from "./helpers/hardhat-compiler.js";
+import { COMPILATION_TARGETS } from "./compilation-targets.js";
 
 export async function setup(): Promise<void> {
   console.log("\n========================================");
@@ -8,7 +10,10 @@ export async function setup(): Promise<void> {
   );
   console.log("========================================\n");
 
-  await cleanUpLocalEthokoStorage();
+  await GlobalFolder.setup();
+
+  console.log("🔨 Compiling contracts...");
+  await compileContracts();
 
   console.log("\n✅ Test ready to be run!\n");
 }
@@ -18,17 +23,23 @@ export async function teardown(): Promise<void> {
   console.log("🧹 Cleaning Up Test Suite");
   console.log("========================================\n");
 
-  await cleanUpLocalEthokoStorage();
+  await cleanUpCompiledArtifacts();
+  await GlobalFolder.teardown();
 
   console.log("\n✅ Cleanup complete!\n");
 }
 
-async function cleanUpLocalEthokoStorage() {
-  const doesExist = await fs
-    .stat(E2E_FOLDER_PATH)
-    .then(() => true)
-    .catch(() => false);
-  if (doesExist) {
-    await fs.rm(E2E_FOLDER_PATH, { recursive: true });
+async function compileContracts() {
+  await Promise.all([
+    HardhatCompiler.compile(
+      COMPILATION_TARGETS.ISOLATED_BUILD.command,
+      COMPILATION_TARGETS.ISOLATED_BUILD.outputPath,
+    ),
+  ]);
+}
+
+async function cleanUpCompiledArtifacts() {
+  for (const target of Object.values(COMPILATION_TARGETS)) {
+    await fs.rm(target.outputPath, { recursive: true, force: true });
   }
 }

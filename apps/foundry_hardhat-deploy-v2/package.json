@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "ethoko": "ethoko",
     "lint": "hardhat ethoko typings && eslint . --max-warnings 0",
     "check-format": "forge fmt --check",
     "format-contracts": "forge fmt",
@@ -16,6 +17,8 @@
     "reset-example": "./ethoko-scripts/reset-example.sh"
   },
   "devDependencies": {
+    "@ethoko/cli": "workspace:*",
+    "@ethoko/eslint-config": "workspace:*",
     "@nomicfoundation/hardhat-ignition": "^3.0.7",
     "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.2",
@@ -23,18 +26,17 @@
     "@rocketh/deploy": "^0.18.0",
     "@rocketh/node": "^0.18.2",
     "@rocketh/read-execute": "^0.18.0",
-    "@ethoko/eslint-config": "workspace:*",
-    "hardhat-ethoko": "workspace:*",
     "@types/node": "^22.8.5",
     "dotenv": "^17.2.4",
     "eslint": "^9.39.1",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.1.7",
     "hardhat-deploy": "2.0.0-next.76",
+    "hardhat-ethoko": "workspace:*",
     "prettier-plugin-solidity": "^2.2.1",
     "rocketh": "^0.18.1",
     "typescript": "~5.8.0",
-    "vitest": "^4.0.17",
-    "viem": "^2.43.0"
+    "viem": "^2.43.0",
+    "vitest": "^4.0.17"
   }
 }

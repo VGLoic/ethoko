@@ -1,0 +1,20 @@
+{
+  "../foundry_hardhat-deploy-v2/lib/forge-std": {
+    "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
+  },
+  "../uniswap-v4-core/lib/forge-std": {
+    "rev": "59e4cc349b75f64520fbef515ef44ca03a0a7ef6"
+  },
+  "../uniswap-v4-core/lib/openzeppelin-contracts": {
+    "rev": "b6597503248d2608efc34c1cb79fd025db5f70eb"
+  },
+  "../uniswap-v4-core/lib/solmate": {
+    "rev": "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+  },
+  "lib/forge-std": {
+    "rev": "04ee608913e6c334973649b2b1a2976260647c1b"
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "95a983ad986fa73af774c74601acae3ef1789418"
+  }
+}

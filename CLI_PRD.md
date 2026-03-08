@@ -1,0 +1,2609 @@
+# Product Requirements Document: Ethoko Standalone CLI
+
+**Document Version:** 1.0  
+**Last Updated:** March 5, 2026  
+**Status:** Draft - Ready for Implementation  
+**Owner:** Engineering Team
+
+---
+
+## 1. Executive Summary
+
+### Overview
+
+Create a standalone `@ethoko/cli` tool that enables Foundry users and CI/CD pipelines to use Ethoko without requiring Hardhat installation. The CLI will be distributed as both an npm package and standalone binaries.
+
+### Goals
+
+- **Primary:** Enable Foundry projects to use Ethoko artifact management
+- **Secondary:** Simplify CI/CD integration (no Hardhat dependency)
+- **Tertiary:** Maintain 100% backward compatibility with existing Hardhat plugins
+
+### Key Decisions
+
+| Decision          | Choice                                  |
+| ----------------- | --------------------------------------- |
+| CLI Framework     | Commander.js                            |
+| Config Format     | JSON only (`ethoko.json`)               |
+| Binary Compiler   | Bun (`bun build --compile`)             |
+| Release Cadence   | Automatic with every Changesets release |
+| Platform Packages | Public on npm                           |
+| Versioning        | Independent from `@ethoko/core`         |
+
+### Success Criteria
+
+- All 8 commands work identically to Hardhat plugin
+- Binaries build for 5 platforms (Linux x64/arm64, macOS x64/arm64, Windows x64)
+- npm installation works: `npm install -g @ethoko/cli`
+- Curl installation works: `curl -fsSL https://...install.sh | bash`
+- Zero breaking changes to existing Hardhat users
+- GitHub Actions automatically releases binaries with npm publish
+
+---
+
+## 2. Problem Statement
+
+### Current Limitations
+
+1. **Foundry users cannot use Ethoko** - Requires Hardhat installation
+2. **CI/CD complexity** - Must install Hardhat even for artifact management only
+3. **Dependency bloat** - Hardhat brings 100+ dependencies for simple push/pull operations
+4. **User confusion** - "Why do I need Hardhat to manage artifacts?"
+
+### Impact
+
+- **Market limitation:** Missing entire Foundry ecosystem
+- **User friction:** Complex setup for simple use cases
+- **Competitive disadvantage:** Other artifact tools offer standalone CLIs
+
+### Solution
+
+Standalone CLI that:
+
+- Works with zero dependencies (standalone binary)
+- Works with Node.js (npm installation)
+- Uses same `@ethoko/core` business logic (no duplication)
+- Maintains Hardhat plugin for existing users (no breaking changes)
+
+---
+
+## 3. User Personas & Use Cases
+
+### Persona 1: Foundry Developer
+
+**Profile:** Smart contract developer using Foundry for compilation and testing
+
+**Pain Points:**
+
+- Cannot use Ethoko without installing Hardhat
+- Wants lightweight artifact management
+
+**Use Cases:**
+
+- Push Foundry compilation artifacts to S3
+- Pull artifacts in deployment scripts
+- Compare local artifacts with remote versions
+
+**Example Workflow:**
+
+```bash
+# Compile with Foundry
+forge build
+
+# Push to Ethoko
+ethoko push --artifact-path out/build-info --tag v1.0.0
+
+# In deployment script
+ethoko pull --tag v1.0.0
+```
+
+---
+
+### Persona 2: DevOps Engineer
+
+**Profile:** Manages CI/CD pipelines, prefers minimal dependencies
+
+**Pain Points:**
+
+- CI images bloated with unnecessary dependencies
+- Hardhat installation adds minutes to build time
+- Wants single binary for artifact operations
+
+**Use Cases:**
+
+- Push artifacts in GitHub Actions
+- Pull artifacts in deployment pipelines
+- Validate artifact integrity before deployment
+
+**Example Workflow:**
+
+```yaml
+# GitHub Actions
+- name: Install Ethoko
+  run: curl -fsSL https://...install.sh | bash
+
+- name: Push artifacts
+  run: ethoko push --artifact-path artifacts/build-info --tag ${{ github.sha }}
+```
+
+---
+
+### Persona 3: Existing Hardhat User
+
+**Profile:** Already using `hardhat-ethoko` plugin
+
+**Pain Points:**
+
+- None (satisfied with current solution)
+
+**Use Cases:**
+
+- Continue using Hardhat plugin (no migration required)
+- Optionally adopt CLI for specific workflows
+
+**Example Workflow:**
+
+```bash
+# Continues to work
+npx hardhat ethoko push --tag v1.0.0
+
+# Optional: Use CLI for faster operations
+ethoko push --tag v1.0.0
+```
+
+---
+
+## 4. Product Overview
+
+### What We're Building
+
+Standalone CLI package (`@ethoko/cli`) with:
+
+- 8 commands matching Hardhat plugin functionality
+- JSON configuration file (`ethoko.config.json`)
+- Multiple distribution methods (npm, binary, GitHub Releases)
+- Cross-platform support (Linux, macOS, Windows)
+
+### Architecture Principle
+
+```
+Current:
+  hardhat-ethoko (wrapper) → @ethoko/core (business logic)
+
+New:
+  @ethoko/cli (wrapper) → @ethoko/core (business logic)
+  hardhat-ethoko (unchanged) → @ethoko/core (business logic)
+```
+
+**Key Insight:** `@ethoko/core` has ZERO Hardhat dependencies. All business logic already extracted.
+
+### Non-Goals (Out of Scope)
+
+- ❌ Deprecating Hardhat plugins
+- ❌ Web UI or graphical interface
+- ❌ Interactive prompts (CLI is scriptable)
+- ❌ Smart contract compilation (use Hardhat/Foundry)
+- ❌ Blockchain interaction (use Hardhat/Foundry)
+
+---
+
+## 5. Technical Architecture
+
+### Package Structure
+
+#### New Packages (7 total)
+
+**1. `@ethoko/cli` (Main Package)**
+
+```
+packages/cli/
+├── src/
+│   ├── index.ts              # Commander.js entry point
+│   ├── config.ts             # Load ethoko.config.json
+│   ├── commands/
+│   │   ├── push.ts
+│   │   ├── pull.ts
+│   │   ├── diff.ts
+│   │   ├── inspect.ts
+│   │   ├── artifacts.ts
+│   │   ├── typings.ts
+│   │   ├── export.ts
+│   │   └── restore.ts
+│   └── utils/
+│       └── storage-provider.ts  # Factory for LocalStorage/S3
+├── bin/
+│   └── ethoko               # Node.js wrapper script
+├── scripts/
+│   ├── build-binary.ts      # Bun build script
+│   ├── copy-binaries.ts     # Copy to platform packages
+│   └── postinstall.mjs      # npm postinstall hook
+├── package.json
+├── tsup.config.ts
+└── README.md
+```
+
+**2-6. Platform Binary Packages**
+
+```
+packages/cli-linux-x64/
+├── package.json
+├── binary/
+│   └── ethoko           # Compiled binary (30-50MB)
+└── README.md
+
+(Repeat for: cli-linux-arm64, cli-darwin-x64, cli-darwin-arm64, cli-windows-x64)
+```
+
+---
+
+### Distribution Architecture
+
+#### Method 1: npm Installation (Primary)
+
+```bash
+npm install -g @ethoko/cli
+```
+
+**Flow:**
+
+1. npm installs `@ethoko/cli` package
+2. npm resolves `optionalDependencies` → installs platform-specific package
+3. `postinstall` script verifies binary present
+4. Wrapper script (`bin/ethoko`) detects platform → executes binary
+
+**Implementation:**
+
+```json
+// packages/cli/package.json
+{
+  "bin": {
+    "ethoko": "./bin/ethoko"
+  },
+  "optionalDependencies": {
+    "ethoko-linux-x64": "^0.1.0",
+    "ethoko-linux-arm64": "^0.1.0",
+    "ethoko-darwin-x64": "^0.1.0",
+    "ethoko-darwin-arm64": "^0.1.0",
+    "ethoko-windows-x64": "^0.1.0"
+  }
+}
+```
+
+```javascript
+// packages/cli/bin/ethoko (Node.js wrapper)
+#!/usr/bin/env node
+const { spawnSync } = require("child_process");
+const os = require("os");
+
+function getPlatformBinary() {
+  const platform = os.platform(); // linux, darwin, win32
+  const arch = os.arch();         // x64, arm64
+
+  const pkgName = `ethoko-${platform}-${arch}`;
+  const binary = require.resolve(`${pkgName}/binary/ethoko`);
+  return binary;
+}
+
+const binary = getPlatformBinary();
+const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
+process.exit(result.status);
+```
+
+---
+
+#### Method 2: Direct Binary Installation (Alternative)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+```
+
+**Flow:**
+
+1. Script detects OS/arch
+2. Queries GitHub API for latest CLI release
+3. Downloads binary from GitHub Releases
+4. Installs to `~/.ethoko/bin/ethoko`
+5. Adds to PATH (updates .bashrc/.zshrc)
+
+**Implementation:** See `install.sh` specification in Section 8.5
+
+---
+
+#### Method 3: GitHub Releases (Backing Store)
+
+Every release uploads 5 binaries:
+
+- `ethoko-linux-x64`
+- `ethoko-linux-arm64`
+- `ethoko-darwin-x64`
+- `ethoko-darwin-arm64`
+- `ethoko-windows-x64.exe`
+
+**Release Tag Format:** `cli-v{version}`  
+**Example:** `cli-v0.1.0`
+
+---
+
+### Build System
+
+#### Binary Compilation with Bun
+
+```bash
+# Build for single platform
+bun build src/index.ts --compile --target=bun-linux-x64 --outfile=ethoko-linux-x64
+
+# Build all platforms
+bun scripts/build-binary.ts
+```
+
+**Platforms:**
+
+- `bun-linux-x64` (Linux x86_64)
+- `bun-linux-arm64` (Linux ARM64)
+- `bun-darwin-x64` (macOS Intel)
+- `bun-darwin-arm64` (macOS Apple Silicon)
+- `bun-windows-x64` (Windows x86_64)
+
+**Binary Characteristics:**
+
+- Size: ~30-50MB (includes Bun runtime + dependencies)
+- Standalone: No Node.js required
+- Fast startup: ~50ms cold start
+
+---
+
+### Configuration System
+
+#### File: `ethoko.json`
+
+Location: Project root (searches parent directories up to filesystem root)
+
+**Schema:**
+
+```typescript
+{
+  project: string;                     // Required: Project name
+  compilationOutputPath?: string;      // Path to artifacts (optional)
+  pulledArtifactsPath?: string;        // Default: ".ethoko"
+  typingsPath?: string;                // Default: ".ethoko-typings"
+  storage: {
+    type: "local" | "aws";
+    // Local storage
+    path?: string;                     // If type: "local"
+    // AWS S3 storage
+    awsBucketName?: string;            // If type: "aws"
+    awsRegion?: string;                // If type: "aws"
+    awsAccessKeyId?: string;           // Optional (uses env vars)
+    awsSecretAccessKey?: string;       // Optional (uses env vars)
+    awsRoleArn?: string;               // Optional (AssumeRole ARN)
+    awsRoleExternalId?: string;        // Optional (AssumeRole external ID)
+    awsRoleSessionName?: string;       // Optional (default: "ethoko-cli-session")
+    awsRoleDurationSeconds?: number;   // Optional (default: 3600)
+  };
+  debug?: boolean;                     // Default: false
+}
+```
+
+**Example:**
+
+```json
+{
+  "project": "my-contracts",
+  "compilationOutputPath": "out/build-info",
+  "pulledArtifactsPath": ".ethoko",
+  "storage": {
+    "type": "aws",
+    "awsBucketName": "my-ethoko-bucket",
+    "awsRegion": "us-east-1"
+  },
+  "debug": false
+}
+```
+
+**Config Discovery:**
+
+1. Check `--config <path>` flag
+2. Search current directory for `ethoko.json`
+3. Search parent directories up to filesystem root (standard pattern like ESLint)
+4. Error if not found (show example config in error message)
+
+---
+
+### Command Mapping
+
+All 8 Hardhat plugin commands become CLI commands:
+
+| Hardhat Command            | CLI Command        | Description                             |
+| -------------------------- | ------------------ | --------------------------------------- |
+| `hardhat ethoko push`      | `ethoko push`      | Upload compilation artifacts to storage |
+| `hardhat ethoko pull`      | `ethoko pull`      | Download artifacts from storage         |
+| `hardhat ethoko diff`      | `ethoko diff`      | Compare local artifacts with remote     |
+| `hardhat ethoko inspect`   | `ethoko inspect`   | View artifact details                   |
+| `hardhat ethoko artifacts` | `ethoko artifacts` | List pulled artifacts                   |
+| `hardhat ethoko typings`   | `ethoko typings`   | Generate TypeScript typings             |
+| `hardhat ethoko export`    | `ethoko export`    | Export contract artifact                |
+| `hardhat ethoko restore`   | `ethoko restore`   | Restore original artifacts              |
+
+**Backward Compatibility:** Hardhat plugin commands continue to work unchanged.
+
+---
+
+## 6. Feature Requirements
+
+### 6.1 Command: `ethoko push`
+
+**Description:** Upload compilation artifacts to storage
+
+**Usage:**
+
+```bash
+ethoko push [options]
+```
+
+**Options:**
+
+- `--artifact-path <path>` - Path to compilation artifact (overrides config)
+- `--tag <tag>` - Tag to associate with artifact (e.g., "v1.0.0")
+- `--force` - Force push even if tag exists
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output (errors still shown)
+- `--config <path>` - Config file path (default: search upwards)
+
+**Example:**
+
+```bash
+# Push with auto-detected path (from config)
+ethoko push --tag v1.0.0
+
+# Push specific artifact
+ethoko push --artifact-path out/build-info --tag v1.0.0 --force
+
+# Push in CI (silent mode)
+ethoko push --tag $CI_COMMIT_SHA --silent
+```
+
+**Exit Codes:**
+
+- `0` - Success
+- `1` - Error (artifact not found, tag exists, upload failed, etc.)
+
+**Output:**
+
+```
+╔════════════════════════════════════════════════════════════╗
+║ Pushing artifact to "my-contracts" with tag "v1.0.0"      ║
+╚════════════════════════════════════════════════════════════╝
+
+✓ Hardhat v3 compilation artifact found
+✓ Compilation artifact is valid
+✓ Tag is available
+✓ Artifact uploaded successfully
+
+Artifact ID: 0x1234567890abcdef...
+```
+
+---
+
+### 6.2 Command: `ethoko pull`
+
+**Description:** Download artifacts from storage
+
+**Usage:**
+
+```bash
+ethoko pull [options]
+```
+
+**Options:**
+
+- `--id <id>` - Artifact ID (mutually exclusive with --tag)
+- `--tag <tag>` - Artifact tag (mutually exclusive with --id)
+- `--project <project>` - Project name (overrides config)
+- `--force` - Overwrite existing local artifacts
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# Pull by tag
+ethoko pull --tag v1.0.0
+
+# Pull by ID
+ethoko pull --id 0x1234567890abcdef
+
+# Pull from different project
+ethoko pull --project other-contracts --tag latest
+
+# Force overwrite
+ethoko pull --tag v1.0.0 --force
+```
+
+**Exit Codes:**
+
+- `0` - Success
+- `1` - Error (artifact not found, download failed, etc.)
+
+---
+
+### 6.3 Command: `ethoko diff`
+
+**Description:** Compare local compilation artifacts with remote version
+
+**Usage:**
+
+```bash
+ethoko diff [options]
+```
+
+**Options:**
+
+- `--artifact-path <path>` - Local artifact path
+- `--id <id>` - Remote artifact ID (mutually exclusive with --tag)
+- `--tag <tag>` - Remote artifact tag (mutually exclusive with --id)
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# Compare with tagged version
+ethoko diff --artifact-path out/build-info --tag v1.0.0
+
+# Compare with ID
+ethoko diff --id 0x1234567890abcdef
+```
+
+**Output:**
+
+```
+Comparing local artifact with remote "v1.0.0"...
+
+✓ Artifacts are identical
+```
+
+or
+
+```
+⚠ Artifacts differ:
+  - Contract "Counter" bytecode differs
+  - Contract "Token" not present in remote
+```
+
+---
+
+### 6.4 Command: `ethoko inspect`
+
+**Description:** View details of a pulled artifact
+
+**Usage:**
+
+```bash
+ethoko inspect [options]
+```
+
+**Options:**
+
+- `--id <id>` - Artifact ID
+- `--tag <tag>` - Artifact tag
+- `--project <project>` - Project name
+- `--json` - Output JSON format
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# Inspect by tag
+ethoko inspect --tag v1.0.0
+
+# JSON output
+ethoko inspect --tag v1.0.0 --json
+```
+
+---
+
+### 6.5 Command: `ethoko artifacts`
+
+**Description:** List all pulled artifacts
+
+**Usage:**
+
+```bash
+ethoko artifacts [options]
+```
+
+**Options:**
+
+- `--json` - Output JSON format
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# List all pulled artifacts
+ethoko artifacts
+
+# JSON output for scripting
+ethoko artifacts --json | jq '.[] | .tag'
+```
+
+---
+
+### 6.6 Command: `ethoko typings`
+
+**Description:** Generate TypeScript typings from pulled artifacts
+
+**Usage:**
+
+```bash
+ethoko typings [options]
+```
+
+**Options:**
+
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# Generate typings
+ethoko typings
+
+# Output location: .ethoko-typings/ (configurable)
+```
+
+---
+
+### 6.7 Command: `ethoko export`
+
+**Description:** Export contract artifact from pulled artifact
+
+**Usage:**
+
+```bash
+ethoko export [options]
+```
+
+**Options:**
+
+- `--contract <name>` - Contract name or FQN (source:contract)
+- `--id <id>` - Source artifact ID
+- `--tag <tag>` - Source artifact tag
+- `--project <project>` - Project name
+- `--output <path>` - Output file (default: stdout)
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# Export to stdout
+ethoko export --contract Counter --tag v1.0.0
+
+# Export to file
+ethoko export --contract Counter --tag v1.0.0 --output Counter.json
+
+# Pipe to deployment script
+ethoko export --contract Counter --tag v1.0.0 | jq '.abi'
+```
+
+---
+
+### 6.8 Command: `ethoko restore`
+
+**Description:** Restore original compilation artifacts from pulled artifact
+
+**Usage:**
+
+```bash
+ethoko restore [options]
+```
+
+**Options:**
+
+- `--id <id>` - Artifact ID
+- `--tag <tag>` - Artifact tag
+- `--project <project>` - Project name
+- `--output <path>` - Output directory (required)
+- `--force` - Overwrite existing directory
+- `--debug` - Enable debug logging
+- `--silent` - Suppress output
+- `--config <path>` - Config file path
+
+**Example:**
+
+```bash
+# Restore to specific directory
+ethoko restore --tag v1.0.0 --output restored-artifacts
+
+# Force overwrite
+ethoko restore --tag v1.0.0 --output artifacts --force
+```
+
+---
+
+### 6.9 Global Options
+
+All commands support:
+
+- `--version` - Show CLI version
+- `--help` - Show command help
+- `--config <path>` - Config file path (default: search upwards)
+- `--debug` - Enable debug logging (shows full stack traces)
+- `--silent` - Suppress CLI output (errors/warnings still shown)
+
+---
+
+## 7. Distribution Strategy
+
+### 7.1 npm Distribution
+
+**Package:** `@ethoko/cli`  
+**Registry:** npmjs.com  
+**Visibility:** Public
+
+**Installation:**
+
+```bash
+# Global installation
+npm install -g @ethoko/cli
+pnpm add -g @ethoko/cli
+yarn global add @ethoko/cli
+
+# Local installation (CI/CD)
+npm install --save-dev @ethoko/cli
+```
+
+**Platform Packages:** All public on npm
+
+- `ethoko-linux-x64`
+- `ethoko-linux-arm64`
+- `ethoko-darwin-x64`
+- `ethoko-darwin-arm64`
+- `ethoko-windows-x64`
+
+**Version Strategy:** Independent from `@ethoko/core`
+
+- `@ethoko/cli` depends on `@ethoko/core` with `^` range
+- Example: `@ethoko/cli@0.1.0` depends on `@ethoko/core@^0.8.0`
+
+---
+
+### 7.2 Direct Binary Distribution
+
+**Install Script URL:**
+
+```
+https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh
+```
+
+**Installation:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+
+# With custom install directory
+ETHOKO_INSTALL_DIR=/usr/local curl -fsSL https://...install.sh | bash
+```
+
+**Install Location:**
+
+- Default: `~/.ethoko/bin/ethoko`
+- Custom: `$ETHOKO_INSTALL_DIR/bin/ethoko`
+
+**PATH Management:** Script automatically adds to PATH by updating:
+
+- `~/.bashrc` (bash)
+- `~/.zshrc` (zsh)
+
+---
+
+### 7.3 GitHub Releases
+
+**Repository:** `VGLoic/ethoko-monorepo`  
+**Release Tag Format:** `cli-v{version}`  
+**Example:** `cli-v0.1.0`
+
+**Release Assets:**
+
+- `ethoko-linux-x64`
+- `ethoko-linux-arm64`
+- `ethoko-darwin-x64`
+- `ethoko-darwin-arm64`
+- `ethoko-windows-x64.exe`
+
+**Release Notes:** Auto-generated from changeset
+
+**Direct Download:**
+
+```bash
+# Linux x64
+curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.0/ethoko-linux-x64 -o ethoko
+
+# macOS ARM64
+curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.0/ethoko-darwin-arm64 -o ethoko
+
+chmod +x ethoko
+./ethoko --version
+```
+
+---
+
+### 7.4 Future Distribution Channels (Phase 5+)
+
+**Homebrew (macOS/Linux):**
+
+```bash
+brew install ethoko/tap/ethoko
+```
+
+**AUR (Arch Linux):**
+
+```bash
+yay -S ethoko-cli
+```
+
+**Scoop (Windows):**
+
+```powershell
+scoop install ethoko
+```
+
+**Docker:**
+
+```dockerfile
+FROM oven/bun:alpine
+COPY ethoko /usr/local/bin/ethoko
+```
+
+---
+
+## 8. Implementation Roadmap
+
+### Phase 1: CLI Package Structure + Integration Tests (11-12 hours)
+
+**Status:** ✅ Completed  
+**Last Updated:** March 5, 2026
+
+**Goal:** Create `@ethoko/cli` package with all commands runnable with Node.js, AND update all integration apps to test both Hardhat plugin and CLI in parallel.
+
+**Key User Decisions:**
+
+- ✅ Config filename: `ethoko.json` (not `ethoko.config.json`)
+- ✅ Tag naming: Simple prefix (`2026-hardhat-plugin`, `2026-cli`)
+- ✅ Test execution: Parallel (Hardhat plugin + CLI run simultaneously)
+- ✅ Compilation: Once in global `setup.ts` (not per test suite)
+- ✅ Foundry tests: Separate CLI test files (not two invocations)
+- ✅ Deployment scripts: Duplicate per tag (Option A)
+- ✅ All 8 apps confirmed to have ethoko tests
+
+---
+
+#### Part A: CLI Package Implementation (6.25 hours)
+
+**Tasks:**
+
+1. **Create package structure** (30 min)
+   - Create `packages/cli/` directory
+   - Setup `package.json` with Commander.js dependency
+   - Setup `tsup.config.ts` for TypeScript build (ESM only)
+   - Add shebang: `#!/usr/bin/env node`
+
+2. **Implement config system** (1.5 hours)
+   - Create `src/config.ts`
+   - JSON parsing with Zod validation
+   - Upward directory search (cwd → filesystem root)
+   - `--config` flag override
+   - Error message shows example JSON config
+   - **Config structure:** FLATTENED (no nested storage config)
+     ```typescript
+     {
+       project: string;
+       pulledArtifactsPath?: string;
+       typingsPath?: string;
+       compilationOutputPath?: string;
+       storage: {
+         type: "local" | "aws";
+         path?: string;              // local only
+         awsBucketName?: string;     // aws only
+         awsRegion?: string;         // aws only
+         awsAccessKeyId?: string;    // aws only (optional)
+         awsSecretAccessKey?: string;// aws only (optional)
+         awsRoleArn?: string;        // aws only (optional)
+         awsRoleExternalId?: string; // aws only (optional)
+         awsRoleSessionName?: string;// aws only (optional)
+         awsRoleDurationSeconds?: number; // aws only (optional)
+       };
+       debug?: boolean;
+     }
+     ```
+
+3. **Implement storage provider factory** (30 min)
+   - Create `src/utils/storage-provider.ts`
+   - Convert flattened JSON config → nested core provider format
+   - Map CLI's flat AWS credentials to core's nested structure
+   - Return `LocalStorageProvider` or `S3BucketProvider` instance
+
+4. **Port 8 commands** (2.5 hours - 20 min each)
+   - Create `src/commands/push.ts`
+   - Create `src/commands/pull.ts`
+   - Create `src/commands/diff.ts`
+   - Create `src/commands/inspect.ts`
+   - Create `src/commands/artifacts.ts`
+   - Create `src/commands/typings.ts`
+   - Create `src/commands/export.ts`
+   - Create `src/commands/restore.ts`
+
+   **Porting pattern:**
+   - Copy logic from `packages/hardhat-ethoko/src/tasks/*.ts`
+   - Replace `hre.config.ethoko` → `await getConfig()`
+   - Replace Hardhat task arguments → Commander options
+   - Keep same `@ethoko/core/cli-client` function calls
+   - Keep same `@ethoko/core/cli-ui` display functions
+   - Keep same error handling (CliError vs unexpected)
+
+5. **Create CLI entry point** (45 min)
+   - Create `src/index.ts`
+   - Setup Commander program
+   - Register all 8 commands
+   - Global options: `--version`, `--help`, `--config`
+   - Global config access pattern:
+     ```typescript
+     const getConfig = async () => loadConfig(program.opts().config);
+     registerPushCommand(program, getConfig);
+     ```
+
+6. **Validation** (30 min)
+
+   ```bash
+   cd packages/cli
+   pnpm install
+   pnpm build
+   node dist/index.js --version
+   node dist/index.js --help
+   node dist/index.js push --help
+
+   # Test with config
+   echo '{"project":"test","storage":{"type":"local","path":".test"}}' > ethoko.json
+   node dist/index.js artifacts
+   ```
+
+**Deliverables:**
+
+- ✅ `packages/cli/` with full source code
+- ✅ All 8 commands functional with Node.js
+- ✅ Config loading from `ethoko.json` (upward search)
+- ✅ Config paths resolved relative to `ethoko.json` location
+- ✅ Full TypeScript type safety
+
+---
+
+#### Part B: Integration App Updates (5 hours)
+
+**Goal:** Update all 8 integration apps to test both Hardhat plugin and CLI in parallel.
+
+**Key Architecture Changes:**
+
+1. ✅ **Compilation moves to `setup.ts`** - Run once before all tests
+2. ✅ **Tests run in parallel** - Hardhat plugin + CLI simultaneously
+3. ✅ **Separate CLI test files** - `push-pull-deploy.cli.e2e.test.ts`
+4. ✅ **Different tags prevent conflicts** - `2026-hardhat-plugin` vs `2026-cli`
+5. ✅ **Duplicate deployment scripts** - Per-tag deployment files
+
+---
+
+##### B1: Simple Apps (7 apps × 30 min = 3.5 hours)
+
+**Apps:**
+
+1. `hardhat-v2_hardhat-deploy-v0`
+2. `hardhat-v2_hardhat-deploy-v0_external-lib`
+3. `hardhat-v3_etherscan-verification`
+4. `hardhat-v3_hardhat-deploy-v2`
+5. `hardhat-v3_ignition`
+6. `foundry_etherscan-verification`
+7. `uniswap-v4-core`
+
+**Steps per app:**
+
+**1. Add CLI dependency** (`package.json`):
+
+```json
+{
+  "devDependencies": {
+    "@ethoko/cli": "workspace:*"
+  }
+}
+```
+
+**2. Create `ethoko.json`** (extract from `hardhat.config.e2e.ts`):
+
+```json
+{
+  "project": "ignited-counter",
+  "pulledArtifactsPath": "./.ethoko-e2e/.ethoko",
+  "typingsPath": "./.ethoko-typings",
+  "compilationOutputPath": "./artifacts",
+  "storage": {
+    "type": "local",
+    "path": "./.ethoko-e2e/.storage"
+  }
+}
+```
+
+**3. Update `e2e-test/setup.ts`** - Add compilation:
+
+```typescript
+import { asyncExec } from "./async-exec.js";
+
+export async function setup(): Promise<void> {
+  console.log("\n🚀 Starting [App Name] E2E Test Suite\n");
+  await cleanUpLocalEthokoStorage();
+
+  // Compile once for all tests
+  console.log("📦 Compiling contracts...");
+  await asyncExec("npx hardhat build --config ./hardhat.config.e2e.ts");
+  console.log("✅ Compilation complete\n");
+
+  console.log("\n✅ Tests ready to run!\n");
+}
+```
+
+**4. Update existing test file** - Remove compilation test, update tag:
+
+```typescript
+const TAG_NAME = "2026-hardhat-plugin";
+
+describe("[App] Push/pull/deploy - Hardhat Plugin", async () => {
+  // NO MORE "it compiles" test - moved to setup.ts
+
+  test("it pushes the tag", () =>
+    asyncExec(
+      `npx hardhat --config ./hardhat.config.e2e.ts ethoko push --tag ${TAG_NAME}`,
+    ));
+
+  test("it pulls the tag", () =>
+    asyncExec("npx hardhat --config ./hardhat.config.e2e.ts ethoko pull"));
+
+  // ... rest of tests
+});
+```
+
+**5. Create CLI test file** - `e2e-test/push-pull-deploy.cli.e2e.test.ts`:
+
+```typescript
+import { describe, test } from "vitest";
+import { asyncExec } from "./async-exec.js";
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
+
+const TAG_NAME = "2026-cli";
+
+describe("[App] Push/pull/deploy - CLI", async () => {
+  test("it pushes the tag", () =>
+    asyncExec(`pnpm ethoko push --tag ${TAG_NAME}`));
+
+  test("it pulls the tag", () => asyncExec("pnpm ethoko pull"));
+
+  test("it generates the typings", () => asyncExec("pnpm ethoko typings"));
+
+  test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
+
+  test("it deploys", () =>
+    asyncExec(
+      `npx hardhat ignition deploy ./ignition/modules/counter-${TAG_NAME}.ts --config ./hardhat.config.e2e.ts`,
+    ));
+
+  test("it restores the original artifacts", async () => {
+    await asyncExec(
+      `pnpm ethoko restore --tag ${TAG_NAME} --output ./${E2E_FOLDER_PATH}/restored-artifacts-${TAG_NAME}`,
+    );
+    await asyncExec(
+      `ls -la ./${E2E_FOLDER_PATH}/restored-artifacts-${TAG_NAME}`,
+    );
+  });
+});
+```
+
+**6. Duplicate deployment scripts** (if app uses them):
+
+- Keep: `counter-2026-02-02.ts` (original, unused after update)
+- Create: `counter-2026-hardhat-plugin.ts` (for Hardhat plugin tests)
+- Create: `counter-2026-cli.ts` (for CLI tests)
+
+**Files created per app:**
+
+- `ethoko.json`
+- `e2e-test/push-pull-deploy.cli.e2e.test.ts`
+- Deployment script duplicates (if applicable)
+
+**Files modified per app:**
+
+- `package.json` (add CLI dependency + `ethoko` script)
+- `e2e-test/setup.ts` (add compilation)
+- `e2e-test/push-pull-deploy.e2e.test.ts` (remove compilation test, update tag)
+
+---
+
+##### B2: Foundry App (1 app × 1.5 hours = 1.5 hours)
+
+**App:** `foundry_hardhat-deploy-v2`
+
+**Structure:**
+
+- 1 helper file: `e2e-test/foundry-describe.ts`
+- 4 test files using the helper
+
+**Steps:**
+
+**1. Add CLI dependency + create `ethoko.json`** (same as simple apps)
+
+**2. Update `e2e-test/setup.ts`** - NO compilation (Foundry compiles per suite):
+
+```typescript
+export async function setup(): Promise<void> {
+  console.log("\n🚀 Starting [Foundry Hardhat-deploy v2] E2E Test Suite\n");
+  await cleanUpLocalEthokoStorage();
+  console.log("\n✅ Tests ready to run!\n");
+}
+```
+
+**3. Update `e2e-test/foundry-describe.ts`** - Add `ethokoRunner` parameter:
+
+```typescript
+import { beforeAll, describe, test } from "vitest";
+import fs from "fs/promises";
+import { asyncExec } from "./async-exec.js";
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
+
+export function foundryDescribe(
+  title: string,
+  buildCommand: string,
+  tag: string,
+  outputArtifactsPath: string,
+  ethokoRunner: "hardhat" | "cli",
+) {
+  const ethokoCmd =
+    ethokoRunner === "hardhat"
+      ? "npx hardhat --config ./hardhat.config.e2e.ts ethoko"
+      : "pnpm ethoko";
+
+  describe(`${title} - ${ethokoRunner === "hardhat" ? "Hardhat Plugin" : "CLI"}`, () => {
+    beforeAll(async () => {
+      // Setup deployment script
+      const deploymentScriptContent = await fs.readFile(
+        "deploy/00-deploy-counter-2026-02-04.ts",
+        "utf-8",
+      );
+      const updatedScriptContent = deploymentScriptContent.replaceAll(
+        "2026-02-04",
+        tag,
+      );
+      const tmpDeploymentScript = `deploy/00-deploy-counter-${tag}.ts`;
+      await fs.writeFile(tmpDeploymentScript, updatedScriptContent);
+
+      // Compile once for this suite
+      await asyncExec(buildCommand);
+
+      return async () => {
+        await fs.rm(tmpDeploymentScript);
+      };
+    });
+
+    // NO MORE "it compiles" test
+
+    test("it pushes the tag", () =>
+      asyncExec(
+        `${ethokoCmd} push --tag ${tag} --artifact-path ${outputArtifactsPath}`,
+      ));
+
+    test("it pulls the tag", () => asyncExec(`${ethokoCmd} pull`));
+
+    test("it generates the typings", () => asyncExec(`${ethokoCmd} typings`));
+
+    test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
+
+    test("it deploys", () =>
+      asyncExec(
+        `npx hardhat --config ./hardhat.config.e2e.ts deploy --tags ${tag}`,
+      ));
+
+    test("it restores the original artifacts", async () => {
+      await asyncExec(
+        `${ethokoCmd} restore --tag ${tag} --output ./${E2E_FOLDER_PATH}/restored-artifacts-${tag}`,
+      );
+      await asyncExec(`ls -la ./${E2E_FOLDER_PATH}/restored-artifacts-${tag}`);
+    });
+  });
+}
+```
+
+**4. Update existing test files** (4 files) - Add 5th parameter:
+
+```typescript
+// e2e-test/push-pull-deploy.with-build-info.with-tests.e2e.test.ts
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
+import { foundryDescribe } from "./foundry-describe.js";
+
+const outputArtifactsPath = `${E2E_FOLDER_PATH}/out-2026-hardhat-plugin-forge-build-info-full`;
+
+foundryDescribe(
+  "[Foundry Hardhat-deploy v2] - WITH --build-info WITH test and scripts",
+  `forge build --build-info --out ${outputArtifactsPath} --cache-path ${outputArtifactsPath}-cache`,
+  "2026-hardhat-plugin-forge-build-info-full",
+  outputArtifactsPath,
+  "hardhat",
+);
+```
+
+**5. Create 4 new CLI test files:**
+
+```typescript
+// e2e-test/push-pull-deploy.with-build-info.with-tests.cli.e2e.test.ts
+import { E2E_FOLDER_PATH } from "./e2e-folder-path.js";
+import { foundryDescribe } from "./foundry-describe.js";
+
+const outputArtifactsPath = `${E2E_FOLDER_PATH}/out-2026-cli-forge-build-info-full`;
+
+foundryDescribe(
+  "[Foundry Hardhat-deploy v2] - WITH --build-info WITH test and scripts",
+  `forge build --build-info --out ${outputArtifactsPath} --cache-path ${outputArtifactsPath}-cache`,
+  "2026-cli-forge-build-info-full",
+  outputArtifactsPath,
+  "cli",
+);
+```
+
+Repeat for:
+
+- `push-pull-deploy.with-build-info.without-tests.cli.e2e.test.ts`
+- `push-pull-deploy.without-build-info.with-tests.cli.e2e.test.ts`
+- `push-pull-deploy.without-build-info.without-tests.cli.e2e.test.ts`
+
+**Files created:**
+
+- `ethoko.json`
+- `e2e-test/push-pull-deploy.with-build-info.with-tests.cli.e2e.test.ts`
+- `e2e-test/push-pull-deploy.with-build-info.without-tests.cli.e2e.test.ts`
+- `e2e-test/push-pull-deploy.without-build-info.with-tests.cli.e2e.test.ts`
+- `e2e-test/push-pull-deploy.without-build-info.without-tests.cli.e2e.test.ts`
+
+**Files modified:**
+
+- `package.json` (add CLI dependency + `ethoko` script)
+- `e2e-test/foundry-describe.ts`
+- `e2e-test/push-pull-deploy.with-build-info.with-tests.e2e.test.ts`
+- `e2e-test/push-pull-deploy.with-build-info.without-tests.e2e.test.ts`
+- `e2e-test/push-pull-deploy.without-build-info.with-tests.e2e.test.ts`
+- `e2e-test/push-pull-deploy.without-build-info.without-tests.e2e.test.ts`
+
+---
+
+#### Part C: Validation & Testing (45 min)
+
+**Step 1: Validate CLI Package (15 min)**
+
+```bash
+cd packages/cli
+pnpm install
+pnpm build
+pnpm ethoko --version
+pnpm ethoko --help
+```
+
+**Step 2: Validate One Simple App (15 min)**
+
+```bash
+cd apps/hardhat-v3_ignition
+pnpm install
+pnpm test:e2e
+```
+
+Expected:
+
+```
+✓ [Hardhat v3 - Ignition] ... - Hardhat Plugin (6 tests)
+✓ [Hardhat v3 - Ignition] ... - CLI (6 tests)
+```
+
+**Step 3: Validate Foundry App (15 min)**
+
+```bash
+cd apps/foundry_hardhat-deploy-v2
+pnpm install
+pnpm test:e2e
+```
+
+Expected: 16 test suites (8 Hardhat + 8 CLI)
+
+**Step 4: Full Validation (run at root)**
+
+```bash
+pnpm build
+pnpm check-types
+pnpm lint
+pnpm format
+pnpm test:e2e:core
+pnpm test:e2e:apps
+```
+
+**Results:**
+
+- ✅ `pnpm test:e2e:apps` (all 12 app test suites passed)
+
+---
+
+#### Summary
+
+**Total Files Created:** 29
+
+- CLI package: 14 files
+- Simple apps: 7 × 2 = 14 files (`ethoko.json` + CLI test file)
+- Foundry app: 1 + 4 = 5 files (`ethoko.json` + 4 CLI test files)
+
+**Total Files Modified:** 27
+
+- Simple apps: 7 × 3 = 21 files (`package.json`, `setup.ts`, test file)
+- Foundry app: 1 + 1 + 4 = 6 files (`package.json`, `foundry-describe.ts`, 4 test files)
+
+**Total Duration:** 11-12 hours
+
+- Part A (CLI): 6.25 hours
+- Part B1 (Simple apps): 3.5 hours
+- Part B2 (Foundry app): 1.5 hours
+- Part C (Validation): 0.75 hours
+
+**Actual Test Results:**
+
+- Each app runs TWO test suites (Hardhat plugin + CLI)
+- Both suites run in parallel (share compilation from `setup.ts`)
+- Different tags prevent storage conflicts
+- Total: ~96 tests across 8 apps (12 per app: 6 Hardhat + 6 CLI)
+
+---
+
+### Phase 2: Binary Compilation (2-3 hours)
+
+**Goal:** Compile TypeScript → standalone binaries using Bun
+
+**Tasks:**
+
+1. Install Bun locally (`curl -fsSL https://bun.sh/install | bash`)
+2. Create build script (`scripts/build-binary.ts`)
+   - Loop through 5 platforms
+   - Execute `bun build --compile` for each
+   - Output to `binaries/` directory
+3. Test local platform binary
+4. Add `build:binary` script to `package.json`
+
+**Build Script Implementation:**
+
+```typescript
+// packages/cli/scripts/build-binary.ts
+import { $ } from "bun";
+import { mkdirSync } from "fs";
+import { join } from "path";
+
+const platforms = [
+  { os: "linux", arch: "x64", target: "bun-linux-x64" },
+  { os: "linux", arch: "arm64", target: "bun-linux-arm64" },
+  { os: "darwin", arch: "x64", target: "bun-darwin-x64" },
+  { os: "darwin", arch: "arm64", target: "bun-darwin-arm64" },
+  { os: "windows", arch: "x64", target: "bun-windows-x64" },
+] as const;
+
+const outDir = join(import.meta.dir, "../binaries");
+mkdirSync(outDir, { recursive: true });
+
+for (const platform of platforms) {
+  const ext = platform.os === "windows" ? ".exe" : "";
+  const outFile = join(outDir, `ethoko-${platform.os}-${platform.arch}${ext}`);
+
+  console.log(`Building ${platform.os}-${platform.arch}...`);
+  await $`bun build src/index.ts --compile --target=${platform.target} --outfile=${outFile}`;
+  console.log(`✓ ${outFile}`);
+}
+```
+
+**Validation:**
+
+```bash
+pnpm build:binary
+ls -lh binaries/
+./binaries/ethoko-darwin-arm64 --version
+./binaries/ethoko-darwin-arm64 push --help
+```
+
+**Deliverables:**
+
+- ✅ 5 compiled binaries in `packages/cli/binaries/`
+- ✅ Binaries are 30-50MB each
+- ✅ Binaries run without Node.js
+
+---
+
+### Phase 3: Platform Packages (2-3 hours)
+
+**Goal:** Create npm packages wrapping each binary + wrapper script
+
+**Tasks:**
+
+1. Create 5 platform package directories
+   - `packages/cli-linux-x64/`
+   - `packages/cli-linux-arm64/`
+   - `packages/cli-darwin-x64/`
+   - `packages/cli-darwin-arm64/`
+   - `packages/cli-windows-x64/`
+2. Create minimal `package.json` for each
+   - Set `os` and `cpu` fields for platform detection
+   - Include binary in `files` array
+3. Create copy script (`scripts/copy-binaries-to-packages.ts`)
+   - Copy binaries from Phase 2 to platform packages
+   - Set executable permissions (chmod +x)
+4. Create Node.js wrapper script (`bin/ethoko`)
+   - Detect platform/arch
+   - Resolve platform package binary
+   - Spawn binary with arguments
+5. Update `@ethoko/cli/package.json`
+   - Add `bin` field
+   - Add `optionalDependencies` for platform packages
+
+**Platform Package Example:**
+
+```json
+// packages/cli-linux-x64/package.json
+{
+  "name": "ethoko-linux-x64",
+  "version": "0.1.0",
+  "description": "Ethoko CLI binary for Linux x64",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "files": ["binary/ethoko"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VGLoic/ethoko-monorepo"
+  }
+}
+```
+
+**Wrapper Script:**
+
+```javascript
+#!/usr/bin/env node
+// packages/cli/bin/ethoko
+const { spawnSync } = require("child_process");
+const { join } = require("path");
+const os = require("os");
+
+function getPlatformBinary() {
+  const platform = os.platform();
+  const arch = os.arch();
+
+  const mapping = {
+    "linux-x64": "ethoko-linux-x64",
+    "linux-arm64": "ethoko-linux-arm64",
+    "darwin-x64": "ethoko-darwin-x64",
+    "darwin-arm64": "ethoko-darwin-arm64",
+    "win32-x64": "ethoko-windows-x64",
+  };
+
+  const key = `${platform}-${arch}`;
+  const pkgName = mapping[key];
+
+  if (!pkgName) {
+    console.error(`Unsupported platform: ${key}`);
+    process.exit(1);
+  }
+
+  try {
+    const ext = platform === "win32" ? ".exe" : "";
+    const binaryPath = require.resolve(`${pkgName}/binary/ethoko${ext}`);
+    return binaryPath;
+  } catch (err) {
+    console.error(`Binary not found for ${key}. Try reinstalling @ethoko/cli.`);
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+
+const binary = getPlatformBinary();
+const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
+process.exit(result.status ?? 1);
+```
+
+**Validation:**
+
+```bash
+pnpm build:binary
+bun scripts/copy-binaries-to-packages.ts
+node bin/ethoko --version
+pnpm pack
+npm install -g ethoko-cli-0.1.0.tgz
+ethoko --version
+```
+
+**Deliverables:**
+
+- ✅ 5 platform packages with binaries
+- ✅ Wrapper script detects platform and executes binary
+- ✅ Local npm install works
+
+---
+
+### Phase 4: GitHub Actions Integration (2-3 hours)
+
+**Goal:** Automatically build and upload binaries on npm publish
+
+**Tasks:**
+
+1. Update `.github/workflows/main.yaml`
+   - Add `outputs` to `release` job
+   - Add new `build-and-upload-binaries` job
+2. Install Bun in CI (using `oven-sh/setup-bun@v2`)
+3. Build all binaries in CI
+4. Extract CLI version from `package.json`
+5. Create GitHub Release with binaries
+6. Publish platform packages to npm
+
+**GitHub Actions Job:**
+
+```yaml
+# .github/workflows/main.yaml
+
+release:
+  name: Release
+  needs:
+    [build, check-format, check-types, lint, test, test-e2e-core, test-e2e-apps]
+  runs-on: ubuntu-latest
+  outputs:
+    published: ${{ steps.changesets.outputs.published }}
+  steps:
+    # ... existing steps ...
+    - name: Create Release Pull Request or Publish to NPM
+      id: changesets
+      uses: changesets/action@v1
+      with:
+        publish: "pnpm release"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+build-and-upload-binaries:
+  name: Build and Upload Binaries
+  needs: release
+  if: needs.release.outputs.published == 'true'
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v5
+
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version-file: .nvmrc
+        cache: "pnpm"
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Build CLI package
+      run: pnpm --filter @ethoko/cli build
+
+    - name: Build binaries
+      run: pnpm --filter @ethoko/cli build:binary
+
+    - name: Copy binaries to platform packages
+      run: bun packages/cli/scripts/copy-binaries-to-packages.ts
+
+    - name: Get CLI version
+      id: cli_version
+      run: |
+        VERSION=$(node -p "require('./packages/cli/package.json').version")
+        echo "version=v$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "cli-${{ steps.cli_version.outputs.version }}"
+        name: "CLI ${{ steps.cli_version.outputs.version }}"
+        files: |
+          packages/cli/binaries/ethoko-linux-x64
+          packages/cli/binaries/ethoko-linux-arm64
+          packages/cli/binaries/ethoko-darwin-x64
+          packages/cli/binaries/ethoko-darwin-arm64
+          packages/cli/binaries/ethoko-windows-x64.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish platform packages
+      run: |
+        echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+        cd packages/cli-linux-x64 && pnpm publish --no-git-checks --access public
+        cd ../cli-linux-arm64 && pnpm publish --no-git-checks --access public
+        cd ../cli-darwin-x64 && pnpm publish --no-git-checks --access public
+        cd ../cli-darwin-arm64 && pnpm publish --no-git-checks --access public
+        cd ../cli-windows-x64 && pnpm publish --no-git-checks --access public
+      env:
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+**Validation:**
+
+1. Create test changeset: `pnpm changeset add`
+2. Create Version PR (merge to trigger release)
+3. Verify GitHub Release created with 5 binaries
+4. Verify platform packages published to npm
+5. Test installation: `npm install -g @ethoko/cli`
+
+**Deliverables:**
+
+- ✅ GitHub Actions workflow extended
+- ✅ Binaries automatically uploaded to GitHub Releases
+- ✅ Platform packages automatically published to npm
+- ✅ Full automation integrated with Changesets
+
+---
+
+### Phase 5: Install Script (2 hours)
+
+**Goal:** Enable curl-based installation for non-npm users
+
+**Tasks:**
+
+1. Create `install.sh` in repo root
+2. Implement platform detection (OS + arch)
+3. Query GitHub API for latest CLI release
+4. Download correct binary
+5. Install to `~/.ethoko/bin/`
+6. Add to PATH (update shell profile)
+7. Verify installation
+
+**Install Script Implementation:**
+
+```bash
+#!/usr/bin/env bash
+# install.sh
+
+set -euo pipefail
+
+REPO="VGLoic/ethoko-monorepo"
+INSTALL_DIR="${ETHOKO_INSTALL_DIR:-$HOME/.ethoko}"
+BIN_DIR="$INSTALL_DIR/bin"
+
+detect_platform() {
+  local os arch
+
+  case "$(uname -s)" in
+    Linux*)   os="linux" ;;
+    Darwin*)  os="darwin" ;;
+    MINGW*|MSYS*|CYGWIN*) os="windows" ;;
+    *)
+      echo "Error: Unsupported OS $(uname -s)"
+      exit 1
+      ;;
+  esac
+
+  case "$(uname -m)" in
+    x86_64|amd64) arch="x64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *)
+      echo "Error: Unsupported architecture $(uname -m)"
+      exit 1
+      ;;
+  esac
+
+  echo "${os}-${arch}"
+}
+
+get_latest_version() {
+  curl -s "https://api.github.com/repos/$REPO/releases" \
+    | grep '"tag_name"' \
+    | grep 'cli-v' \
+    | head -n 1 \
+    | sed -E 's/.*"cli-(v[^"]+)".*/\1/'
+}
+
+main() {
+  echo "🔍 Detecting platform..."
+  local platform=$(detect_platform)
+  echo "✓ Platform: $platform"
+
+  echo "🔍 Finding latest version..."
+  local version=$(get_latest_version)
+  if [ -z "$version" ]; then
+    echo "Error: Could not determine latest version"
+    exit 1
+  fi
+  echo "✓ Latest version: $version"
+
+  local binary_name="ethoko-${platform}"
+  local ext=""
+  if [[ "$platform" == "windows"* ]]; then
+    ext=".exe"
+  fi
+
+  local download_url="https://github.com/$REPO/releases/download/cli-$version/$binary_name$ext"
+
+  echo "📥 Downloading Ethoko CLI..."
+  mkdir -p "$BIN_DIR"
+  local temp_file="$BIN_DIR/ethoko.download"
+
+  if command -v curl &> /dev/null; then
+    curl -fsSL "$download_url" -o "$temp_file"
+  elif command -v wget &> /dev/null; then
+    wget -q "$download_url" -O "$temp_file"
+  else
+    echo "Error: Neither curl nor wget found"
+    exit 1
+  fi
+
+  mv "$temp_file" "$BIN_DIR/ethoko$ext"
+  chmod +x "$BIN_DIR/ethoko$ext"
+
+  echo "✅ Ethoko CLI installed to $BIN_DIR/ethoko$ext"
+
+  # Add to PATH
+  local shell_profile
+  case "$SHELL" in
+    */bash) shell_profile="$HOME/.bashrc" ;;
+    */zsh)  shell_profile="$HOME/.zshrc" ;;
+    */fish) shell_profile="$HOME/.config/fish/config.fish" ;;
+    *)      shell_profile="" ;;
+  esac
+
+  if [ -n "$shell_profile" ]; then
+    if ! grep -q "$BIN_DIR" "$shell_profile" 2>/dev/null; then
+      echo "" >> "$shell_profile"
+      echo "# Ethoko CLI" >> "$shell_profile"
+      echo "export PATH=\"\$PATH:$BIN_DIR\"" >> "$shell_profile"
+      echo "📝 Added $BIN_DIR to PATH in $shell_profile"
+      echo "   Run: source $shell_profile"
+    else
+      echo "ℹ️  $BIN_DIR already in PATH"
+    fi
+  fi
+
+  echo ""
+  echo "🎉 Installation complete!"
+  echo "   Run: ethoko --version"
+  echo "   Or:  $BIN_DIR/ethoko --version"
+}
+
+main
+```
+
+**Validation:**
+
+```bash
+# Test locally
+bash install.sh
+~/.ethoko/bin/ethoko --version
+
+# Test from URL (after pushing to main)
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+ethoko --version
+```
+
+**Deliverables:**
+
+- ✅ `install.sh` in repo root
+- ✅ Works on Linux, macOS, Windows (Git Bash)
+- ✅ Detects platform automatically
+- ✅ Downloads from GitHub Releases
+- ✅ Adds to PATH automatically
+
+---
+
+### Phase 6: Documentation & Testing (2-3 hours)
+
+**Goal:** Complete documentation and E2E tests
+
+**Tasks:**
+
+1. Write `packages/cli/README.md`
+   - Installation instructions (npm + curl)
+   - Configuration guide
+   - Command reference
+   - Examples
+   - Migration guide from Hardhat
+2. Write E2E tests (`packages/cli/test/e2e/cli.e2e.test.ts`)
+   - Test each command
+   - Test with both local and S3 storage
+   - Test error cases
+3. Update root `README.md`
+   - Add CLI installation section
+   - Link to CLI package README
+4. Create migration guide (`packages/cli/MIGRATION.md`)
+   - Hardhat → CLI conversion
+   - Config migration
+   - Command mapping
+
+**CLI README Structure:**
+
+```markdown
+# @ethoko/cli
+
+Standalone CLI for Ethoko artifact management.
+
+## Installation
+
+### npm (recommended for Node.js projects)
+
+\`\`\`bash
+npm install -g @ethoko/cli
+\`\`\`
+
+### Direct binary download (no Node.js required)
+
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+\`\`\`
+
+## Quick Start
+
+1. Create `ethoko.json`:
+   \`\`\`json
+   {
+   "project": "my-contracts",
+   "storage": {
+   "type": "local",
+   "path": ".ethoko-storage"
+   }
+   }
+   \`\`\`
+
+2. Push artifacts:
+   \`\`\`bash
+   ethoko push --artifact-path out/build-info --tag v1.0.0
+   \`\`\`
+
+3. Pull artifacts:
+   \`\`\`bash
+   ethoko pull --tag v1.0.0
+   \`\`\`
+
+## Configuration
+
+[Full config schema and examples]
+
+## Commands
+
+[Full command reference]
+
+## Migration from Hardhat Plugin
+
+[Migration guide]
+```
+
+**E2E Test Structure:**
+
+```typescript
+// packages/cli/test/e2e/cli.e2e.test.ts
+import { describe, test, expect, beforeAll } from "vitest";
+import { execSync } from "child_process";
+import fs from "fs/promises";
+import path from "path";
+
+const CLI_PATH = path.join(__dirname, "../../dist/index.js");
+
+describe("CLI E2E", () => {
+  beforeAll(async () => {
+    // Setup test config
+    await fs.writeFile(
+      "ethoko.json",
+      JSON.stringify({
+        project: "test-project",
+        storage: { type: "local", path: ".ethoko-test" },
+      }),
+    );
+  });
+
+  test("ethoko --version", () => {
+    const output = execSync(`node ${CLI_PATH} --version`).toString();
+    expect(output).toMatch(/\d+\.\d+\.\d+/);
+  });
+
+  test("ethoko push", () => {
+    // Create test artifact
+    // Run push command
+    // Verify artifact uploaded
+  });
+
+  test("ethoko pull", () => {
+    // Run pull command
+    // Verify artifact downloaded
+  });
+
+  // More tests...
+});
+```
+
+**Validation:**
+
+```bash
+pnpm --filter @ethoko/cli test:e2e
+pnpm --filter @ethoko/cli lint
+pnpm --filter @ethoko/cli check-types
+```
+
+**Deliverables:**
+
+- ✅ Complete CLI README
+- ✅ E2E tests passing
+- ✅ Migration guide
+- ✅ Root README updated
+
+---
+
+### Timeline Summary
+
+| Phase                       | Duration        | Cumulative  |
+| --------------------------- | --------------- | ----------- |
+| Phase 1: CLI Structure      | 4-6 hours       | 4-6 hours   |
+| Phase 2: Binary Compilation | 2-3 hours       | 6-9 hours   |
+| Phase 3: Platform Packages  | 2-3 hours       | 8-12 hours  |
+| Phase 4: GitHub Actions     | 2-3 hours       | 10-15 hours |
+| Phase 5: Install Script     | 2 hours         | 12-17 hours |
+| Phase 6: Documentation      | 2-3 hours       | 14-20 hours |
+| **Total**                   | **14-20 hours** |             |
+
+---
+
+## 9. Success Metrics
+
+### Technical Metrics
+
+**Binary Quality:**
+
+- ✅ Binary size < 60MB per platform
+- ✅ Cold start time < 100ms
+- ✅ All 8 commands functional
+- ✅ Zero runtime errors in common use cases
+
+**Distribution Success:**
+
+- ✅ npm installation works on all 5 platforms
+- ✅ Curl install script works on Linux/macOS
+- ✅ Binaries uploaded to every release
+- ✅ Platform packages published automatically
+
+**Testing:**
+
+- ✅ E2E tests pass for all commands
+- ✅ Manual testing on all 5 platforms
+- ✅ Integration tests with real S3 and LocalStack
+- ✅ Zero linting/type errors
+
+---
+
+### User Adoption Metrics (Post-Launch)
+
+**Early Adoption (First Month):**
+
+- 50+ npm installs per week
+- 10+ GitHub Stars
+- 5+ community issues/discussions
+
+**Growth (First Quarter):**
+
+- 500+ npm installs total
+- 50+ GitHub Stars
+- Usage in at least 1 production project
+- Positive feedback in community channels
+
+**Long-term Success (First Year):**
+
+- 5,000+ npm installs total
+- 200+ GitHub Stars
+- Multiple case studies from Foundry projects
+- Community contributions (PRs, issues)
+
+---
+
+### Quality Metrics
+
+**Reliability:**
+
+- < 1% error rate in production
+- Zero data loss incidents
+- < 1 critical bug per month
+
+**Performance:**
+
+- Push/pull operations < 10s for typical artifacts
+- Binary startup < 100ms
+- Memory usage < 100MB
+
+**Developer Experience:**
+
+- Clear error messages (no cryptic stack traces)
+- Comprehensive documentation
+- Quick response to issues (< 48 hours)
+
+---
+
+## 10. Risk Analysis
+
+### Technical Risks
+
+#### Risk 1: Bun Compilation Fails for Some Platforms
+
+**Likelihood:** Low  
+**Impact:** High  
+**Mitigation:**
+
+- Test compilation early (Phase 2)
+- Fallback to `pkg` or `nexe` if needed
+- Worst case: Ship Node.js + bundled code (less ideal)
+
+---
+
+#### Risk 2: Binary Size Too Large (>100MB)
+
+**Likelihood:** Low  
+**Impact:** Medium  
+**Mitigation:**
+
+- Bun produces ~30-50MB binaries (proven with OpenCode)
+- If larger, investigate tree-shaking and dead code elimination
+- Acceptable up to 100MB for standalone binary
+
+---
+
+#### Risk 3: Platform Detection Edge Cases
+
+**Likelihood:** Medium  
+**Impact:** Low  
+**Mitigation:**
+
+- Use OpenCode's proven detection logic
+- Provide `--platform` override flag
+- Document manual installation steps
+
+---
+
+#### Risk 4: Breaking Changesets Workflow
+
+**Likelihood:** Low  
+**Impact:** Critical  
+**Mitigation:**
+
+- Only extend workflow, don't modify `release` job
+- Test with dummy changeset before production
+- Rollback plan: remove new job, no impact on existing flow
+
+---
+
+### Product Risks
+
+#### Risk 5: Low User Adoption
+
+**Likelihood:** Medium  
+**Impact:** Medium  
+**Mitigation:**
+
+- Beta release to gather feedback
+- Promote in Foundry community channels
+- Create video tutorials and examples
+- Showcase in README with clear value proposition
+
+---
+
+#### Risk 6: Compatibility Issues with Foundry
+
+**Likelihood:** Medium  
+**Impact:** High  
+**Mitigation:**
+
+- Test with multiple Foundry versions
+- Document supported Foundry versions
+- Provide clear error messages for unsupported formats
+- Maintain test suite with Foundry integration
+
+---
+
+#### Risk 7: S3 Configuration Complexity
+
+**Likelihood:** High  
+**Impact:** Medium  
+**Mitigation:**
+
+- Provide clear AWS setup guide
+- Support multiple authentication methods (access keys, IAM roles, env vars)
+- Offer local storage as simple alternative
+- Create troubleshooting guide
+
+---
+
+### Business Risks
+
+#### Risk 8: Maintenance Burden
+
+**Likelihood:** Medium  
+**Impact:** Medium  
+**Mitigation:**
+
+- Automated releases (no manual steps)
+- Comprehensive E2E tests catch regressions
+- Clear contributor guidelines
+- Invest in documentation upfront
+
+---
+
+#### Risk 9: Security Vulnerabilities in Dependencies
+
+**Likelihood:** Low  
+**Impact:** High  
+**Mitigation:**
+
+- Regular dependency updates
+- Automated security scanning (Dependabot)
+- Minimize dependencies (only Commander.js + @ethoko/core)
+- Audit dependencies before major releases
+
+---
+
+## 11. Open Questions
+
+### Q1: Versioning Strategy ✅ DECIDED
+
+**Question:** Should CLI version match `@ethoko/core` version or be independent?
+
+**Decision:** **Independent versioning**
+
+- CLI depends on `@ethoko/core` with `^` range
+- Example: `@ethoko/cli@0.1.0` depends on `@ethoko/core@^0.8.0`
+- Document compatibility in CLI README
+
+---
+
+### Q2: Config File Discovery ✅ DECIDED
+
+**Question:** Should CLI search parent directories for `ethoko.json`?
+
+**Decision:** **Search upwards** (standard pattern like ESLint, `.git`, `package.json`)
+
+- Check current directory first
+- Walk up to filesystem root
+- Stop at first `ethoko.json` found
+- Provide `--config <path>` to override
+
+---
+
+### Q3: Validation Workflow Frequency ✅ DECIDED
+
+**Question:** Run full validation after each phase or only at end?
+
+**Decision:** **After each phase**
+
+- Phases are small (2-6 hours each)
+- Catching issues early saves time
+- Run: `pnpm build && pnpm lint && pnpm check-types && pnpm test:e2e:core`
+
+---
+
+### Q4: Config Filename ✅ DECIDED
+
+**Question:** Use `ethoko.config.json` or `ethoko.json`?
+
+**Decision:** **`ethoko.json`**
+
+- Simpler, follows common patterns (`.eslintrc.json` → `eslint.json` trend)
+- Less typing for users
+
+---
+
+### Q5: Phase 1 Test Strategy ✅ DECIDED
+
+**Question:** How should integration apps test both Hardhat plugin and CLI?
+
+**Decision:** **Parallel execution with separate test files**
+
+- Compilation in global `setup.ts` (once per app)
+- Hardhat plugin tests: existing file, update tag to `2026-hardhat-plugin`
+- CLI tests: new file `push-pull-deploy.cli.e2e.test.ts`, tag `2026-cli`
+- Tests run in parallel (Vitest handles file-level parallelism)
+- Different tags prevent storage conflicts
+
+---
+
+### Q6: Beta Testing Strategy
+
+**Question:** Release beta version first or go straight to stable?
+
+**Options:**
+
+1. **Beta release first:** `@ethoko/cli@0.1.0-beta.1`
+   - Pro: Gather feedback, fix bugs before stable
+   - Con: Slower path to stable release
+
+2. **Direct stable release:** `@ethoko/cli@0.1.0`
+   - Pro: Faster to market
+   - Con: Risk of issues in stable version
+
+**Recommendation:** Beta release
+
+- Publish `0.1.0-beta.1` after Phase 1 completion
+- Test with 2-3 early adopter projects
+- Gather feedback for 1-2 weeks
+- Fix critical issues
+- Promote to stable `0.1.0`
+
+**Decision:** ⏳ Pending
+
+---
+
+### Q7: Auto-Update Mechanism
+
+**Question:** Should CLI support self-update?
+
+**Context:** Similar to `bun upgrade`, `rustup update`
+
+**Implementation:**
+
+- Add `ethoko update` command
+- Check GitHub API for latest release
+- Download new binary
+- Replace current binary
+- Only for direct binary installs (npm users use `npm update`)
+
+**Recommendation:** Phase 7+ enhancement (post-MVP)
+
+- Get CLI stable first
+- Add auto-update after user feedback
+- Consider security implications (verify signatures)
+
+**Decision:** ⏳ Defer to Phase 7
+
+---
+
+## 12. Appendices
+
+### Appendix A: Command Porting Reference
+
+**Pattern: Hardhat Task → CLI Command**
+
+**Before (Hardhat Task):**
+
+```typescript
+// packages/hardhat-ethoko/src/tasks/push.ts
+export default async function (taskArguments, hre: HardhatRuntimeEnvironment) {
+  const ethokoConfig = hre.config.ethoko;
+
+  // Validate args
+  const opts = z.object({ tag: z.string().optional() }).safeParse(taskArguments);
+
+  // Create storage provider
+  const storageProvider = ethokoConfig.storageConfiguration.type === "aws"
+    ? new S3BucketProvider({ ... })
+    : new LocalStorageProvider({ ... });
+
+  // Call core function
+  await push(artifactPath, project, tag, storageProvider, opts);
+}
+```
+
+**After (CLI Command):**
+
+```typescript
+// packages/cli/src/commands/push.ts
+import { Command } from "commander";
+import { loadConfig } from "../config";
+import { createStorageProvider } from "../utils/storage-provider";
+import { push } from "@ethoko/core/cli-client";
+
+export function registerPushCommand(program: Command) {
+  program
+    .command("push")
+    .option("--tag <tag>", "Tag to associate with artifact")
+    .action(async (options) => {
+      const config = await loadConfig(options.config);
+      const storageProvider = createStorageProvider(config.storage);
+      await push(
+        artifactPath,
+        config.project,
+        options.tag,
+        storageProvider,
+        opts,
+      );
+    });
+}
+```
+
+---
+
+### Appendix B: Platform Package Template
+
+```
+packages/cli-{os}-{arch}/
+├── package.json
+├── binary/
+│   └── ethoko[.exe]
+└── README.md
+```
+
+**package.json Template:**
+
+```json
+{
+  "name": "ethoko-{os}-{arch}",
+  "version": "0.1.0",
+  "description": "Ethoko CLI binary for {OS} {ARCH}",
+  "os": ["{os}"],
+  "cpu": ["{arch}"],
+  "files": ["binary"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VGLoic/ethoko-monorepo",
+    "directory": "packages/cli-{os}-{arch}"
+  },
+  "homepage": "https://github.com/VGLoic/ethoko-monorepo#readme",
+  "bugs": {
+    "url": "https://github.com/VGLoic/ethoko-monorepo/issues"
+  }
+}
+```
+
+**README.md Template:**
+
+```markdown
+# ethoko-{os}-{arch}
+
+Ethoko CLI binary for {OS} {ARCH}.
+
+This package is automatically installed as an optional dependency of `@ethoko/cli`.
+
+## Direct Usage
+
+If you need to use this binary directly:
+
+\`\`\`bash
+./node_modules/ethoko-{os}-{arch}/binary/ethoko --version
+\`\`\`
+
+## Installation
+
+This package is typically installed automatically via:
+
+\`\`\`bash
+npm install -g @ethoko/cli
+\`\`\`
+```
+
+---
+
+### Appendix C: GitHub Actions Workflow Reference
+
+**Complete workflow file:** `.github/workflows/main.yaml`
+
+Key changes:
+
+1. Add `outputs` to `release` job
+2. Add `build-and-upload-binaries` job after `release`
+3. Conditional execution: only if `published == 'true'`
+
+See Phase 4 for full implementation.
+
+---
+
+### Appendix D: Configuration Schema Reference
+
+**TypeScript Schema (for documentation):**
+
+```typescript
+interface EthokoConfig {
+  project: string;
+  compilationOutputPath?: string;
+  pulledArtifactsPath?: string;
+  storage: LocalStorageConfig | S3StorageConfig;
+  debug?: boolean;
+}
+
+interface LocalStorageConfig {
+  type: "local";
+  path: string;
+}
+
+interface S3StorageConfig {
+  type: "aws";
+  awsBucketName: string;
+  awsRegion: string;
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsRole?: string;
+}
+```
+
+**Zod Schema (runtime validation):**
+
+```typescript
+const ConfigSchema = z.object({
+  project: z.string().min(1),
+  compilationOutputPath: z.string().optional(),
+  pulledArtifactsPath: z.string().default(".ethoko"),
+  storage: z.discriminatedUnion("type", [
+    z.object({
+      type: z.literal("local"),
+      path: z.string(),
+    }),
+    z.object({
+      type: z.literal("aws"),
+      awsBucketName: z.string(),
+      awsRegion: z.string(),
+      awsAccessKeyId: z.string().optional(),
+      awsSecretAccessKey: z.string().optional(),
+      awsRole: z.string().optional(),
+    }),
+  ]),
+  debug: z.boolean().default(false),
+});
+```
+
+---
+
+### Appendix E: Testing Checklist
+
+**Pre-Implementation Testing:**
+
+- [ ] `@ethoko/core` has no Hardhat dependencies
+- [ ] All 8 CLI client functions are pure (no HRE dependency)
+
+**Phase 1 Testing:**
+
+- [ ] Config loads from JSON file
+- [ ] Config validation catches invalid configs
+- [ ] Storage provider factory creates correct instances
+- [ ] All 8 commands parse arguments correctly
+- [ ] Commands call correct `@ethoko/core` functions
+
+**Phase 2 Testing:**
+
+- [ ] Bun compiles for all 5 platforms
+- [ ] Binaries are 30-60MB each
+- [ ] Local platform binary executes successfully
+- [ ] Binary shows correct version
+
+**Phase 3 Testing:**
+
+- [ ] Platform packages have correct `os`/`cpu` fields
+- [ ] Wrapper script detects platform correctly
+- [ ] Wrapper script executes correct binary
+- [ ] npm install selects correct optional dependency
+- [ ] Local npm install works
+
+**Phase 4 Testing:**
+
+- [ ] GitHub Actions job triggers on publish
+- [ ] Bun installs in CI
+- [ ] All binaries build in CI
+- [ ] GitHub Release created with correct tag
+- [ ] All 5 binaries uploaded
+- [ ] Platform packages published to npm
+- [ ] No errors in CI logs
+
+**Phase 5 Testing:**
+
+- [ ] Install script detects platform correctly
+- [ ] Install script downloads correct binary
+- [ ] Install script sets executable permissions
+- [ ] Install script adds to PATH
+- [ ] Installed binary works
+
+**Phase 6 Testing:**
+
+- [ ] All E2E tests pass
+- [ ] Documentation is accurate
+- [ ] Examples work as documented
+- [ ] Migration guide tested with real project
+
+**Integration Testing:**
+
+- [ ] Test with Foundry project
+- [ ] Test with Hardhat v2 project
+- [ ] Test with Hardhat v3 project
+- [ ] Test with LocalStack (S3)
+- [ ] Test with real AWS S3
+- [ ] Test on Linux x64
+- [ ] Test on Linux arm64 (GitHub Actions runner)
+- [ ] Test on macOS Intel
+- [ ] Test on macOS Apple Silicon
+- [ ] Test on Windows (WSL)
+
+---
+
+### Appendix F: Release Checklist
+
+**Pre-Release:**
+
+- [ ] All tests passing
+- [ ] Documentation complete
+- [ ] CHANGELOG updated
+- [ ] Version bumped
+
+**Create Changeset:**
+
+```bash
+pnpm changeset add
+# Select: @ethoko/cli (minor)
+# Summary: "Add standalone CLI for Foundry users"
+```
+
+**Merge Version PR:**
+
+- [ ] Changesets bot creates PR
+- [ ] Review version bump
+- [ ] Merge PR → triggers release
+
+**Post-Release:**
+
+- [ ] Verify GitHub Release created
+- [ ] Verify binaries uploaded
+- [ ] Verify npm packages published
+- [ ] Test npm install: `npm install -g @ethoko/cli@latest`
+- [ ] Test curl install
+- [ ] Announce release
+
+---
+
+### Appendix G: Troubleshooting Guide (Draft)
+
+**Issue: Binary not found after npm install**
+
+- Check platform: `node -p "os.platform() + '-' + os.arch()"`
+- Check optional dependency installed: `ls node_modules/ethoko-*/binary`
+- Reinstall: `npm uninstall -g @ethoko/cli && npm install -g @ethoko/cli`
+
+**Issue: Permission denied**
+
+- Run: `chmod +x $(which ethoko)`
+- Or: `chmod +x ~/.ethoko/bin/ethoko`
+
+**Issue: Config file not found**
+
+- Check current directory: `ls ethoko.config.json`
+- Use explicit path: `ethoko push --config /path/to/ethoko.config.json`
+
+**Issue: S3 authentication fails**
+
+- Check AWS credentials: `aws sts get-caller-identity`
+- Check config: `cat ethoko.config.json | jq .storage`
+- Use debug mode: `ethoko push --debug`
+
+---
+
+## Document Change Log
+
+| Version | Date       | Author           | Changes           |
+| ------- | ---------- | ---------------- | ----------------- |
+| 1.0     | 2026-03-04 | Engineering Team | Initial PRD draft |
+
+---
+
+## Approval & Sign-off
+
+**Document Status:** Draft  
+**Next Review Date:** 2026-03-11
+
+**Approvals:**
+
+- [ ] Engineering Lead
+- [ ] Product Manager
+- [ ] Technical Lead
+
+---
+
+**END OF DOCUMENT**

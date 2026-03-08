@@ -1,0 +1,58 @@
+{
+  "name": "@ethoko/cli",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Standalone CLI for Ethoko artifact management.",
+  "author": "Loïc Vincent-Genod",
+  "homepage": "https://github.com/VGLoic/ethoko-monorepo",
+  "bugs": {
+    "url": "https://github.com/VGLoic/ethoko-monorepo/issues"
+  },
+  "keywords": [
+    "web3",
+    "ethereum",
+    "smart contracts",
+    "foundry",
+    "hardhat",
+    "cli",
+    "infrastructure"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "ethoko": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write src/**/*.ts",
+    "check-format": "prettier --check src/**/*.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ethoko/core": "workspace:*",
+    "commander": "^12.1.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@ethoko/eslint-config": "workspace:*",
+    "@ethoko/typescript-config": "workspace:*",
+    "@types/node": "^22.1.0",
+    "eslint": "^9.39.1",
+    "tsup": "^8.2.4",
+    "typescript": "5.9.2"
+  }
+}

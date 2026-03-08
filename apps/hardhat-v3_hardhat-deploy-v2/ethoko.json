@@ -1,0 +1,8 @@
+{
+  "project": "curious-counter",
+  "compilationOutputPath": "./artifacts",
+  "storage": {
+    "type": "local",
+    "path": "./ethoko-storage"
+  }
+}

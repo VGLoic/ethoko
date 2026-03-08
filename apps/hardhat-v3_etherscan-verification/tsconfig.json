@@ -14,7 +14,7 @@
   },
   "include": [
     "./hardhat.config.ts",
-    "./e2e-test/*",
+    "./e2e-test/**/*",
     ".ethoko-typings/*",
     "./scripts/*"
   ]

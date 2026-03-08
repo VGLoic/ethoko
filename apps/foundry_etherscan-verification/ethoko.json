@@ -1,0 +1,8 @@
+{
+  "project": "verified-forge-counter",
+  "compilationOutputPath": "./out",
+  "storage": {
+    "type": "local",
+    "path": "./.ethoko-storage"
+  }
+}

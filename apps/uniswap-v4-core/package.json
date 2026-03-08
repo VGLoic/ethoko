@@ -5,9 +5,12 @@
   "private": true,
   "description": "Fork of Core smart contracts of Uniswap v4 - Meant for testing with Ethoko",
   "scripts": {
+    "ethoko": "ethoko",
+    "hardhat": "hardhat",
     "test:e2e:apps": "vitest run e2e-test"
   },
   "devDependencies": {
+    "@ethoko/cli": "workspace:*",
     "@ethoko/eslint-config": "workspace:*",
     "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.2",

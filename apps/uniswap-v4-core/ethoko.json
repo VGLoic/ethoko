@@ -1,0 +1,8 @@
+{
+  "project": "uniswap-v4-core-ethoko-test",
+  "compilationOutputPath": "./out",
+  "storage": {
+    "type": "local",
+    "path": "./ethoko-storage"
+  }
+}

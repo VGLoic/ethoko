@@ -26,7 +26,7 @@ import { project } from "../../.ethoko-typings";
 
 const TARGET_RELEASE_TAG = "2026-02-02";
 // Hardhat Ignition likes alphanumeric and underscores
-const MODULE_SUFFIX = TARGET_RELEASE_TAG.replaceAll("-", "_");
+const MODULE_SUFFIX = TARGET_RELEASE_TAG.split("-").join("_");
 
 export default buildModule(`release_${MODULE_SUFFIX}`, (m) => {
   const projectUtils = project("verified-forge-counter");
