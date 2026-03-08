@@ -28,9 +28,9 @@ describe("[Foundry Hardhat-deploy v2] - Compilation WITH --build-info WITHOUT te
     const deploymentScriptCleanup = await deploymentScriptSetup.setup();
 
     return async () => {
+      await deploymentScriptCleanup();
       await cliCleanup();
       await hardhatCleanup();
-      await deploymentScriptCleanup();
       await configCleanup();
     };
   });
