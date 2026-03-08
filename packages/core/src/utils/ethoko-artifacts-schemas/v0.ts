@@ -33,6 +33,14 @@ const EthokoArtifactOriginSchema = z.discriminatedUnion("type", [
       }),
     ),
   }),
+  z.object({
+    type: z.literal("hardhat-v3-non-isolated-build"),
+    id: z.string(),
+    pair: z.object({
+      inputFormat: z.literal(HARDHAT_V3_COMPILER_INPUT_FORMAT),
+      outputFormat: z.literal(HARDHAT_V3_COMPILER_OUTPUT_FORMAT),
+    }),
+  }),
 ]);
 
 export type EthokoArtifactOrigin = z.infer<typeof EthokoArtifactOriginSchema>;

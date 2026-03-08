@@ -112,7 +112,11 @@ function originToLabel(origin: InspectResult["origin"]): string {
   if (origin.format === "hardhat-v3") {
     return `Hardhat v3 (${origin.ids.join(", ")})`;
   }
-  return origin.format === "hardhat-v2"
-    ? `Hardhat v2 (${origin.id})`
-    : `Forge (${origin.id})`;
+  if (origin.format === "hardhat-v2") {
+    return `Hardhat v2 (${origin.id})`;
+  }
+  if (origin.format === "hardhat-v3-non-isolated-build") {
+    return `Hardhat v3 (${origin.id})`;
+  }
+  return `Forge (${origin.id})`;
 }
