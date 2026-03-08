@@ -16,7 +16,13 @@ export type OriginalBuildInfoPaths =
       buildInfoPath: string;
     }
   | {
-      // TODO: handle isolated build
+      format: "hardhat-v3-non-isolated-build";
+      buildInfoPaths: {
+        input: string;
+        output: string;
+      };
+    }
+  | {
       format: "hardhat-v3";
       buildInfoPaths: {
         input: string;
@@ -40,6 +46,8 @@ export function mapOriginalArtifactToEthokoArtifact(
 }> {
   if (paths.format === "hardhat-v3") {
     return mapHardhatV3ArtifactsToEthokoArtifact(paths.buildInfoPaths, debug);
+  } else if (paths.format === "hardhat-v3-non-isolated-build") {
+    return mapHardhatV3ArtifactsToEthokoArtifact([paths.buildInfoPaths], debug);
   } else if (paths.format === "hardhat-v2") {
     return mapHardhatV2ArtifactToEthokoArtifact(paths.buildInfoPath, debug);
   } else if (paths.format === "forge-v1-with-build-info-option") {

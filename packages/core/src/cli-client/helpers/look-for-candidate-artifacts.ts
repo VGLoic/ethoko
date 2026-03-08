@@ -348,11 +348,28 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
     mtime: Date;
   }[] = [];
   for (const file of files) {
-    // TODO: handle isolated build
-    if (
-      file.artifact.format === "hardhat-v3-input-no-isolated-build" ||
-      file.artifact.format === "hardhat-v3-input-isolated-build"
-    ) {
+    if (file.artifact.format === "hardhat-v3-input-no-isolated-build") {
+      const hardhatV3BuildInfoId = file.artifact.data.id;
+      // We check if the corresponding output file is present in the list of files, if not, we ignore this file since it is not a valid build info on its own
+      const matchingOutputFile = files.find(
+        (f) =>
+          f.artifact.format === "hardhat-v3-output" &&
+          f.artifact.data.id === hardhatV3BuildInfoId,
+      );
+      if (!matchingOutputFile) {
+        continue;
+      }
+      options.push({
+        display: `${truncateFilename(file.name)} (Hardhat v3, Solc ${file.artifact.data.solcLongVersion}, ${formatTimeAgo(file.mtime)})`,
+        value: {
+          format: "hardhat-v3-non-isolated-build",
+          buildInfoPaths: {
+            input: file.filePath,
+            output: matchingOutputFile.filePath,
+          },
+        },
+      });
+    } else if (file.artifact.format === "hardhat-v3-input-isolated-build") {
       const hardhatV3BuildInfoId = file.artifact.data.id;
       // We check if the corresponding output file is present in the list of files, if not, we ignore this file since it is not a valid build info on its own
       const matchingOutputFile = files.find(
@@ -380,7 +397,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
       // Hardhat V3 output files are ignored as they will be handled together with their corresponding input file
     } else {
       options.push({
-        display: `${truncateFilename(file.name)} (${formatBuildInfoFormat(file.artifact.format)}, ${formatTimeAgo(file.mtime)}, ${formatFileSize(file.size)})`,
+        display: `${truncateFilename(file.name)} (${BUILD_INFO_FORMAT_TO_HUMAN_READABLE[file.artifact.format]}, ${formatTimeAgo(file.mtime)}, ${formatFileSize(file.size)})`,
         value: {
           buildInfoPath: file.filePath,
           format: file.artifact.format,
@@ -415,7 +432,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
   }
   const hardhatV3OptionGroups: CandidateBuildInfoOption[] =
     hardhatV3PairsGroups.map((group) => {
-      const display = `${formatBuildInfoFormat("hardhat-v3")} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
+      const display = `${BUILD_INFO_FORMAT_TO_HUMAN_READABLE["hardhat-v3"]} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
       const value: OriginalBuildInfoPaths = {
         format: "hardhat-v3",
         buildInfoPaths: group.pairs.map((pair) => ({
@@ -594,11 +611,7 @@ const BUILD_INFO_FORMAT_TO_HUMAN_READABLE: Record<
 > = {
   "hardhat-v2": "Hardhat v2",
   "hardhat-v3": "Hardhat v3",
+  "hardhat-v3-non-isolated-build": "Hardhat v3 (Non isolated build)",
   "forge-v1-default": "Forge",
   "forge-v1-with-build-info-option": "Forge",
 };
-function formatBuildInfoFormat(
-  format: OriginalBuildInfoPaths["format"],
-): string {
-  return BUILD_INFO_FORMAT_TO_HUMAN_READABLE[format];
-}

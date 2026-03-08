@@ -18,6 +18,9 @@ function buildInfoPathToSuccessText(paths: OriginalBuildInfoPaths): string {
   if (paths.format === "hardhat-v3") {
     return `Hardhat v3 compilation artifact found`;
   }
+  if (paths.format === "hardhat-v3-non-isolated-build") {
+    return `Hardhat v3 compilation artifact found (non isolated build)`;
+  }
   if (paths.format === "hardhat-v2") {
     return `Hardhat v2 compilation artifact input file found at ${paths.buildInfoPath}`;
   }
@@ -38,6 +41,8 @@ const FORMAT_TO_ERROR_MESSAGE: Record<
 > = {
   "hardhat-v3":
     "Hardhat v3 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
+  "hardhat-v3-non-isolated-build":
+    "Hardhat v3 (non isolated build) compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
   "hardhat-v2":
     "Hardhat v2 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Hardhat v2 build info JSON file or contact us. Run with debug mode for more info.",
   "forge-v1-with-build-info-option":

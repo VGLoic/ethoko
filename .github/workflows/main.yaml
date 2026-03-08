@@ -87,6 +87,11 @@ jobs:
           node-version-file: .nvmrc
           cache: "pnpm"
       - run: pnpm install
+      # For obscure reasons, the CLI needs to be explictly built and reinstalled
+      # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
+      # This behavior has been observed in `uniswap-v4-core` and the `hardhat-v2` apps
+      - run: pnpm build --filter=@ethoko/cli
+      - run: pnpm install
       - run: pnpm test:e2e:apps
   release:
     name: Release

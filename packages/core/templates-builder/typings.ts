@@ -481,6 +481,14 @@ type EthokoArtifactOrigin =
       format: string;
     }
   | {
+      type: "hardhat-v3-non-isolated-build";
+      id: string;
+      pair: {
+        inputFormat: string;
+        outputFormat: string;
+      };
+    }
+  | {
       type: "hardhat-v3";
       pairs: Array<{
         id: string;
