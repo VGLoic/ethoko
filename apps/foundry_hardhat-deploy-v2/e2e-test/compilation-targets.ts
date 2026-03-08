@@ -10,7 +10,7 @@ export const COMPILATION_TARGETS = {
     outputPath: withBuildInfoWithTestPath,
   },
   WITH_BUILD_INFO_WITHOUT_TEST: {
-    command: `forge build --build-info --skip test/**/* --skip src/test/**/* --out ${withBuildInfoWithoutTestPath} --cache-path ${withBuildInfoWithoutTestPath}-cache`,
+    command: `forge build --build-info --skip test/**/* --skip script/**/* --out ${withBuildInfoWithoutTestPath} --cache-path ${withBuildInfoWithoutTestPath}-cache`,
     outputPath: withBuildInfoWithoutTestPath,
   },
   WITHOUT_BUILD_INFO_WITH_TEST: {
@@ -18,7 +18,7 @@ export const COMPILATION_TARGETS = {
     outputPath: withoutBuildInfoWithTestPath,
   },
   WITHOUT_BUILD_INFO_WITHOUT_TEST: {
-    command: `forge build --use-literal-content --skip test/**/* --skip src/test/**/* --out ${withoutBuildInfoWithoutTestPath} --cache-path ${withoutBuildInfoWithoutTestPath}-cache`,
+    command: `forge build --use-literal-content --skip test/**/* --skip script/**/* --out ${withoutBuildInfoWithoutTestPath} --cache-path ${withoutBuildInfoWithoutTestPath}-cache`,
     outputPath: withoutBuildInfoWithoutTestPath,
   },
 };
