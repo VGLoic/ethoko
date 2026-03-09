@@ -1358,19 +1358,19 @@ pnpm test:e2e:apps
 
 **Tasks:**
 
-1. Install Bun locally (`curl -fsSL https://bun.sh/install | bash`)
-2. Create build script (`scripts/build-binary.ts`)
+1. Install Bun via pnpm devDependency in `packages/cli`
+2. Create build script (`scripts/build-binary.ts`) using Bun API
    - Loop through 5 platforms
-   - Execute `bun build --compile` for each
+   - Use `Bun.build({ compile: { ... } })` for each target
    - Output to `binaries/` directory
 3. Test local platform binary
 4. Add `build:binary` script to `package.json`
+5. Add CI smoke test (Ubuntu only) for `--version`
 
 **Build Script Implementation:**
 
 ```typescript
 // packages/cli/scripts/build-binary.ts
-import { $ } from "bun";
 import { mkdirSync } from "fs";
 import { join } from "path";
 
@@ -1390,7 +1390,13 @@ for (const platform of platforms) {
   const outFile = join(outDir, `ethoko-${platform.os}-${platform.arch}${ext}`);
 
   console.log(`Building ${platform.os}-${platform.arch}...`);
-  await $`bun build src/index.ts --compile --target=${platform.target} --outfile=${outFile}`;
+  await Bun.build({
+    entrypoints: ["./src/index.ts"],
+    compile: {
+      target: platform.target as never,
+      outfile: outFile,
+    },
+  });
   console.log(`✓ ${outFile}`);
 }
 ```
@@ -1402,6 +1408,13 @@ pnpm build:binary
 ls -lh binaries/
 ./binaries/ethoko-darwin-arm64 --version
 ./binaries/ethoko-darwin-arm64 push --help
+```
+
+**CI Smoke Test (Ubuntu only):**
+
+```bash
+pnpm --filter @ethoko/cli build:binary
+./packages/cli/binaries/ethoko-linux-x64 --version
 ```
 
 **Deliverables:**
