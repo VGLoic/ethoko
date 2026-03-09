@@ -72,6 +72,7 @@ jobs:
           node-version-file: .nvmrc
           cache: "pnpm"
       - run: pnpm install
+      - run: pnpm build --filter=@ethoko/cli
       - run: pnpm --filter @ethoko/cli build:binary
       # Smoke test to ensure the CLI binary was built correctly
       - run: ./packages/cli/binaries/ethoko-linux-x64 --version
