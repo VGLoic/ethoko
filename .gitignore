@@ -29,6 +29,7 @@ test/.localstack/
 out/
 build
 dist
+packages/cli/binaries/
 
 
 # Ethoko

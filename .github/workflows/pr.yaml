@@ -62,6 +62,20 @@ jobs:
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm test
+  build-cli-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm build --filter=@ethoko/cli
+      - run: pnpm --filter @ethoko/cli build:binary
+      # Smoke test to ensure the CLI binary was built correctly
+      - run: ./packages/cli/binaries/ethoko-linux-x64 --version
   test-e2e-core:
     runs-on: ubuntu-latest
     steps:
@@ -78,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-            submodules: "recursive"
+          submodules: "recursive"
       - uses: pnpm/action-setup@v4
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1

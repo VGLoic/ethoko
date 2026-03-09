@@ -1,9 +1,9 @@
 {
   "extends": "@ethoko/typescript-config/node-base.json",
   "compilerOptions": {
-    "types": ["node"],
+    "types": ["node", "bun"],
     "baseUrl": ".",
     "moduleResolution": "nodenext"
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

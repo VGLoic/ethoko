@@ -37,6 +37,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "build:binary": "bun scripts/build-binary.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
     "check-format": "prettier --check src/**/*.ts",
@@ -51,6 +52,8 @@
     "@ethoko/eslint-config": "workspace:*",
     "@ethoko/typescript-config": "workspace:*",
     "@types/node": "^22.1.0",
+    "@types/bun": "^1.2.22",
+    "bun": "^1.2.22",
     "eslint": "^9.39.1",
     "tsup": "^8.2.4",
     "typescript": "5.9.2"

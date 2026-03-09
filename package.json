@@ -35,6 +35,9 @@
     "typescript": "5.9.2"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "bun"
+    ],
     "packageExtensions": {
       "hardhat-deploy@0.12.4": {
         "dependencies": {

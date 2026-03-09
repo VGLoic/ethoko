@@ -215,24 +215,15 @@ packages/cli/
 │   └── ethoko               # Node.js wrapper script
 ├── scripts/
 │   ├── build-binary.ts      # Bun build script
-│   ├── copy-binaries.ts     # Copy to platform packages
-│   └── postinstall.mjs      # npm postinstall hook
+│   └── publish-binary.ts    # Generate + publish platform packages
 ├── package.json
 ├── tsup.config.ts
 └── README.md
 ```
 
-**2-6. Platform Binary Packages**
+**2-6. Platform Binary Packages (Generated)**
 
-```
-packages/cli-linux-x64/
-├── package.json
-├── binary/
-│   └── ethoko           # Compiled binary (30-50MB)
-└── README.md
-
-(Repeat for: cli-linux-arm64, cli-darwin-x64, cli-darwin-arm64, cli-windows-x64)
-```
+Platform packages are generated during publishing into `packages/cli/dist/` and are not committed to git.
 
 ---
 
@@ -248,8 +239,7 @@ npm install -g @ethoko/cli
 
 1. npm installs `@ethoko/cli` package
 2. npm resolves `optionalDependencies` → installs platform-specific package
-3. `postinstall` script verifies binary present
-4. Wrapper script (`bin/ethoko`) detects platform → executes binary
+3. Wrapper script (`bin/ethoko`) detects platform → executes binary
 
 **Implementation:**
 
@@ -260,11 +250,11 @@ npm install -g @ethoko/cli
     "ethoko": "./bin/ethoko"
   },
   "optionalDependencies": {
-    "ethoko-linux-x64": "^0.1.0",
-    "ethoko-linux-arm64": "^0.1.0",
-    "ethoko-darwin-x64": "^0.1.0",
-    "ethoko-darwin-arm64": "^0.1.0",
-    "ethoko-windows-x64": "^0.1.0"
+    "@ethoko/cli-linux-x64": "^0.1.0",
+    "@ethoko/cli-linux-arm64": "^0.1.0",
+    "@ethoko/cli-darwin-x64": "^0.1.0",
+    "@ethoko/cli-darwin-arm64": "^0.1.0",
+    "@ethoko/cli-windows-x64": "^0.1.0"
   }
 }
 ```
@@ -273,20 +263,47 @@ npm install -g @ethoko/cli
 // packages/cli/bin/ethoko (Node.js wrapper)
 #!/usr/bin/env node
 const { spawnSync } = require("child_process");
+const { join } = require("path");
+const { existsSync } = require("fs");
 const os = require("os");
 
-function getPlatformBinary() {
-  const platform = os.platform(); // linux, darwin, win32
-  const arch = os.arch();         // x64, arm64
+const platformMap = { darwin: "darwin", linux: "linux", win32: "windows" };
+const archMap = { x64: "x64", arm64: "arm64" };
 
-  const pkgName = `ethoko-${platform}-${arch}`;
-  const binary = require.resolve(`${pkgName}/binary/ethoko`);
-  return binary;
+const platform = platformMap[os.platform()];
+const arch = archMap[os.arch()];
+
+if (!platform || !arch) {
+  console.error(`Unsupported platform: ${os.platform()}-${os.arch()}`);
+  process.exit(1);
 }
 
-const binary = getPlatformBinary();
+const packageName = `@ethoko/cli-${platform}-${arch}`;
+const binaryName = platform === "windows" ? "ethoko.exe" : "ethoko";
+
+function findBinary(startDir) {
+  let current = startDir;
+  while (true) {
+    const nodeModules = join(current, "node_modules");
+    if (existsSync(nodeModules)) {
+      const candidate = join(nodeModules, packageName, "bin", binaryName);
+      if (existsSync(candidate)) return candidate;
+    }
+    const parent = join(current, "..");
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+const binary = findBinary(__dirname);
+if (!binary) {
+  console.error(`Binary not found for ${platform}-${arch}. Reinstall @ethoko/cli.`);
+  process.exit(1);
+}
+
 const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
-process.exit(result.status);
+process.exit(result.status ?? 1);
 ```
 
 ---
@@ -305,7 +322,7 @@ curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install
 4. Installs to `~/.ethoko/bin/ethoko`
 5. Adds to PATH (updates .bashrc/.zshrc)
 
-**Implementation:** See `install.sh` specification in Section 8.5
+**Implementation:** See `install.sh` specification in Section 5
 
 ---
 
@@ -763,13 +780,13 @@ yarn global add @ethoko/cli
 npm install --save-dev @ethoko/cli
 ```
 
-**Platform Packages:** All public on npm
+**Platform Packages:** All public on npm (generated during publish)
 
-- `ethoko-linux-x64`
-- `ethoko-linux-arm64`
-- `ethoko-darwin-x64`
-- `ethoko-darwin-arm64`
-- `ethoko-windows-x64`
+- `@ethoko/cli-linux-x64`
+- `@ethoko/cli-linux-arm64`
+- `@ethoko/cli-darwin-x64`
+- `@ethoko/cli-darwin-arm64`
+- `@ethoko/cli-windows-x64`
 
 **Version Strategy:** Independent from `@ethoko/core`
 
@@ -1358,19 +1375,19 @@ pnpm test:e2e:apps
 
 **Tasks:**
 
-1. Install Bun locally (`curl -fsSL https://bun.sh/install | bash`)
-2. Create build script (`scripts/build-binary.ts`)
-   - Loop through 5 platforms
-   - Execute `bun build --compile` for each
-   - Output to `binaries/` directory
-3. Test local platform binary
-4. Add `build:binary` script to `package.json`
+1. ✅ Install Bun via pnpm devDependency in `packages/cli`
+2. ✅ Create build script (`scripts/build-binary.ts`) using Bun API
+   - ✅ Loop through 5 platforms
+   - ✅ Use `Bun.build({ compile: { ... } })` for each target
+   - ✅ Output to `binaries/` directory
+3. ✅ Test local platform binary
+4. ✅ Add `build:binary` script to `package.json`
+5. ✅ Add CI smoke test (Ubuntu only) for `--version`
 
 **Build Script Implementation:**
 
 ```typescript
 // packages/cli/scripts/build-binary.ts
-import { $ } from "bun";
 import { mkdirSync } from "fs";
 import { join } from "path";
 
@@ -1390,7 +1407,13 @@ for (const platform of platforms) {
   const outFile = join(outDir, `ethoko-${platform.os}-${platform.arch}${ext}`);
 
   console.log(`Building ${platform.os}-${platform.arch}...`);
-  await $`bun build src/index.ts --compile --target=${platform.target} --outfile=${outFile}`;
+  await Bun.build({
+    entrypoints: ["./src/index.ts"],
+    compile: {
+      target: platform.target as never,
+      outfile: outFile,
+    },
+  });
   console.log(`✓ ${outFile}`);
 }
 ```
@@ -1404,51 +1427,64 @@ ls -lh binaries/
 ./binaries/ethoko-darwin-arm64 push --help
 ```
 
+**CI Smoke Test (Ubuntu only):**
+
+```bash
+pnpm --filter @ethoko/cli build:binary
+./packages/cli/binaries/ethoko-linux-x64 --version
+```
+
 **Deliverables:**
 
 - ✅ 5 compiled binaries in `packages/cli/binaries/`
 - ✅ Binaries are 30-50MB each
 - ✅ Binaries run without Node.js
 
+**Implementation Notes:**
+
+- ✅ `packages/cli/scripts/build-binary.ts` (Bun API build script)
+- ✅ `packages/cli/package.json` includes `build:binary`, `bun`, `@types/bun`
+- ✅ `packages/cli/tsconfig.json` includes `scripts` + `bun` types
+- ✅ `.github/workflows/pr.yaml` runs Ubuntu smoke test
+- ✅ Root `package.json` allowlists Bun via `pnpm.onlyBuiltDependencies`
+
 ---
 
-### Phase 3: Platform Packages (2-3 hours)
+### Phase 3: Wrapper + Dynamic Platform Packages (2-3 hours)
 
-**Goal:** Create npm packages wrapping each binary + wrapper script
+**Goal:** Generate platform packages dynamically at publish time (no committed platform package directories)
+
+**Overview:**
+
+Platform packages (`@ethoko/cli-linux-x64`, etc.) are generated into `packages/cli/dist/` during publishing. Only the wrapper and publish scripts are committed. This mirrors OpenCode's approach and keeps the repo clean.
 
 **Tasks:**
 
-1. Create 5 platform package directories
-   - `packages/cli-linux-x64/`
-   - `packages/cli-linux-arm64/`
-   - `packages/cli-darwin-x64/`
-   - `packages/cli-darwin-arm64/`
-   - `packages/cli-windows-x64/`
-2. Create minimal `package.json` for each
-   - Set `os` and `cpu` fields for platform detection
-   - Include binary in `files` array
-3. Create copy script (`scripts/copy-binaries-to-packages.ts`)
-   - Copy binaries from Phase 2 to platform packages
-   - Set executable permissions (chmod +x)
-4. Create Node.js wrapper script (`bin/ethoko`)
+1. Create Node.js wrapper script (`packages/cli/bin/ethoko`)
    - Detect platform/arch
-   - Resolve platform package binary
+   - Search `node_modules` for matching platform package
    - Spawn binary with arguments
-5. Update `@ethoko/cli/package.json`
-   - Add `bin` field
-   - Add `optionalDependencies` for platform packages
+2. Add `publish:binary` script (`packages/cli/scripts/publish-binary.ts`)
+   - Generate `dist/@ethoko/cli-<os>-<arch>/` with `package.json` + `bin/ethoko`
+   - Generate `dist/@ethoko/cli/` with wrapper + `optionalDependencies`
+   - Publish platform packages first, then main package
+3. Update `packages/cli/package.json`
+   - Add `bin` field for wrapper
+   - Add `publish:binary` script
+4. Update `.gitignore`
+   - Ignore `packages/cli/dist/`
 
-**Platform Package Example:**
+**Package Generation Example:**
 
 ```json
-// packages/cli-linux-x64/package.json
+// dist/@ethoko/cli-linux-x64/package.json
 {
-  "name": "ethoko-linux-x64",
+  "name": "@ethoko/cli-linux-x64",
   "version": "0.1.0",
   "description": "Ethoko CLI binary for Linux x64",
   "os": ["linux"],
   "cpu": ["x64"],
-  "files": ["binary/ethoko"],
+  "files": ["bin"],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -1457,86 +1493,92 @@ ls -lh binaries/
 }
 ```
 
-**Wrapper Script:**
+**Wrapper Script (simplified, no postinstall):**
 
 ```javascript
 #!/usr/bin/env node
 // packages/cli/bin/ethoko
 const { spawnSync } = require("child_process");
 const { join } = require("path");
+const { existsSync } = require("fs");
 const os = require("os");
 
-function getPlatformBinary() {
-  const platform = os.platform();
-  const arch = os.arch();
+const platformMap = { darwin: "darwin", linux: "linux", win32: "windows" };
+const archMap = { x64: "x64", arm64: "arm64" };
 
-  const mapping = {
-    "linux-x64": "ethoko-linux-x64",
-    "linux-arm64": "ethoko-linux-arm64",
-    "darwin-x64": "ethoko-darwin-x64",
-    "darwin-arm64": "ethoko-darwin-arm64",
-    "win32-x64": "ethoko-windows-x64",
-  };
+const platform = platformMap[os.platform()];
+const arch = archMap[os.arch()];
 
-  const key = `${platform}-${arch}`;
-  const pkgName = mapping[key];
-
-  if (!pkgName) {
-    console.error(`Unsupported platform: ${key}`);
-    process.exit(1);
-  }
-
-  try {
-    const ext = platform === "win32" ? ".exe" : "";
-    const binaryPath = require.resolve(`${pkgName}/binary/ethoko${ext}`);
-    return binaryPath;
-  } catch (err) {
-    console.error(`Binary not found for ${key}. Try reinstalling @ethoko/cli.`);
-    console.error(err.message);
-    process.exit(1);
-  }
+if (!platform || !arch) {
+  console.error(`Unsupported platform: ${os.platform()}-${os.arch()}`);
+  process.exit(1);
 }
 
-const binary = getPlatformBinary();
-const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
+const packageName = `@ethoko/cli-${platform}-${arch}`;
+const binaryName = platform === "windows" ? "ethoko.exe" : "ethoko";
+
+function findBinary(startDir) {
+  let current = startDir;
+  while (true) {
+    const nodeModules = join(current, "node_modules");
+    if (existsSync(nodeModules)) {
+      const candidate = join(nodeModules, packageName, "bin", binaryName);
+      if (existsSync(candidate)) return candidate;
+    }
+    const parent = join(current, "..");
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+const binaryPath = findBinary(__dirname);
+if (!binaryPath) {
+  console.error(
+    `Binary not found for ${platform}-${arch}. Reinstall @ethoko/cli.`,
+  );
+  process.exit(1);
+}
+
+const result = spawnSync(binaryPath, process.argv.slice(2), {
+  stdio: "inherit",
+});
 process.exit(result.status ?? 1);
 ```
 
 **Validation:**
 
 ```bash
-pnpm build:binary
-bun scripts/copy-binaries-to-packages.ts
-node bin/ethoko --version
-pnpm pack
-npm install -g ethoko-cli-0.1.0.tgz
-ethoko --version
+pnpm --filter @ethoko/cli build:binary
+bun packages/cli/scripts/publish-binary.ts --dry-run
+node packages/cli/bin/ethoko --version
 ```
 
 **Deliverables:**
 
-- ✅ 5 platform packages with binaries
-- ✅ Wrapper script detects platform and executes binary
+- ✅ Wrapper script committed
+- ✅ Publish script committed
+- ✅ Platform packages generated dynamically in `packages/cli/dist/`
 - ✅ Local npm install works
 
 ---
 
 ### Phase 4: GitHub Actions Integration (2-3 hours)
 
-**Goal:** Automatically build and upload binaries on npm publish
+**Goal:** Automatically build binaries and publish dynamic platform packages when Changesets publishes `@ethoko/cli`
+
+**Changesets Integration:**
+
+Binary publishing happens inside the existing `release` job after `changesets/action` runs. If `changesets.outputs.published == 'true'`, CI builds binaries, runs `publish:binary`, and uploads binaries to GitHub Releases.
 
 **Tasks:**
 
-1. Update `.github/workflows/main.yaml`
-   - Add `outputs` to `release` job
-   - Add new `build-and-upload-binaries` job
-2. Install Bun in CI (using `oven-sh/setup-bun@v2`)
-3. Build all binaries in CI
-4. Extract CLI version from `package.json`
-5. Create GitHub Release with binaries
-6. Publish platform packages to npm
+1. Install Bun in CI (using `oven-sh/setup-bun@v2`)
+2. Build binaries in CI
+3. Run `pnpm --filter @ethoko/cli publish:binary`
+4. Create GitHub Release with binaries
 
-**GitHub Actions Job:**
+**GitHub Actions Update:**
 
 ```yaml
 # .github/workflows/main.yaml
@@ -1546,10 +1588,15 @@ release:
   needs:
     [build, check-format, check-types, lint, test, test-e2e-core, test-e2e-apps]
   runs-on: ubuntu-latest
-  outputs:
-    published: ${{ steps.changesets.outputs.published }}
   steps:
-    # ... existing steps ...
+    - uses: actions/checkout@v5
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v6
+      with:
+        node-version-file: .nvmrc
+        cache: "pnpm"
+    - run: pnpm install
+    - run: pnpm build
     - name: Create Release Pull Request or Publish to NPM
       id: changesets
       uses: changesets/action@v1
@@ -1559,48 +1606,35 @@ release:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-build-and-upload-binaries:
-  name: Build and Upload Binaries
-  needs: release
-  if: needs.release.outputs.published == 'true'
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v5
-
-    - uses: oven-sh/setup-bun@v2
+    - name: Install Bun
+      if: steps.changesets.outputs.published == 'true'
+      uses: oven-sh/setup-bun@v2
       with:
         bun-version: latest
 
-    - uses: pnpm/action-setup@v4
-
-    - uses: actions/setup-node@v6
-      with:
-        node-version-file: .nvmrc
-        cache: "pnpm"
-
-    - name: Install dependencies
-      run: pnpm install
-
-    - name: Build CLI package
-      run: pnpm --filter @ethoko/cli build
-
     - name: Build binaries
+      if: steps.changesets.outputs.published == 'true'
       run: pnpm --filter @ethoko/cli build:binary
 
-    - name: Copy binaries to platform packages
-      run: bun packages/cli/scripts/copy-binaries-to-packages.ts
-
     - name: Get CLI version
+      if: steps.changesets.outputs.published == 'true'
       id: cli_version
       run: |
         VERSION=$(node -p "require('./packages/cli/package.json').version")
-        echo "version=v$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+    - name: Publish platform packages
+      if: steps.changesets.outputs.published == 'true'
+      run: pnpm --filter @ethoko/cli publish:binary
+      env:
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Upload binaries to GitHub Release
+      if: steps.changesets.outputs.published == 'true'
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: "cli-${{ steps.cli_version.outputs.version }}"
-        name: "CLI ${{ steps.cli_version.outputs.version }}"
+        tag_name: "cli-v${{ steps.cli_version.outputs.version }}"
+        name: "CLI v${{ steps.cli_version.outputs.version }}"
         files: |
           packages/cli/binaries/ethoko-linux-x64
           packages/cli/binaries/ethoko-linux-arm64
@@ -1609,33 +1643,22 @@ build-and-upload-binaries:
           packages/cli/binaries/ethoko-windows-x64.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Publish platform packages
-      run: |
-        echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-        cd packages/cli-linux-x64 && pnpm publish --no-git-checks --access public
-        cd ../cli-linux-arm64 && pnpm publish --no-git-checks --access public
-        cd ../cli-darwin-x64 && pnpm publish --no-git-checks --access public
-        cd ../cli-darwin-arm64 && pnpm publish --no-git-checks --access public
-        cd ../cli-windows-x64 && pnpm publish --no-git-checks --access public
-      env:
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
 
 **Validation:**
 
 1. Create test changeset: `pnpm changeset add`
-2. Create Version PR (merge to trigger release)
+2. Merge Version PR (triggers release)
 3. Verify GitHub Release created with 5 binaries
 4. Verify platform packages published to npm
 5. Test installation: `npm install -g @ethoko/cli`
 
 **Deliverables:**
 
-- ✅ GitHub Actions workflow extended
-- ✅ Binaries automatically uploaded to GitHub Releases
-- ✅ Platform packages automatically published to npm
-- ✅ Full automation integrated with Changesets
+- ✅ GitHub Actions workflow updated
+- ✅ Binaries uploaded to GitHub Releases
+- ✅ Platform packages published to npm
+- ✅ Automated with Changesets
 
 ---
 
@@ -1648,8 +1671,8 @@ build-and-upload-binaries:
 1. Create `install.sh` in repo root
 2. Implement platform detection (OS + arch)
 3. Query GitHub API for latest CLI release
-4. Download correct binary
-5. Install to `~/.ethoko/bin/`
+4. Download correct binary from GitHub Releases
+5. Install to `~/.ethoko/bin/` (or `$ETHOKO_INSTALL_DIR`)
 6. Add to PATH (update shell profile)
 7. Verify installation
 
@@ -1695,7 +1718,7 @@ get_latest_version() {
     | grep '"tag_name"' \
     | grep 'cli-v' \
     | head -n 1 \
-    | sed -E 's/.*"cli-(v[^"]+)".*/\1/'
+    | sed -E 's/.*"cli-v([^"]+)".*/\1/'
 }
 
 main() {
@@ -1717,7 +1740,7 @@ main() {
     ext=".exe"
   fi
 
-  local download_url="https://github.com/$REPO/releases/download/cli-$version/$binary_name$ext"
+  local download_url="https://github.com/$REPO/releases/download/cli-v$version/$binary_name$ext"
 
   echo "📥 Downloading Ethoko CLI..."
   mkdir -p "$BIN_DIR"
