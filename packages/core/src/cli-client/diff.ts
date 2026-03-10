@@ -304,7 +304,7 @@ export async function generateDiffWithTargetRelease(
   }
 
   const contractListResult = await toAsyncResult(
-    localStorage.listContractArtifactsById(artifact.project, artifactId),
+    localStorage.listContractArtifacts(artifact.project, artifactId),
     { debug: opts.debug },
   );
   if (!contractListResult.success) {
@@ -323,7 +323,7 @@ export async function generateDiffWithTargetRelease(
   const commonContractArtifactsResult = await toAsyncResult(
     Promise.all(
       commonContracts.map((contract) =>
-        localStorage.retrieveContractOutputArtifactById(
+        localStorage.retrieveContractOutputArtifact(
           artifact.project,
           artifactId,
           contract.sourceName,

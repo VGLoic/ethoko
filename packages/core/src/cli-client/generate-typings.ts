@@ -126,7 +126,7 @@ export async function generateArtifactsSummariesAndTypings(
         );
       }
       const contractArtifactsResult = await toAsyncResult(
-        localStorage.listContractArtifactsById(project, artifactIdResult.value),
+        localStorage.listContractArtifacts(project, artifactIdResult.value),
         { debug: opts.debug },
       );
       if (!contractArtifactsResult.success) {
@@ -139,7 +139,7 @@ export async function generateArtifactsSummariesAndTypings(
         contractName,
       } of contractArtifactsResult.value) {
         const artifactResult = await toAsyncResult(
-          localStorage.retrieveContractOutputArtifactById(
+          localStorage.retrieveContractOutputArtifact(
             project,
             artifactIdResult.value,
             sourceName,

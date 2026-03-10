@@ -14,6 +14,8 @@ import { Dirent } from "fs";
 /**
  * Local storage implementation for storing artifacts on the local filesystem.
  *
+ * Methods favour use of ID instead of tag.
+ *
  * Storage layout (relative to rootPath)
  * - {project}/ids/{id}/input.json
  * - {project}/ids/{id}/outputs/{sourceName}/{contractName}.json
@@ -125,7 +127,7 @@ export class LocalStorage {
    * @param id The artifact ID.
    * @returns The list of contract artifacts with their source names and contract names.
    */
-  public async listContractArtifactsById(
+  public async listContractArtifacts(
     project: string,
     id: string,
   ): Promise<
@@ -165,79 +167,43 @@ export class LocalStorage {
   }
 
   /**
-   * Creates an artifact associated with the given ID.
+   * Creates an artifact associated with the given ID and optional tag
    * @param project The project name.
    * @param id The artifact ID.
    * @param inputArtifact The input artifact content.
    * @param contractOutputArtifacts The contract output artifacts content.
    */
-  public async createArtifactById(
+  public async createArtifact(
     project: string,
     id: string,
-    inputArtifact: Stream,
-    contractOutputArtifacts: {
-      sourceName: string;
-      contractName: string;
-      stream: Stream;
-    }[],
+    tag: string | null,
+    artifacts: {
+      input: Stream;
+      outputs: {
+        sourceName: string;
+        contractName: string;
+        stream: Stream;
+      }[];
+    },
   ): Promise<void> {
     const idDir = `${this.rootPath}/${project}/ids/${id}`;
     await fs.mkdir(idDir, { recursive: true });
     await Promise.all([
-      fs.writeFile(`${idDir}/input.json`, inputArtifact),
-      ...contractOutputArtifacts.map(({ sourceName, contractName, stream }) => {
+      fs.writeFile(`${idDir}/input.json`, artifacts.input),
+      ...artifacts.outputs.map(({ sourceName, contractName, stream }) => {
         const contractPath = `${idDir}/outputs/${sourceName}/${contractName}.json`;
         return fs
           .mkdir(path.dirname(contractPath), { recursive: true })
           .then(() => fs.writeFile(contractPath, stream));
       }),
     ]);
-  }
-
-  /**
-   * Creates an artifact associated with the given tag.
-   * @param project The project name.
-   * @param tag The tag name.
-   * @param id The artifact ID.
-   * @param inputArtifact The input artifact content.
-   * @param contractOutputArtifacts The contract output artifacts content.
-   */
-  public async createArtifactByTag(
-    project: string,
-    tag: string,
-    id: string,
-    inputArtifact: Stream,
-    contractOutputArtifacts: {
-      sourceName: string;
-      contractName: string;
-      stream: Stream;
-    }[],
-  ): Promise<void> {
-    await this.createArtifactById(
-      project,
-      id,
-      inputArtifact,
-      contractOutputArtifacts,
-    );
-    const manifest: TagManifest = { id };
-    await fs.writeFile(
-      `${this.rootPath}/${project}/tags/${tag}.json`,
-      JSON.stringify(manifest),
-    );
-  }
-
-  /**
-   * Retrieves the input artifact associated with the given tag.
-   * @param project The project name.
-   * @param tag The tag name.
-   * @returns The input artifact.
-   */
-  public async retrieveInputArtifactByTag(
-    project: string,
-    tag: string,
-  ): Promise<EthokoInputArtifact> {
-    const id = await this.retrieveArtifactId(project, tag);
-    return this.retrieveInputArtifactById(project, id);
+    if (tag) {
+      const manifest: TagManifest = { id };
+      await fs.writeFile(
+        `${this.rootPath}/${project}/tags/${tag}.json`,
+        JSON.stringify(manifest),
+      );
+    }
   }
 
   /**
@@ -246,7 +212,7 @@ export class LocalStorage {
    * @param id The artifact ID.
    * @returns The input artifact.
    */
-  public async retrieveInputArtifactById(
+  public async retrieveInputArtifact(
     project: string,
     id: string,
   ): Promise<EthokoInputArtifact> {
@@ -266,7 +232,7 @@ export class LocalStorage {
    * @param contractName The contract name.
    * @returns The contract output artifact.
    */
-  public async retrieveContractOutputArtifactById(
+  public async retrieveContractOutputArtifact(
     project: string,
     id: string,
     sourceName: string,

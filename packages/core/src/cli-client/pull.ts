@@ -181,13 +181,10 @@ export async function pull(
       }
 
       const createResult = await toAsyncResult(
-        localStorage.createArtifactByTag(
-          project,
-          tag,
-          downloadResult.value.id,
-          downloadResult.value.input,
-          downloadResult.value.contractOutputArtifacts,
-        ),
+        localStorage.createArtifact(project, downloadResult.value.id, tag, {
+          input: downloadResult.value.input,
+          outputs: downloadResult.value.contractOutputArtifacts,
+        }),
         { debug: opts.debug },
       );
       if (!createResult.success) {
@@ -234,12 +231,10 @@ export async function pull(
       }
 
       const createResult = await toAsyncResult(
-        localStorage.createArtifactById(
-          project,
-          id,
-          downloadResult.value.input,
-          downloadResult.value.contractOutputArtifacts,
-        ),
+        localStorage.createArtifact(project, id, null, {
+          input: downloadResult.value.input,
+          outputs: downloadResult.value.contractOutputArtifacts,
+        }),
         { debug: opts.debug },
       );
       if (!createResult.success) {

@@ -73,8 +73,8 @@ export async function inspectArtifact(
 
   const artifactsResult = await toAsyncResult(
     Promise.all([
-      localStorage.retrieveInputArtifactById(artifact.project, artifactId),
-      localStorage.listContractArtifactsById(artifact.project, artifactId),
+      localStorage.retrieveInputArtifact(artifact.project, artifactId),
+      localStorage.listContractArtifacts(artifact.project, artifactId),
     ]),
     { debug: opts.debug },
   );

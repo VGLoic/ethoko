@@ -85,7 +85,7 @@ export async function exportContractArtifact(
   }
 
   const contractListResult = await toAsyncResult(
-    localStorage.listContractArtifactsById(artifact.project, artifactId),
+    localStorage.listContractArtifacts(artifact.project, artifactId),
     { debug: opts.debug },
   );
   if (!contractListResult.success) {
@@ -144,7 +144,7 @@ export async function exportContractArtifact(
   }
 
   const contractArtifactResult = await toAsyncResult(
-    localStorage.retrieveContractOutputArtifactById(
+    localStorage.retrieveContractOutputArtifact(
       artifact.project,
       artifactId,
       targetContract.sourceName,

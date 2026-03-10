@@ -68,7 +68,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           ),
         ).toBe(true);
 
-        const localArtifact = await localStorage.retrieveInputArtifactById(
+        const localArtifact = await localStorage.retrieveInputArtifact(
           project,
           artifactId,
         );
