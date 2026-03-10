@@ -1,6 +1,5 @@
 import {
   EthokoInputArtifact,
-  EthokoOutputArtifact,
   EthokoContractOutputArtifact,
 } from "../ethoko-artifacts-schemas/v0";
 import { mapForgeV1DefaultArtifactToEthokoArtifact } from "./forge-v1/map-default-to-ethoko-artifact";
@@ -42,7 +41,6 @@ export function mapOriginalArtifactToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {

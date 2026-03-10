@@ -4,7 +4,6 @@ import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 import { ForgeCompilerOutputWithBuildInfoOptionSchema } from "./schemas";
 import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-artifact-paths";
@@ -33,7 +32,6 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
@@ -87,19 +85,13 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
     solcLongVersion: forgeBuildInfo.solcLongVersion,
     input: forgeBuildInfo.input,
   };
-  const outputArtifact: EthokoOutputArtifact = {
-    id,
-    _format: "ethoko-output-v0",
-    output: forgeBuildInfo.output,
-  };
 
-  // REMIND ME: reconsider once we delete the global output
   const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
   for (const [sourceName, contracts] of Object.entries(
-    outputArtifact.output.contracts,
+    forgeBuildInfo.output.contracts,
   )) {
     for (const [contractName, contractOutput] of Object.entries(contracts)) {
-      const relatedSourceObject = outputArtifact.output.sources?.[sourceName];
+      const relatedSourceObject = forgeBuildInfo.output.sources?.[sourceName];
       outputContractArtifacts.push({
         id: inputArtifact.id,
         _format: "ethoko-output-v0",
@@ -115,7 +107,6 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
 
   return {
     inputArtifact,
-    outputArtifact,
     outputContractArtifacts,
     originalContentPaths: contractArtifactsPaths.concat(buildInfoPath),
   };

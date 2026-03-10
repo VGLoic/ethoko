@@ -3,7 +3,6 @@ import {
   EthokoArtifactOrigin,
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
@@ -35,7 +34,6 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
@@ -133,7 +131,6 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
   }
 
   const ethokoArtifactId = deriveEthokoArtifactId(solcInput);
-  // REMIND ME: reconsider once we delete the global output
   const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
   for (const [sourceName, contracts] of Object.entries(solcOutput.contracts)) {
     for (const [contractName, contractOutput] of Object.entries(contracts)) {
@@ -168,11 +165,6 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
       },
       solcLongVersion,
       input: solcInput,
-    },
-    outputArtifact: {
-      id: ethokoArtifactId,
-      _format: "ethoko-output-v0",
-      output: solcOutput,
     },
     outputContractArtifacts,
     originalContentPaths: pairs

@@ -2,11 +2,11 @@ import fs from "fs/promises";
 import path from "path";
 import { Stream } from "stream";
 import {
-  EthokoContractOutputArtifact,
+  type EthokoContractOutputArtifact,
   EthokoContractOutputArtifactSchema,
-  EthokoInputArtifact,
+  type EthokoInputArtifact,
   EthokoInputArtifactSchema,
-  TagManifest,
+  type TagManifest,
   TagManifestSchema,
 } from "./utils/ethoko-artifacts-schemas/v0";
 import { Dirent } from "fs";
@@ -16,7 +16,6 @@ import { Dirent } from "fs";
  *
  * Storage layout (relative to rootPath)
  * - {project}/ids/{id}/input.json
- * - {project}/ids/{id}/output.json
  * - {project}/ids/{id}/outputs/{sourceName}/{contractName}.json
  * - {project}/tags/{tag}.json (manifest: { id })
  */
@@ -170,14 +169,12 @@ export class LocalStorage {
    * @param project The project name.
    * @param id The artifact ID.
    * @param inputArtifact The input artifact content.
-   * @param outputArtifact The output artifact content.
    * @param contractOutputArtifacts The contract output artifacts content.
    */
   public async createArtifactById(
     project: string,
     id: string,
     inputArtifact: Stream,
-    outputArtifact: Stream,
     contractOutputArtifacts: {
       sourceName: string;
       contractName: string;
@@ -188,7 +185,6 @@ export class LocalStorage {
     await fs.mkdir(idDir, { recursive: true });
     await Promise.all([
       fs.writeFile(`${idDir}/input.json`, inputArtifact),
-      fs.writeFile(`${idDir}/output.json`, outputArtifact),
       ...contractOutputArtifacts.map(({ sourceName, contractName, stream }) => {
         const contractPath = `${idDir}/outputs/${sourceName}/${contractName}.json`;
         return fs
@@ -204,7 +200,6 @@ export class LocalStorage {
    * @param tag The tag name.
    * @param id The artifact ID.
    * @param inputArtifact The input artifact content.
-   * @param outputArtifact The output artifact content.
    * @param contractOutputArtifacts The contract output artifacts content.
    */
   public async createArtifactByTag(
@@ -212,7 +207,6 @@ export class LocalStorage {
     tag: string,
     id: string,
     inputArtifact: Stream,
-    outputArtifact: Stream,
     contractOutputArtifacts: {
       sourceName: string;
       contractName: string;
@@ -223,7 +217,6 @@ export class LocalStorage {
       project,
       id,
       inputArtifact,
-      outputArtifact,
       contractOutputArtifacts,
     );
     const manifest: TagManifest = { id };

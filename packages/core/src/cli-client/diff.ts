@@ -8,10 +8,7 @@ import {
   lookForCandidateArtifacts,
   promptUserSelection,
 } from "./helpers/look-for-candidate-artifacts";
-import {
-  EthokoContractOutputArtifact,
-  EthokoOutputArtifact,
-} from "@/utils/ethoko-artifacts-schemas/v0";
+import { EthokoContractOutputArtifact } from "@/utils/ethoko-artifacts-schemas/v0";
 import {
   mapOriginalArtifactToEthokoArtifact,
   OriginalBuildInfoPaths,
@@ -409,7 +406,7 @@ function generateContractHashes(
   return contractHashes;
 }
 
-type Contract = EthokoOutputArtifact["output"]["contracts"][string][string];
+type Contract = EthokoContractOutputArtifact["output"]["contract"];
 function hashContract(contract: Contract): string {
   const hash = createHash("sha256");
 

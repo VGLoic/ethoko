@@ -13,7 +13,6 @@ import { LOG_COLORS } from "@/cli-ui/utils";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
   TagManifest,
   TagManifestSchema,
 } from "../utils/ethoko-artifacts-schemas/v0";
@@ -287,14 +286,12 @@ export class S3BucketProvider implements StorageProvider {
   public async uploadArtifact(
     project: string,
     inputArtifact: EthokoInputArtifact,
-    outputArtifact: EthokoOutputArtifact,
     contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
     originalContentPaths: string[],
   ): Promise<void> {
     const client = await this.getClient();
     const inputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/input.json`;
-    const outputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/output.json`;
     const contractUploads = contractOutputArtifacts.map((contractArtifact) => {
       const contractKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/outputs/${contractArtifact.sourceName}/${contractArtifact.contract}.json`;
       return client.send(
@@ -312,13 +309,6 @@ export class S3BucketProvider implements StorageProvider {
           Bucket: this.config.bucketName,
           Key: inputKey,
           Body: JSON.stringify(inputArtifact),
-        }),
-      ),
-      client.send(
-        new PutObjectCommand({
-          Bucket: this.config.bucketName,
-          Key: outputKey,
-          Body: JSON.stringify(outputArtifact),
         }),
       ),
     ]);
@@ -359,7 +349,6 @@ export class S3BucketProvider implements StorageProvider {
     id: string,
   ): Promise<{
     input: Stream;
-    output: Stream;
     contractOutputArtifacts: {
       sourceName: string;
       contractName: string;
@@ -371,15 +360,8 @@ export class S3BucketProvider implements StorageProvider {
       Bucket: this.config.bucketName,
       Key: `${this.rootPath}/${project}/ids/${id}/input.json`,
     });
-    const outputCommand = new GetObjectCommand({
-      Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}/output.json`,
-    });
-    const [inputResult, outputResult] = await Promise.all([
-      client.send(inputCommand),
-      client.send(outputCommand),
-    ]);
-    if (!inputResult.Body || !outputResult.Body) {
+    const inputResult = await client.send(inputCommand);
+    if (!inputResult.Body) {
       throw new Error(
         `Artifact corrupted on remote storage for ID ${id}, requires attention`,
       );
@@ -404,7 +386,6 @@ export class S3BucketProvider implements StorageProvider {
     );
     return {
       input: inputResult.Body as Stream,
-      output: outputResult.Body as Stream,
       contractOutputArtifacts,
     };
   }
@@ -415,7 +396,6 @@ export class S3BucketProvider implements StorageProvider {
   ): Promise<{
     id: string;
     input: Stream;
-    output: Stream;
     contractOutputArtifacts: {
       sourceName: string;
       contractName: string;

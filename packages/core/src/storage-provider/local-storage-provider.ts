@@ -7,7 +7,6 @@ import { LOG_COLORS } from "@/cli-ui/utils";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
   TagManifest,
   TagManifestSchema,
 } from "../utils/ethoko-artifacts-schemas/v0";
@@ -108,7 +107,6 @@ export class LocalStorageProvider implements StorageProvider {
   public async uploadArtifact(
     project: string,
     inputArtifact: EthokoInputArtifact,
-    outputArtifact: EthokoOutputArtifact,
     outputContractArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
     originalContentPaths: string[],
@@ -133,10 +131,6 @@ export class LocalStorageProvider implements StorageProvider {
       fs.writeFile(
         this.inputFilePath(project, inputArtifact.id),
         JSON.stringify(inputArtifact),
-      ),
-      fs.writeFile(
-        this.outputFilePath(project, inputArtifact.id),
-        JSON.stringify(outputArtifact),
       ),
     ]);
 
@@ -170,7 +164,6 @@ export class LocalStorageProvider implements StorageProvider {
     id: string,
   ): Promise<{
     input: Stream;
-    output: Stream;
     contractOutputArtifacts: {
       sourceName: string;
       contractName: string;
@@ -183,7 +176,6 @@ export class LocalStorageProvider implements StorageProvider {
     );
     return {
       input: createReadStream(this.inputFilePath(project, id)),
-      output: createReadStream(this.outputFilePath(project, id)),
       contractOutputArtifacts: contractOutputArtifacts.map((artifact) => ({
         sourceName: artifact.sourceName,
         contractName: artifact.contractName,
@@ -205,7 +197,6 @@ export class LocalStorageProvider implements StorageProvider {
   ): Promise<{
     id: string;
     input: Stream;
-    output: Stream;
     contractOutputArtifacts: {
       sourceName: string;
       contractName: string;
@@ -265,10 +256,6 @@ export class LocalStorageProvider implements StorageProvider {
 
   private inputFilePath(project: string, id: string): string {
     return path.join(this.idDirPath(project, id), "input.json");
-  }
-
-  private outputFilePath(project: string, id: string): string {
-    return path.join(this.idDirPath(project, id), "output.json");
   }
 
   private contractOutputsPath(project: string, id: string): string {

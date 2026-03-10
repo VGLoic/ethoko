@@ -4,7 +4,6 @@ import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 
 export async function mapHardhatV2ArtifactToEthokoArtifact(
@@ -12,7 +11,6 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
@@ -69,14 +67,8 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
       });
     }
   }
-  const outputArtifact: EthokoOutputArtifact = {
-    id,
-    _format: "ethoko-output-v0",
-    output: parsingResult.data.output,
-  };
   return {
     inputArtifact,
-    outputArtifact,
     outputContractArtifacts,
     originalContentPaths: [buildInfoPath],
   };

@@ -2,7 +2,6 @@ import path from "path";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
@@ -28,7 +27,6 @@ export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
@@ -79,11 +77,6 @@ export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
       },
       solcLongVersion,
       input: solcInput,
-    },
-    outputArtifact: {
-      id: ethokoArtifactId,
-      _format: "ethoko-output-v0",
-      output: solcOutput,
     },
     outputContractArtifacts,
     originalContentPaths: [pair.input, pair.output].concat(

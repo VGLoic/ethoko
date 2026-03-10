@@ -539,7 +539,7 @@ interface CompilerInput {
   settings?: InputSettings;
 }
 
-type InputSource = {
+interface InputSource {
   license?: string;
   keccak256?: string;
   urls?: string[];
@@ -550,7 +550,7 @@ type InputSource = {
     ".data"?: Record<string, unknown>;
     sourceList?: string[];
   };
-};
+}
 
 interface InputSettings {
   stopAfter?: string;
