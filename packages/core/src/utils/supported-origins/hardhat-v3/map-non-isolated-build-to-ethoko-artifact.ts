@@ -40,8 +40,25 @@ export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
 
   const solcInput = inputArtifact.input;
   const solcOutput = outputArtifact.output;
-
   const ethokoArtifactId = deriveEthokoArtifactId(solcInput);
+
+  const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
+  for (const [sourceName, contracts] of Object.entries(solcOutput.contracts)) {
+    for (const [contractName, contractOutput] of Object.entries(contracts)) {
+      const relatedSourceObject = solcOutput.sources?.[sourceName];
+      outputContractArtifacts.push({
+        id: ethokoArtifactId,
+        _format: "ethoko-output-v0",
+        contract: contractName,
+        sourceName,
+        output: {
+          contract: contractOutput,
+          source: relatedSourceObject,
+        },
+      });
+    }
+  }
+
   const contractArtifactsPaths = await retrieveHardhatv3ContractArtifactsPaths(
     path.dirname(pair.input),
     [inputArtifact.id],
@@ -68,8 +85,7 @@ export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
       _format: "ethoko-output-v0",
       output: solcOutput,
     },
-    // REMIND ME: implement
-    outputContractArtifacts: [],
+    outputContractArtifacts,
     originalContentPaths: [pair.input, pair.output].concat(
       contractArtifactsPaths,
     ),

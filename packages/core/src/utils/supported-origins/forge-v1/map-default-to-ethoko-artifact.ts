@@ -265,11 +265,31 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
     );
   }
 
+  // REMIND ME: reconsider once we delete the global output
+  const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
+  for (const [sourceName, contracts] of Object.entries(
+    outputArtifactResult.data.output.contracts,
+  )) {
+    for (const [contractName, contractOutput] of Object.entries(contracts)) {
+      const relatedSourceObject =
+        outputArtifactResult.data.output.sources?.[sourceName];
+      outputContractArtifacts.push({
+        id: inputArtifactResult.data.id,
+        _format: "ethoko-output-v0",
+        contract: contractName,
+        sourceName,
+        output: {
+          contract: contractOutput,
+          source: relatedSourceObject,
+        },
+      });
+    }
+  }
+
   return {
     inputArtifact: inputArtifactResult.data,
     outputArtifact: outputArtifactResult.data,
-    // REMIND ME: implement
-    outputContractArtifacts: [],
+    outputContractArtifacts,
     originalContentPaths: additionalArtifactsPaths.concat(buildInfoPath),
   };
 }

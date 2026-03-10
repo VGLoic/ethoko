@@ -50,6 +50,25 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
     solcLongVersion: parsingResult.data.solcLongVersion,
     input: parsingResult.data.input,
   };
+  const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
+  for (const [sourceName, contracts] of Object.entries(
+    parsingResult.data.output.contracts,
+  )) {
+    for (const [contractName, contractOutput] of Object.entries(contracts)) {
+      const relatedSourceObject =
+        parsingResult.data.output.sources?.[sourceName];
+      outputContractArtifacts.push({
+        id,
+        _format: "ethoko-output-v0",
+        contract: contractName,
+        sourceName,
+        output: {
+          contract: contractOutput,
+          source: relatedSourceObject,
+        },
+      });
+    }
+  }
   const outputArtifact: EthokoOutputArtifact = {
     id,
     _format: "ethoko-output-v0",
@@ -58,7 +77,7 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
   return {
     inputArtifact,
     outputArtifact,
-    outputContractArtifacts: [],
+    outputContractArtifacts,
     originalContentPaths: [buildInfoPath],
   };
 }
