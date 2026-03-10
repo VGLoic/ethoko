@@ -6,8 +6,6 @@ import {
   EthokoContractOutputArtifactSchema,
   EthokoInputArtifact,
   EthokoInputArtifactSchema,
-  EthokoOutputArtifact,
-  EthokoOutputArtifactSchema,
   TagManifest,
   TagManifestSchema,
 } from "./utils/ethoko-artifacts-schemas/v0";
@@ -250,21 +248,6 @@ export class LocalStorage {
   }
 
   /**
-   * Retrieves the output artifact associated with the given tag.
-   * @param project The project name.
-   * @param tag The tag name.
-   * @returns The output artifact.
-   * @deprecated This method is deprecated and will be removed in a future version. Please retrieve artifacts by ID for better performance and reliability.
-   */
-  public async retrieveOutputArtifactByTag(
-    project: string,
-    tag: string,
-  ): Promise<EthokoOutputArtifact> {
-    const id = await this.retrieveArtifactId(project, tag);
-    return this.retrieveOutputArtifactById(project, id);
-  }
-
-  /**
    * Retrieves the input artifact associated with the given ID.
    * @param project The project name.
    * @param id The artifact ID.
@@ -280,25 +263,6 @@ export class LocalStorage {
     );
     const rawArtifact = JSON.parse(artifactContent);
     return EthokoInputArtifactSchema.parse(rawArtifact);
-  }
-
-  /**
-   * Retrieves the output artifact associated with the given ID.
-   * @param project The project name.
-   * @param id The artifact ID.
-   * @returns The output artifact.
-   * @deprecated This method is deprecated and will be removed in a future version. Please retrieve artifacts by ID for better performance and reliability.
-   */
-  public async retrieveOutputArtifactById(
-    project: string,
-    id: string,
-  ): Promise<EthokoOutputArtifact> {
-    const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/ids/${id}/output.json`,
-      "utf-8",
-    );
-    const rawArtifact = JSON.parse(artifactContent);
-    return EthokoOutputArtifactSchema.parse(rawArtifact);
   }
 
   /**

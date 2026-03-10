@@ -1,12 +1,7 @@
-import fs from "fs/promises";
-
 import { LocalStorage } from "../local-storage";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
-import type {
-  EthokoInputArtifact,
-  EthokoOutputArtifact,
-} from "../utils/ethoko-artifacts-schemas/v0";
+import type { EthokoInputArtifact } from "../utils/ethoko-artifacts-schemas/v0";
 
 export type InspectResult = {
   project: string;
@@ -35,16 +30,6 @@ export type InspectResult = {
     sourcePath: string;
     contracts: string[];
   }>;
-  artifacts: {
-    input: {
-      path: string;
-      size: number;
-    };
-    output: {
-      path: string;
-      size: number;
-    };
-  };
 };
 
 /**
@@ -70,50 +55,35 @@ export async function inspectArtifact(
     );
   }
 
-  const artifactResult = await toAsyncResult(
-    artifact.search.type === "tag"
-      ? Promise.all([
-          localStorage.retrieveInputArtifactByTag(
-            artifact.project,
-            artifact.search.tag,
-          ),
-          localStorage.retrieveOutputArtifactByTag(
-            artifact.project,
-            artifact.search.tag,
-          ),
-        ])
-      : Promise.all([
-          localStorage.retrieveInputArtifactById(
-            artifact.project,
-            artifact.search.id,
-          ),
-          localStorage.retrieveOutputArtifactById(
-            artifact.project,
-            artifact.search.id,
-          ),
-        ]),
+  let artifactId: string;
+  if (artifact.search.type === "id") {
+    artifactId = artifact.search.id;
+  } else {
+    const artifactIdResult = await toAsyncResult(
+      localStorage.retrieveArtifactId(artifact.project, artifact.search.tag),
+      { debug: opts.debug },
+    );
+    if (!artifactIdResult.success) {
+      throw new CliError(
+        `The artifact ${artifact.project}:${artifact.search.tag} does not have an associated artifact ID. Please pull again. Run with debug mode for more info`,
+      );
+    }
+    artifactId = artifactIdResult.value;
+  }
+
+  const artifactsResult = await toAsyncResult(
+    Promise.all([
+      localStorage.retrieveInputArtifactById(artifact.project, artifactId),
+      localStorage.listContractArtifactsById(artifact.project, artifactId),
+    ]),
     { debug: opts.debug },
   );
-  if (!artifactResult.success) {
+  if (!artifactsResult.success) {
     throw new CliError(
       "Unable to retrieve the artifact content, please ensure it exists locally. Run with debug mode for more info",
     );
   }
-  const [inputArtifact, outputArtifact] = artifactResult.value;
-
-  const inputArtifactPath = `${localStorage.rootPath}/${artifact.project}/ids/${inputArtifact.id}/input.json`;
-  const outputArtifactPath = `${localStorage.rootPath}/${artifact.project}/ids/${inputArtifact.id}/output.json`;
-
-  const fileStatResult = await toAsyncResult(
-    Promise.all([fs.stat(inputArtifactPath), fs.stat(outputArtifactPath)]),
-    { debug: opts.debug },
-  );
-  if (!fileStatResult.success) {
-    throw new CliError(
-      "Unable to read the artifact files size, please ensure they exist locally. Run with debug mode for more info",
-    );
-  }
-  const [inputStat, outputStat] = fileStatResult.value;
+  const [inputArtifact, contractList] = artifactsResult.value;
 
   const compilerSettings = deriveCompilerSettings(inputArtifact);
 
@@ -143,17 +113,7 @@ export async function inspectArtifact(
     origin,
     compiler: compilerSettings,
     sourceFiles: Object.keys(inputArtifact.input.sources).sort(),
-    contractsBySource: deriveContractsBySource(outputArtifact),
-    artifacts: {
-      input: {
-        path: inputArtifactPath,
-        size: inputStat.size,
-      },
-      output: {
-        path: outputArtifactPath,
-        size: outputStat.size,
-      },
-    },
+    contractsBySource: deriveContractsBySource(contractList),
   };
 }
 
@@ -175,17 +135,25 @@ function deriveCompilerSettings(
 }
 
 function deriveContractsBySource(
-  artifact: EthokoOutputArtifact,
+  contracts: { sourceName: string; contractName: string }[],
 ): InspectResult["contractsBySource"] {
+  const gatheredContracts: Record<string, string[]> = {};
+  for (const { sourceName, contractName } of contracts) {
+    if (!gatheredContracts[sourceName]) {
+      gatheredContracts[sourceName] = [];
+    }
+    gatheredContracts[sourceName].push(contractName);
+  }
+
   const entries: InspectResult["contractsBySource"] = [];
-  for (const sourcePath of Object.keys(artifact.output.contracts).sort()) {
-    const contracts = artifact.output.contracts[sourcePath];
+  for (const sourcePath of Object.keys(gatheredContracts).sort()) {
+    const contracts = gatheredContracts[sourcePath];
     if (!contracts) {
       continue;
     }
     entries.push({
       sourcePath,
-      contracts: Object.keys(contracts).sort(),
+      contracts: contracts.sort(),
     });
   }
   return entries;

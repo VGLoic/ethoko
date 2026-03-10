@@ -1,3 +1,4 @@
+import { EthokoContractOutputArtifact } from "@/utils/ethoko-artifacts-schemas/v0";
 import { LocalStorage } from "../local-storage";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
@@ -67,45 +68,44 @@ export async function exportContractArtifact(
     );
   }
 
-  const artifactResult = await toAsyncResult(
-    artifact.search.type === "tag"
-      ? localStorage.retrieveOutputArtifactByTag(
-          artifact.project,
-          artifact.search.tag,
-        )
-      : localStorage.retrieveOutputArtifactById(
-          artifact.project,
-          artifact.search.id,
-        ),
+  let artifactId: string;
+  if (artifact.search.type === "id") {
+    artifactId = artifact.search.id;
+  } else {
+    const idResult = await toAsyncResult(
+      localStorage.retrieveArtifactId(artifact.project, artifact.search.tag),
+      { debug: opts.debug },
+    );
+    if (!idResult.success) {
+      throw new CliError(
+        `Unable to find an artifact with tag ${artifact.search.tag} for project ${artifact.project}, please ensure it exists locally. Run with debug mode for more info`,
+      );
+    }
+    artifactId = idResult.value;
+  }
+
+  const contractListResult = await toAsyncResult(
+    localStorage.listContractArtifactsById(artifact.project, artifactId),
     { debug: opts.debug },
   );
-  if (!artifactResult.success) {
+  if (!contractListResult.success) {
     throw new CliError(
-      "Unable to retrieve the artifact content, please ensure it exists locally. Run with debug mode for more info",
+      `Unable to find any contracts for artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}, please ensure it exists locally. Run with debug mode for more info`,
     );
   }
 
-  const contracts = artifactResult.value.output.contracts;
+  const contracts = contractListResult.value;
 
+  let targetContract: { sourceName: string; contractName: string };
   if (shortOrFullyQualifiedContractName.split(":").length === 1) {
     // Short name, find the contract with that name, if multiple are found, throw an error
     // We will perform the search with lowercase names to allow case-insensitive matching, but we will return the contract with the original contract name casing
     const lowerCaseContractName =
       shortOrFullyQualifiedContractName.toLowerCase();
-    const matchingContracts: {
-      sourcePath: string;
-      exactContractName: string;
-    }[] = [];
-    for (const [sourcePath, contractsByName] of Object.entries(contracts)) {
-      for (const contractName of Object.keys(contractsByName)) {
-        if (contractName.toLowerCase() === lowerCaseContractName) {
-          matchingContracts.push({
-            sourcePath,
-            exactContractName: contractName,
-          });
-        }
-      }
-    }
+    const matchingContracts = contracts.filter(
+      (contract) =>
+        contract.contractName.toLowerCase() === lowerCaseContractName,
+    );
     const matchingContract = matchingContracts[0];
     if (!matchingContract) {
       throw new CliError(
@@ -114,64 +114,52 @@ export async function exportContractArtifact(
     }
     if (matchingContracts.length > 1) {
       throw new CliError(
-        `Multiple contracts found with name ${shortOrFullyQualifiedContractName} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}, please specify the fully qualified contract name (i.e. <sourcePath>:${shortOrFullyQualifiedContractName}).\nMatching source paths: ${matchingContracts.map((c) => c.sourcePath).join(", ")}`,
+        `Multiple contracts found with name ${shortOrFullyQualifiedContractName} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}, please specify the fully qualified contract name (i.e. <sourcePath>:${shortOrFullyQualifiedContractName}).\nMatching source paths: ${matchingContracts.map((c) => c.sourceName).join(", ")}`,
       );
     }
-    const contract =
-      contracts[matchingContract.sourcePath]?.[
-        matchingContract.exactContractName
-      ];
-    if (!contract?.abi) {
+
+    targetContract = matchingContract;
+  } else {
+    // Else, we should be in the fully qualified contract name case, so we should have a string in the format <sourcePath>:<contractName>
+    const elements = shortOrFullyQualifiedContractName.split(":");
+    if (elements.length !== 2) {
       throw new CliError(
-        `No ABI found for contract ${shortOrFullyQualifiedContractName} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}`,
+        `Invalid contract name ${shortOrFullyQualifiedContractName}, expected format is <contractName> or <sourcePath>:<contractName>`,
       );
     }
-    const contractArtifact = buildContractArtifact(
-      matchingContract.sourcePath,
-      matchingContract.exactContractName,
-      contract,
-      artifactResult.value.id,
-      artifact.project,
-      artifact.search.type === "tag" ? artifact.search.tag : null,
+    const [sourcePath, contractName] = elements as [string, string];
+    // We will perform the search with lowercase names to allow case-insensitive matching, but we will return the contract with the original contract name casing
+    const lowerCaseContractName = contractName.toLowerCase();
+    const matchingContract = contracts.find(
+      (contract) =>
+        contract.sourceName === sourcePath &&
+        contract.contractName.toLowerCase() === lowerCaseContractName,
     );
-    return contractArtifact;
+    if (!matchingContract) {
+      throw new CliError(
+        `No contract found with name ${contractName} in source path ${sourcePath} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}`,
+      );
+    }
+    targetContract = matchingContract;
   }
 
-  // Else, we should be in the fully qualified contract name case, so we should have a string in the format <sourcePath>:<contractName>
-  const elements = shortOrFullyQualifiedContractName.split(":");
-  if (elements.length !== 2) {
-    throw new CliError(
-      `Invalid contract name ${shortOrFullyQualifiedContractName}, expected format is <contractName> or <sourcePath>:<contractName>`,
-    );
-  }
-  const [sourcePath, contractName] = elements as [string, string];
-  // We will perform the search with lowercase names to allow case-insensitive matching, but we will return the contract with the original contract name casing
-  const lowerCaseContractName = contractName.toLowerCase();
-  const sourceContracts = contracts[sourcePath];
-  if (!sourceContracts) {
-    throw new CliError(
-      `No contracts found for source path ${sourcePath} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}`,
-    );
-  }
-  const matchingEntry = Object.entries(sourceContracts).find(
-    ([name]) => name.toLowerCase() === lowerCaseContractName,
+  const contractArtifactResult = await toAsyncResult(
+    localStorage.retrieveContractOutputArtifactById(
+      artifact.project,
+      artifactId,
+      targetContract.sourceName,
+      targetContract.contractName,
+    ),
+    { debug: opts.debug },
   );
-  if (!matchingEntry) {
+  if (!contractArtifactResult.success) {
     throw new CliError(
-      `No contract found with name ${contractName} in source path ${sourcePath} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}`,
+      `Unable to retrieve the contract artifact content for contract ${targetContract.contractName} in source path ${targetContract.sourceName} for artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}, please ensure it exists locally. Run with debug mode for more info`,
     );
   }
-  const [exactContractName, contract] = matchingEntry;
-  if (!contract?.abi) {
-    throw new CliError(
-      `No ABI found for contract ${contractName} in source path ${sourcePath} in artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}`,
-    );
-  }
+
   const contractArtifact = buildContractArtifact(
-    sourcePath,
-    exactContractName,
-    contract,
-    artifactResult.value.id,
+    contractArtifactResult.value,
     artifact.project,
     artifact.search.type === "tag" ? artifact.search.tag : null,
   );
@@ -193,59 +181,38 @@ function prefixWith0x(s: string): `0x${string}` {
   return `0x${s}`;
 }
 
-type ContractOutput = ExportContractArtifactResult extends {
-  evm: infer EvmType;
-}
-  ? {
-      abi: ExportContractArtifactResult["abi"];
-      metadata?: string;
-      userdoc?: unknown;
-      devdoc?: unknown;
-      storageLayout?: unknown;
-      evm: EvmType & {
-        bytecode: { object: string; linkReferences: Record<string, unknown> };
-        deployedBytecode?: {
-          object?: string;
-          linkReferences: Record<string, unknown>;
-        };
-      };
-    }
-  : never;
-
 function buildContractArtifact(
-  contractPath: string,
-  contractName: string,
-  contract: ContractOutput,
-  artifactId: string,
+  contractArtifact: EthokoContractOutputArtifact,
   project: string,
   tag: string | null,
 ): ExportContractArtifactResult {
   return {
     tag,
     _format: "ethoko-contract-artifact-v0",
-    id: artifactId,
+    id: contractArtifact.id,
     project,
-    abi: contract.abi,
-    metadata: contract.metadata || "",
-    bytecode: prefixWith0x(contract.evm.bytecode.object),
-    deployedBytecode: contract.evm.deployedBytecode?.object
-      ? prefixWith0x(contract.evm.deployedBytecode.object)
+    abi: contractArtifact.output.contract.abi,
+    metadata: contractArtifact.output.contract.metadata || "",
+    bytecode: prefixWith0x(
+      contractArtifact.output.contract.evm.bytecode.object,
+    ),
+    deployedBytecode: contractArtifact.output.contract.evm.deployedBytecode
+      ?.object
+      ? prefixWith0x(
+          contractArtifact.output.contract.evm.deployedBytecode.object,
+        )
       : "0x",
-    linkReferences: contract.evm.bytecode.linkReferences as Record<
-      string,
-      Record<string, { start: number; length: number }[]>
-    >,
-    deployedLinkReferences: contract.evm.deployedBytecode
-      ? (contract.evm.deployedBytecode.linkReferences as Record<
-          string,
-          Record<string, { start: number; length: number }[]>
-        >)
+    linkReferences:
+      contractArtifact.output.contract.evm.bytecode.linkReferences,
+    deployedLinkReferences: contractArtifact.output.contract.evm
+      .deployedBytecode
+      ? contractArtifact.output.contract.evm.deployedBytecode.linkReferences
       : {},
-    contractName,
-    sourceName: contractPath,
-    userdoc: contract.userdoc,
-    devdoc: contract.devdoc,
-    storageLayout: contract.storageLayout,
-    evm: contract.evm as ExportContractArtifactResult["evm"],
+    contractName: contractArtifact.contract,
+    sourceName: contractArtifact.sourceName,
+    userdoc: contractArtifact.output.contract.userdoc,
+    devdoc: contractArtifact.output.contract.devdoc,
+    storageLayout: contractArtifact.output.contract.storageLayout,
+    evm: contractArtifact.output.contract.evm,
   };
 }

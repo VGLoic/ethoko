@@ -116,27 +116,51 @@ export async function generateArtifactsSummariesAndTypings(
       if (!contractsPerTag[tag]) {
         contractsPerTag[tag] = [];
       }
-      const artifactResult = await toAsyncResult(
-        localStorage.retrieveOutputArtifactByTag(project, tag),
+      const artifactIdResult = await toAsyncResult(
+        localStorage.retrieveArtifactId(project, tag),
         { debug: opts.debug },
       );
-      if (!artifactResult.success) {
+      if (!artifactIdResult.success) {
         throw new CliError(
-          `Error retrieving the artifact for project "${project}" and tag "${tag}". Run with debug mode for more info`,
+          `The artifact ${project}:${tag} does not have an associated artifact ID. Please pull again. Run with debug mode for more info`,
         );
       }
-      for (const contractPath in artifactResult.value.output.contracts) {
-        const contracts = artifactResult.value.output.contracts[contractPath];
-        for (const contractName in contracts) {
-          const contractKey = `${contractPath}:${contractName}`;
-          contractsPerTag[tag].push(contractKey);
-          if (!tagsPerContract[contractKey]) {
-            tagsPerContract[contractKey] = [];
-          }
-          tagsPerContract[contractKey].push(tag);
-          if (!abisPerContract[contractKey]) {
-            abisPerContract[contractKey] = contracts[contractName]?.abi ?? [];
-          }
+      const contractArtifactsResult = await toAsyncResult(
+        localStorage.listContractArtifactsById(project, artifactIdResult.value),
+        { debug: opts.debug },
+      );
+      if (!contractArtifactsResult.success) {
+        throw new CliError(
+          `Error listing the artifacts for project "${project}" and tag "${tag}". Run with debug mode for more info`,
+        );
+      }
+      for (const {
+        sourceName,
+        contractName,
+      } of contractArtifactsResult.value) {
+        const artifactResult = await toAsyncResult(
+          localStorage.retrieveContractOutputArtifactById(
+            project,
+            artifactIdResult.value,
+            sourceName,
+            contractName,
+          ),
+          { debug: opts.debug },
+        );
+        if (!artifactResult.success) {
+          throw new CliError(
+            `Error retrieving the artifact for project "${project}:${tag}" and contract "${sourceName}:${contractName}". Run with debug mode for more info`,
+          );
+        }
+        const contractKey = `${sourceName}:${contractName}`;
+        contractsPerTag[tag].push(contractKey);
+        if (!tagsPerContract[contractKey]) {
+          tagsPerContract[contractKey] = [];
+        }
+        tagsPerContract[contractKey].push(tag);
+        if (!abisPerContract[contractKey]) {
+          abisPerContract[contractKey] =
+            artifactResult.value.output.contract.abi;
         }
       }
     }
