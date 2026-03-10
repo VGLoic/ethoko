@@ -2,10 +2,9 @@ import fs from "fs/promises";
 import path from "path";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
+  EthokoContractOutputArtifact,
   EthokoInputArtifact,
   EthokoInputArtifactSchema,
-  EthokoOutputArtifact,
-  EthokoOutputArtifactSchema,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 import { ForgeCompilerDefaultOutputSchema } from "./schemas";
 import z from "zod";
@@ -13,12 +12,10 @@ import {
   SettingsSchema,
   SolcJsonInputSchema,
 } from "@/utils/solc-artifacts-schemas/v0.8.33/input-json";
-import {
-  SolcContractSchema,
-  SolcJsonOutputSchema,
-} from "@/utils/solc-artifacts-schemas/v0.8.33/output-json";
+import { SolcContractSchema } from "@/utils/solc-artifacts-schemas/v0.8.33/output-json";
 import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-artifact-paths";
 
+type SolcContractOutput = z.infer<typeof SolcContractSchema>;
 /**
  * The default Forge build info format splits the contract output into multiple files, the build info file contains only the mapping to these files.
  *
@@ -31,7 +28,7 @@ import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-arti
  *   - <contract-name>.json (contains the output for the contract)
  * - ...
  *
- * To reconstruct the Ethoko artifacts, we need to read the build info file, then read all the contract output files, and reconstruct the input and output in the Ethoko artifact format.
+ * To reconstruct the Ethoko artifacts, we need to read the build info file, then read all the contract output files, and reconstruct the input and outputs in the Ethoko artifact format.
  *
  * For this:
  * - we place ourselves in the root folder (one level above the build-info folder),
@@ -47,7 +44,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
+  outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
   const jsonContent = await fs
@@ -98,8 +95,10 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   const inputSources: Record<string, any> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const input: Record<string, any> = {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const outputContracts: Record<string, any> = {};
+  const outputContracts: Record<
+    string,
+    Record<string, SolcContractOutput>
+  > = {};
   for await (const {
     fullyQualifiedName,
     localArtifactPath,
@@ -165,10 +164,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
     }
 
     // Fill the output contracts
-    if (!outputContracts[fullyQualifiedName.path]) {
-      outputContracts[fullyQualifiedName.path] = {};
-    }
-    outputContracts[fullyQualifiedName.path][fullyQualifiedName.name] = {
+    const contractArtifact: SolcContractOutput = {
       abi: contract.abi,
       metadata: contractRawMetadata,
       userdoc: contractMetadata.output.userdoc,
@@ -195,7 +191,10 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
         methodIdentifiers: contract.methodIdentifiers,
         gasEstimates: undefined, // not handled
       },
-    } satisfies z.infer<typeof SolcContractSchema>;
+    };
+    const outputContractPath = outputContracts[fullyQualifiedName.path] || {};
+    outputContractPath[fullyQualifiedName.name] = contractArtifact;
+    outputContracts[fullyQualifiedName.path] = outputContractPath;
   }
 
   // We verify that all contract paths have been visited
@@ -219,12 +218,6 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   input.settings.libraries = inputLibraries;
   input.sources = inputSources;
 
-  const output = {
-    errors: undefined, // not handled
-    sources: undefined, // not handled
-    contracts: outputContracts,
-  } satisfies z.infer<typeof SolcJsonOutputSchema>;
-
   const inputParsingResult = SolcJsonInputSchema.safeParse(input);
   if (!inputParsingResult.success) {
     throw new Error(
@@ -242,11 +235,6 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
     },
     input: inputParsingResult.data,
   } satisfies EthokoInputArtifact;
-  const outputArtifact = {
-    id,
-    _format: "ethoko-output-v0",
-    output,
-  } satisfies EthokoOutputArtifact;
 
   const inputArtifactResult =
     EthokoInputArtifactSchema.safeParse(inputArtifact);
@@ -255,17 +243,26 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
       `Failed to parse the reconstructed Ethoko input artifact from the Forge build info default format. Error: ${inputArtifactResult.error}`,
     );
   }
-  const outputArtifactResult =
-    EthokoOutputArtifactSchema.safeParse(outputArtifact);
-  if (!outputArtifactResult.success) {
-    throw new Error(
-      `Failed to parse the reconstructed Ethoko output artifact from the Forge build info default format. Error: ${outputArtifactResult.error}`,
-    );
+
+  const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
+  for (const [sourceName, contracts] of Object.entries(outputContracts)) {
+    for (const [contractName, contractOutput] of Object.entries(contracts)) {
+      outputContractArtifacts.push({
+        id: inputArtifactResult.data.id,
+        _format: "ethoko-output-v0",
+        contract: contractName,
+        sourceName,
+        output: {
+          contract: contractOutput,
+          source: undefined, // Not handled for Forge default output
+        },
+      });
+    }
   }
 
   return {
     inputArtifact: inputArtifactResult.data,
-    outputArtifact: outputArtifactResult.data,
+    outputContractArtifacts,
     originalContentPaths: additionalArtifactsPaths.concat(buildInfoPath),
   };
 }

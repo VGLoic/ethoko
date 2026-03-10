@@ -5,8 +5,8 @@ import { Stream } from "stream";
 import { styleText } from "node:util";
 import { LOG_COLORS } from "@/cli-ui/utils";
 import {
+  EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
   TagManifest,
   TagManifestSchema,
 } from "../utils/ethoko-artifacts-schemas/v0";
@@ -22,7 +22,6 @@ type LocalStorageProviderConfig = {
  *
  * Storage layout (relative to storagePath)
  * - {project}/ids/{id}/input.json
- * - {project}/ids/{id}/output.json
  * - {project}/ids/{id}/original/** (original compilation content)
  * - {project}/tags/{tag}.json (manifest: { id })
  */
@@ -65,10 +64,32 @@ export class LocalStorageProvider implements StorageProvider {
       return [];
     }
     const files: string[] = [];
-    await this.collectOriginalContentFiles(originalContentRoot, files);
+    await this.collectJsonFilePaths(originalContentRoot, files);
     return files.map((filePath) =>
       path.relative(originalContentRoot, filePath),
     );
+  }
+
+  private async listContractOutputArtifacts(
+    project: string,
+    id: string,
+  ): Promise<{ sourceName: string; contractName: string }[]> {
+    const outputsPath = this.contractOutputsPath(project, id);
+    const filePaths: string[] = [];
+    await this.collectJsonFilePaths(outputsPath, filePaths);
+    const outputArtifacts: { sourceName: string; contractName: string }[] = [];
+    for (const filePath of filePaths) {
+      const relativePath = path.relative(outputsPath, filePath);
+      const pathParts = relativePath.split(path.sep);
+      const contractNameWithExt = pathParts.pop();
+      if (!contractNameWithExt || !contractNameWithExt.endsWith(".json")) {
+        continue;
+      }
+      const contractName = contractNameWithExt.replace(".json", "");
+      const sourceName = pathParts.join(path.sep);
+      outputArtifacts.push({ sourceName, contractName });
+    }
+    return outputArtifacts;
   }
 
   public async hasArtifactByTag(
@@ -85,22 +106,30 @@ export class LocalStorageProvider implements StorageProvider {
   public async uploadArtifact(
     project: string,
     inputArtifact: EthokoInputArtifact,
-    outputArtifact: EthokoOutputArtifact,
+    outputContractArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
     originalContentPaths: string[],
   ): Promise<void> {
     await this.ensureProjectSetup(project);
 
-    const idDir = this.idDirPath(project, inputArtifact.id);
-    await fs.mkdir(idDir, { recursive: true });
+    await fs.mkdir(this.idDirPath(project, inputArtifact.id), {
+      recursive: true,
+    });
     await Promise.all([
+      ...outputContractArtifacts.map((artifact) => {
+        const contractPath = this.contractOutputFilePath(
+          project,
+          inputArtifact.id,
+          artifact.sourceName,
+          artifact.contract,
+        );
+        return fs
+          .mkdir(path.dirname(contractPath), { recursive: true })
+          .then(() => fs.writeFile(contractPath, JSON.stringify(artifact)));
+      }),
       fs.writeFile(
         this.inputFilePath(project, inputArtifact.id),
         JSON.stringify(inputArtifact),
-      ),
-      fs.writeFile(
-        this.outputFilePath(project, inputArtifact.id),
-        JSON.stringify(outputArtifact),
       ),
     ]);
 
@@ -132,17 +161,47 @@ export class LocalStorageProvider implements StorageProvider {
   public async downloadArtifactById(
     project: string,
     id: string,
-  ): Promise<{ input: Stream; output: Stream }> {
+  ): Promise<{
+    input: Stream;
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[];
+  }> {
+    const contractOutputArtifacts = await this.listContractOutputArtifacts(
+      project,
+      id,
+    );
     return {
       input: createReadStream(this.inputFilePath(project, id)),
-      output: createReadStream(this.outputFilePath(project, id)),
+      contractOutputArtifacts: contractOutputArtifacts.map((artifact) => ({
+        sourceName: artifact.sourceName,
+        contractName: artifact.contractName,
+        stream: createReadStream(
+          this.contractOutputFilePath(
+            project,
+            id,
+            artifact.sourceName,
+            artifact.contractName,
+          ),
+        ),
+      })),
     };
   }
 
   public async downloadArtifactByTag(
     project: string,
     tag: string,
-  ): Promise<{ id: string; input: Stream; output: Stream }> {
+  ): Promise<{
+    id: string;
+    input: Stream;
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[];
+  }> {
     const tagFilePath = this.tagFilePath(project, tag);
     const manifestContent = await fs.readFile(tagFilePath, "utf-8");
     const manifest = TagManifestSchema.parse(JSON.parse(manifestContent));
@@ -198,8 +257,21 @@ export class LocalStorageProvider implements StorageProvider {
     return path.join(this.idDirPath(project, id), "input.json");
   }
 
-  private outputFilePath(project: string, id: string): string {
-    return path.join(this.idDirPath(project, id), "output.json");
+  private contractOutputsPath(project: string, id: string): string {
+    return path.join(this.idDirPath(project, id), "outputs");
+  }
+
+  private contractOutputFilePath(
+    project: string,
+    id: string,
+    sourceName: string,
+    contract: string,
+  ): string {
+    return path.join(
+      this.contractOutputsPath(project, id),
+      sourceName,
+      `${contract}.json`,
+    );
   }
 
   private sanitizePath(filePath: string): string {
@@ -241,7 +313,14 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
-  private async collectOriginalContentFiles(
+  private async exists(filePath: string): Promise<boolean> {
+    return fs
+      .stat(filePath)
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  private async collectJsonFilePaths(
     dirPath: string,
     files: string[],
   ): Promise<void> {
@@ -252,17 +331,10 @@ export class LocalStorageProvider implements StorageProvider {
     for (const entry of entries) {
       const entryPath = path.join(dirPath, entry.name);
       if (entry.isDirectory()) {
-        await this.collectOriginalContentFiles(entryPath, files);
-      } else if (entry.isFile()) {
+        await this.collectJsonFilePaths(entryPath, files);
+      } else if (entry.isFile() && entry.name.endsWith(".json")) {
         files.push(entryPath);
       }
     }
-  }
-
-  private async exists(filePath: string): Promise<boolean> {
-    return fs
-      .stat(filePath)
-      .then(() => true)
-      .catch(() => false);
   }
 }

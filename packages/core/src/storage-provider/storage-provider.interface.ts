@@ -1,7 +1,7 @@
 import { Stream } from "stream";
 import {
+  EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "../utils/ethoko-artifacts-schemas/v0";
 
 /**
@@ -14,7 +14,6 @@ import {
  *
  * Storage layout (logical)
  * - {project}/ids/{id}/input.json
- * - {project}/ids/{id}/output.json
  * - {project}/ids/{id}/original/** (original compilation content)
  * - {project}/tags/{tag}.json (manifest: { id })
  */
@@ -33,7 +32,7 @@ export interface StorageProvider {
   uploadArtifact(
     project: string,
     inputArtifact: EthokoInputArtifact,
-    outputArtifact: EthokoOutputArtifact,
+    contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
     originalContentPaths: string[],
   ): Promise<void>;
@@ -41,12 +40,27 @@ export interface StorageProvider {
   downloadArtifactById(
     project: string,
     id: string,
-  ): Promise<{ input: Stream; output: Stream }>;
+  ): Promise<{
+    input: Stream;
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[];
+  }>;
   /** Download input/output artifact streams by tag, plus resolved ID. */
   downloadArtifactByTag(
     project: string,
     tag: string,
-  ): Promise<{ id: string; input: Stream; output: Stream }>;
+  ): Promise<{
+    id: string;
+    input: Stream;
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[];
+  }>;
   /** Download an original content file by relative path. */
   downloadOriginalContent(
     project: string,

@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 
 import { createSpinner } from "../cli-ui/utils";
 import { LocalStorage } from "../local-storage";
-import { toAsyncResult } from "../utils/result";
+import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";
 import {
   lookForCandidateArtifacts,
   promptUserSelection,
 } from "./helpers/look-for-candidate-artifacts";
-import { EthokoOutputArtifact } from "@/utils/ethoko-artifacts-schemas/v0";
+import { EthokoContractOutputArtifact } from "@/utils/ethoko-artifacts-schemas/v0";
 import {
   mapOriginalArtifactToEthokoArtifact,
   OriginalBuildInfoPaths,
@@ -269,11 +269,12 @@ export async function generateDiffWithTargetRelease(
         `An error occurred while mapping the build info to Ethoko artifacts. Please provide valid build info JSON files or contact us. Run with debug mode for more info.`,
     );
   }
-  const { outputArtifact } = ethokoArtifactParsingResult.value;
+  const contractArtifacts =
+    ethokoArtifactParsingResult.value.outputContractArtifacts;
   spinner3.succeed("Compilation artifact is valid");
 
-  const virtualReleaseContractHashesResult = await toAsyncResult(
-    generateContractHashes(outputArtifact),
+  const virtualReleaseContractHashesResult = toResult(
+    () => generateContractHashes(contractArtifacts),
     { debug: opts.debug },
   );
   if (!virtualReleaseContractHashesResult.success) {
@@ -285,27 +286,62 @@ export async function generateDiffWithTargetRelease(
   spinner3.succeed("Fresh artifact loaded");
 
   const spinner4 = createSpinner("Reading target artifact...", opts.silent);
-  const artifactContentResult = await toAsyncResult(
-    artifact.search.type === "tag"
-      ? localStorage.retrieveOutputArtifactByTag(
-          artifact.project,
-          artifact.search.tag,
-        )
-      : localStorage.retrieveOutputArtifactById(
-          artifact.project,
-          artifact.search.id,
-        ),
+  let artifactId: string;
+  if (artifact.search.type === "id") {
+    artifactId = artifact.search.id;
+  } else {
+    const idResult = await toAsyncResult(
+      localStorage.retrieveArtifactId(artifact.project, artifact.search.tag),
+      { debug: opts.debug },
+    );
+    if (!idResult.success) {
+      spinner4.fail("Failed to retrieve artifact ID");
+      throw new CliError(
+        `Unable to find an artifact with tag ${artifact.search.tag} for project ${artifact.project}, please ensure it exists locally. Run with debug mode for more info`,
+      );
+    }
+    artifactId = idResult.value;
+  }
+
+  const contractListResult = await toAsyncResult(
+    localStorage.listContractArtifactsById(artifact.project, artifactId),
     { debug: opts.debug },
   );
-  if (!artifactContentResult.success) {
+  if (!contractListResult.success) {
     spinner4.fail("Failed to read target artifact");
     throw new CliError(
       "Unable to retrieve the target artifact content, please ensure it exists locally. Run with debug mode for more info",
     );
   }
 
-  const targetReleaseContractHashesResult = await toAsyncResult(
-    generateContractHashes(artifactContentResult.value),
+  const commonContracts = contractListResult.value.filter((contract) =>
+    virtualReleaseContractHashesResult.value.has(
+      formKey(contract.sourceName, contract.contractName),
+    ),
+  );
+
+  const commonContractArtifactsResult = await toAsyncResult(
+    Promise.all(
+      commonContracts.map((contract) =>
+        localStorage.retrieveContractOutputArtifactById(
+          artifact.project,
+          artifactId,
+          contract.sourceName,
+          contract.contractName,
+        ),
+      ),
+    ),
+    { debug: opts.debug },
+  );
+  if (!commonContractArtifactsResult.success) {
+    spinner4.fail("Failed to read target artifact");
+    throw new CliError(
+      "Unable to retrieve the target artifact content, please ensure it exists locally. Run with debug mode for more info",
+    );
+  }
+
+  const targetReleaseContractHashesResult = toResult(
+    () => generateContractHashes(commonContractArtifactsResult.value),
     { debug: opts.debug },
   );
   if (!targetReleaseContractHashesResult.success) {
@@ -355,28 +391,22 @@ export async function generateDiffWithTargetRelease(
   return differences;
 }
 
-async function generateContractHashes(
-  artifact: EthokoOutputArtifact,
-): Promise<Map<string, string>> {
+function generateContractHashes(
+  contractArtifacts: EthokoContractOutputArtifact[],
+): Map<string, string> {
   const contractHashes = new Map<string, string>();
-  for (const contractPath in artifact.output.contracts) {
-    const contracts = artifact.output.contracts[contractPath];
-    for (const contractName in contracts) {
-      const contract = contracts[contractName];
-      if (!contract) {
-        throw new Error(
-          `Contract ${contractName} in file ${contractPath} is undefined`,
-        );
-      }
-      const hash = hashContract(contract);
-      contractHashes.set(formKey(contractPath, contractName), hash);
-    }
+  for (const contractArtifact of contractArtifacts) {
+    const hash = hashContract(contractArtifact.output.contract);
+    contractHashes.set(
+      formKey(contractArtifact.sourceName, contractArtifact.contract),
+      hash,
+    );
   }
 
   return contractHashes;
 }
 
-type Contract = EthokoOutputArtifact["output"]["contracts"][string][string];
+type Contract = EthokoContractOutputArtifact["output"]["contract"];
 function hashContract(contract: Contract): string {
   const hash = createHash("sha256");
 

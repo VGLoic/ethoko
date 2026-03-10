@@ -1,20 +1,22 @@
 import fs from "fs/promises";
+import path from "path";
 import { Stream } from "stream";
 import {
-  EthokoInputArtifact,
+  type EthokoContractOutputArtifact,
+  EthokoContractOutputArtifactSchema,
+  type EthokoInputArtifact,
   EthokoInputArtifactSchema,
-  EthokoOutputArtifact,
-  EthokoOutputArtifactSchema,
-  TagManifest,
+  type TagManifest,
   TagManifestSchema,
 } from "./utils/ethoko-artifacts-schemas/v0";
+import { Dirent } from "fs";
 
 /**
  * Local storage implementation for storing artifacts on the local filesystem.
  *
  * Storage layout (relative to rootPath)
  * - {project}/ids/{id}/input.json
- * - {project}/ids/{id}/output.json
+ * - {project}/ids/{id}/outputs/{sourceName}/{contractName}.json
  * - {project}/tags/{tag}.json (manifest: { id })
  */
 export class LocalStorage {
@@ -118,23 +120,77 @@ export class LocalStorage {
   }
 
   /**
+   * List all contract artifacts associated with a given ID for a project in the local storage.
+   * @param project The project name.
+   * @param id The artifact ID.
+   * @returns The list of contract artifacts with their source names and contract names.
+   */
+  public async listContractArtifactsById(
+    project: string,
+    id: string,
+  ): Promise<
+    {
+      sourceName: string;
+      contractName: string;
+    }[]
+  > {
+    const jsonFilePaths: string[] = [];
+    await this.collectJsonFilePaths(
+      `${this.rootPath}/${project}/ids/${id}/outputs`,
+      jsonFilePaths,
+    );
+    const contractArtifacts: { sourceName: string; contractName: string }[] =
+      [];
+    for (const filePath of jsonFilePaths) {
+      const relativePath = path.relative(
+        `${this.rootPath}/${project}/ids/${id}/outputs`,
+        filePath,
+      );
+      const items = relativePath.split(path.sep);
+      const contractNameWithExtension = items.pop();
+      if (
+        !contractNameWithExtension ||
+        !contractNameWithExtension.endsWith(".json")
+      ) {
+        continue;
+      }
+      if (items.length === 0) {
+        continue;
+      }
+      const sourceName = items.join(path.sep);
+      const contractName = contractNameWithExtension.replace(".json", "");
+      contractArtifacts.push({ sourceName, contractName });
+    }
+    return contractArtifacts;
+  }
+
+  /**
    * Creates an artifact associated with the given ID.
    * @param project The project name.
    * @param id The artifact ID.
    * @param inputArtifact The input artifact content.
-   * @param outputArtifact The output artifact content.
+   * @param contractOutputArtifacts The contract output artifacts content.
    */
   public async createArtifactById(
     project: string,
     id: string,
     inputArtifact: Stream,
-    outputArtifact: Stream,
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[],
   ): Promise<void> {
     const idDir = `${this.rootPath}/${project}/ids/${id}`;
     await fs.mkdir(idDir, { recursive: true });
     await Promise.all([
       fs.writeFile(`${idDir}/input.json`, inputArtifact),
-      fs.writeFile(`${idDir}/output.json`, outputArtifact),
+      ...contractOutputArtifacts.map(({ sourceName, contractName, stream }) => {
+        const contractPath = `${idDir}/outputs/${sourceName}/${contractName}.json`;
+        return fs
+          .mkdir(path.dirname(contractPath), { recursive: true })
+          .then(() => fs.writeFile(contractPath, stream));
+      }),
     ]);
   }
 
@@ -144,16 +200,25 @@ export class LocalStorage {
    * @param tag The tag name.
    * @param id The artifact ID.
    * @param inputArtifact The input artifact content.
-   * @param outputArtifact The output artifact content.
+   * @param contractOutputArtifacts The contract output artifacts content.
    */
   public async createArtifactByTag(
     project: string,
     tag: string,
     id: string,
     inputArtifact: Stream,
-    outputArtifact: Stream,
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[],
   ): Promise<void> {
-    await this.createArtifactById(project, id, inputArtifact, outputArtifact);
+    await this.createArtifactById(
+      project,
+      id,
+      inputArtifact,
+      contractOutputArtifacts,
+    );
     const manifest: TagManifest = { id };
     await fs.writeFile(
       `${this.rootPath}/${project}/tags/${tag}.json`,
@@ -176,20 +241,6 @@ export class LocalStorage {
   }
 
   /**
-   * Retrieves the output artifact associated with the given tag.
-   * @param project The project name.
-   * @param tag The tag name.
-   * @returns The output artifact.
-   */
-  public async retrieveOutputArtifactByTag(
-    project: string,
-    tag: string,
-  ): Promise<EthokoOutputArtifact> {
-    const id = await this.retrieveArtifactId(project, tag);
-    return this.retrieveOutputArtifactById(project, id);
-  }
-
-  /**
    * Retrieves the input artifact associated with the given ID.
    * @param project The project name.
    * @param id The artifact ID.
@@ -208,21 +259,25 @@ export class LocalStorage {
   }
 
   /**
-   * Retrieves the output artifact associated with the given ID.
+   * Retrieves the contract output artifact associated with the given ID, source name and contract name.
    * @param project The project name.
    * @param id The artifact ID.
-   * @returns The output artifact.
+   * @param sourceName The source name of the contract.
+   * @param contractName The contract name.
+   * @returns The contract output artifact.
    */
-  public async retrieveOutputArtifactById(
+  public async retrieveContractOutputArtifactById(
     project: string,
     id: string,
-  ): Promise<EthokoOutputArtifact> {
+    sourceName: string,
+    contractName: string,
+  ): Promise<EthokoContractOutputArtifact> {
     const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/ids/${id}/output.json`,
+      `${this.rootPath}/${project}/ids/${id}/outputs/${sourceName}/${contractName}.json`,
       "utf-8",
     );
     const rawArtifact = JSON.parse(artifactContent);
-    return EthokoOutputArtifactSchema.parse(rawArtifact);
+    return EthokoContractOutputArtifactSchema.parse(rawArtifact);
   }
 
   /**
@@ -278,5 +333,31 @@ export class LocalStorage {
       .stat(path)
       .then(() => true)
       .catch(() => false);
+  }
+
+  private async collectJsonFilePaths(
+    dirPath: string,
+    files: string[],
+  ): Promise<void> {
+    const entries = await this.safeReadDir(dirPath);
+    if (entries.length === 0) {
+      return;
+    }
+    for (const entry of entries) {
+      const entryPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        await this.collectJsonFilePaths(entryPath, files);
+      } else if (entry.isFile() && entry.name.endsWith(".json")) {
+        files.push(entryPath);
+      }
+    }
+  }
+
+  private async safeReadDir(dirPath: string): Promise<Dirent[]> {
+    try {
+      return await fs.readdir(dirPath, { withFileTypes: true });
+    } catch {
+      return [];
+    }
   }
 }

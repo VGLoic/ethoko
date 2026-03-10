@@ -11,5 +11,15 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["./hardhat.config.ts", "./e2e-test/**/*"]
+  "include": ["./hardhat.config.ts", "./e2e-test/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "artifacts",
+    "cache",
+    "lib",
+    "ethoko-storage",
+    ".ethoko",
+    ".ethoko-typings"
+  ]
 }

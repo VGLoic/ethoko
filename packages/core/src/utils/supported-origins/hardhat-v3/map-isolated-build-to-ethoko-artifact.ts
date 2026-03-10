@@ -1,8 +1,8 @@
 import path from "path";
 import {
   EthokoArtifactOrigin,
+  EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 import { deriveEthokoArtifactId } from "@/utils/derive-ethoko-artifact-id";
 import {
@@ -12,11 +12,13 @@ import {
 } from "./helpers";
 
 /**
- * Hardhat v3 will emit pairs of input/output artifacts for each compiled contract.
- * This functions gathers the pairs and transform them into a single Ethoko artifact, by merging the input and output artifacts of each pair.
+ * Hardhat v3 isolated build will emit pairs of input/output artifacts for each compiled contract.
+ * This functions gathers the pairs and creates the merged input and multiple output ethoko artifacts.
  *
  * The first pair is taken as starting point
- * For each additional pair, the input and output artifacts are merged with the current result.
+ * For each additional pair
+ *  - the input artifact sources is merged with the current result,
+ *  - for each contract of the output artifact, we build the associated Ethoko contract output artifact
  *
  * Additionally, Hardhat v3 output artifacts for each contract directly, we also look to these artifacts based on the pairs we tackled.
  * Once found, we register their paths in the original content list
@@ -32,7 +34,7 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
+  outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
   const firstPair = pairs.at(0);
@@ -71,9 +73,9 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
       );
     }
 
-    // Input updates:
+    // Updates from input:
     // - Merge userSourceNameMap
-    // - Merge sources
+    // - Merge input sources
     for (const [userSourceName, sourceName] of Object.entries(
       inputArtifact.userSourceNameMap,
     )) {
@@ -94,9 +96,9 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
     }
 
     const outputArtifact = await readOutputArtifact(pair.output);
-    // Output updates:
-    // - Merge contracts
-    // - Merge sources
+    // Updates from output:
+    // - Merge contracts in output
+    // - Merge sources in output
     for (const [filePath, fileValue] of Object.entries(
       outputArtifact.output.contracts,
     )) {
@@ -129,12 +131,30 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
   }
 
   const ethokoArtifactId = deriveEthokoArtifactId(solcInput);
+  const outputContractArtifacts: EthokoContractOutputArtifact[] = [];
+  for (const [sourceName, contracts] of Object.entries(solcOutput.contracts)) {
+    for (const [contractName, contractOutput] of Object.entries(contracts)) {
+      const relatedSourceObject = solcOutput.sources?.[sourceName];
+      outputContractArtifacts.push({
+        id: ethokoArtifactId,
+        _format: "ethoko-output-v0",
+        contract: contractName,
+        sourceName,
+        output: {
+          contract: contractOutput,
+          source: relatedSourceObject,
+        },
+      });
+    }
+  }
+
   const contractArtifactsPaths = await retrieveHardhatv3ContractArtifactsPaths(
     path.dirname(firstPair.input),
     originPairs.map((p) => p.id),
     userSourceNameMap,
     debug,
   );
+
   return {
     inputArtifact: {
       id: ethokoArtifactId,
@@ -146,11 +166,7 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
       solcLongVersion,
       input: solcInput,
     },
-    outputArtifact: {
-      id: ethokoArtifactId,
-      _format: "ethoko-output-v0",
-      output: solcOutput,
-    },
+    outputContractArtifacts,
     originalContentPaths: pairs
       .flatMap((pair) => [pair.input, pair.output])
       .concat(contractArtifactsPaths),

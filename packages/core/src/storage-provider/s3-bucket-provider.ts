@@ -11,8 +11,8 @@ import { NodeJsClient } from "@smithy/types";
 import { styleText } from "node:util";
 import { LOG_COLORS } from "@/cli-ui/utils";
 import {
+  EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
   TagManifest,
   TagManifestSchema,
 } from "../utils/ethoko-artifacts-schemas/v0";
@@ -48,7 +48,6 @@ export class S3BucketProvider implements StorageProvider {
   /**
    * S3 storage layout (prefix under rootPath)
    * - {project}/ids/{id}/input.json
-   * - {project}/ids/{id}/output.json
    * - {project}/ids/{id}/original/** (original compilation content)
    * - {project}/tags/{tag}.json (manifest: { id })
    */
@@ -286,26 +285,29 @@ export class S3BucketProvider implements StorageProvider {
   public async uploadArtifact(
     project: string,
     inputArtifact: EthokoInputArtifact,
-    outputArtifact: EthokoOutputArtifact,
+    contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
     originalContentPaths: string[],
   ): Promise<void> {
     const client = await this.getClient();
     const inputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/input.json`;
-    const outputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/output.json`;
+    const contractUploads = contractOutputArtifacts.map((contractArtifact) => {
+      const contractKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/outputs/${contractArtifact.sourceName}/${contractArtifact.contract}.json`;
+      return client.send(
+        new PutObjectCommand({
+          Bucket: this.config.bucketName,
+          Key: contractKey,
+          Body: JSON.stringify(contractArtifact),
+        }),
+      );
+    });
     await Promise.all([
+      ...contractUploads,
       client.send(
         new PutObjectCommand({
           Bucket: this.config.bucketName,
           Key: inputKey,
           Body: JSON.stringify(inputArtifact),
-        }),
-      ),
-      client.send(
-        new PutObjectCommand({
-          Bucket: this.config.bucketName,
-          Key: outputKey,
-          Body: JSON.stringify(outputArtifact),
         }),
       ),
     ]);
@@ -344,35 +346,61 @@ export class S3BucketProvider implements StorageProvider {
   public async downloadArtifactById(
     project: string,
     id: string,
-  ): Promise<{ input: Stream; output: Stream }> {
+  ): Promise<{
+    input: Stream;
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[];
+  }> {
     const client = await this.getClient();
     const inputCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
       Key: `${this.rootPath}/${project}/ids/${id}/input.json`,
     });
-    const outputCommand = new GetObjectCommand({
-      Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}/output.json`,
-    });
-    const [inputResult, outputResult] = await Promise.all([
-      client.send(inputCommand),
-      client.send(outputCommand),
-    ]);
-    if (!inputResult.Body || !outputResult.Body) {
+    const inputResult = await client.send(inputCommand);
+    if (!inputResult.Body) {
       throw new Error(
         `Artifact corrupted on remote storage for ID ${id}, requires attention`,
       );
     }
+    const contractArtifacts = await this.listContractOutputArtifacts(
+      project,
+      id,
+    );
+    const contractOutputArtifacts = await Promise.all(
+      contractArtifacts.map(({ sourceName, contractName }) =>
+        this.downloadContractOutputArtifact(
+          project,
+          id,
+          sourceName,
+          contractName,
+        ).then((stream) => ({
+          sourceName,
+          contractName,
+          stream,
+        })),
+      ),
+    );
     return {
       input: inputResult.Body as Stream,
-      output: outputResult.Body as Stream,
+      contractOutputArtifacts,
     };
   }
 
   public async downloadArtifactByTag(
     project: string,
     tag: string,
-  ): Promise<{ id: string; input: Stream; output: Stream }> {
+  ): Promise<{
+    id: string;
+    input: Stream;
+    contractOutputArtifacts: {
+      sourceName: string;
+      contractName: string;
+      stream: Stream;
+    }[];
+  }> {
     const client = await this.getClient();
     const getObjectCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
@@ -409,5 +437,73 @@ export class S3BucketProvider implements StorageProvider {
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return getObjectResult.Body.transformToWebStream() as any;
+  }
+
+  private async downloadContractOutputArtifact(
+    project: string,
+    id: string,
+    sourceName: string,
+    contractName: string,
+  ): Promise<Stream> {
+    const client = await this.getClient();
+    const getObjectCommand = new GetObjectCommand({
+      Bucket: this.config.bucketName,
+      Key: `${this.rootPath}/${project}/ids/${id}/outputs/${sourceName}/${contractName}.json`,
+    });
+    const getObjectResult = await client.send(getObjectCommand);
+    if (!getObjectResult.Body) {
+      throw new Error(
+        `Contract artifact not found for ${sourceName}:${contractName}`,
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return getObjectResult.Body.transformToWebStream() as any;
+  }
+
+  private async listContractOutputArtifacts(
+    project: string,
+    id: string,
+  ): Promise<
+    {
+      sourceName: string;
+      contractName: string;
+    }[]
+  > {
+    const client = await this.getClient();
+    const prefix = `${this.rootPath}/${project}/ids/${id}/outputs/`;
+    const paths: {
+      sourceName: string;
+      contractName: string;
+    }[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: this.config.bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      });
+      const listResult = await client.send(listCommand);
+      const contents = listResult.Contents;
+      if (contents) {
+        for (const content of contents) {
+          const key = content.Key;
+          if (!key) continue;
+          const relativeKey = key.replace(prefix, "");
+          const items = relativeKey.split("/");
+          const contractNameWithExtension = items.pop();
+          if (!contractNameWithExtension) continue;
+          const contractName = contractNameWithExtension.replace(".json", "");
+          if (items.length === 0) continue;
+          const sourceName = items.join("/");
+          paths.push({ sourceName, contractName });
+        }
+      }
+      continuationToken = listResult.IsTruncated
+        ? listResult.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return paths;
   }
 }

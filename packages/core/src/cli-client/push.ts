@@ -204,7 +204,7 @@ export async function push(
     storageProvider.uploadArtifact(
       project,
       ethokoArtifactParsingResult.value.inputArtifact,
-      ethokoArtifactParsingResult.value.outputArtifact,
+      ethokoArtifactParsingResult.value.outputContractArtifacts,
       tag,
       ethokoArtifactParsingResult.value.originalContentPaths,
     ),

@@ -63,7 +63,9 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.id).toBe(artifactId);
         expect(exportResult.contractName).toBe(exportFixture.name);
         expect(exportResult.sourceName).toBe(exportFixture.path);
-        expect(exportResult._format).toBe("ethoko-contract-artifact-v0");
+        expect(exportResult._format).toBe(
+          "exported-ethoko-contract-artifact-v0",
+        );
         expect(exportResult.project).toBe(project);
         expect(exportResult.bytecode.startsWith("0x")).toBe(true);
         expect(exportResult.deployedBytecode.startsWith("0x")).toBe(true);
@@ -129,7 +131,9 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.id).toBe(artifactId);
         expect(exportResult.contractName).toBe(exportFixture.name);
         expect(exportResult.sourceName).toBe(exportFixture.path);
-        expect(exportResult._format).toBe("ethoko-contract-artifact-v0");
+        expect(exportResult._format).toBe(
+          "exported-ethoko-contract-artifact-v0",
+        );
         expect(exportResult.project).toBe(project);
         expect(exportResult.bytecode.startsWith("0x")).toBe(true);
         expect(exportResult.deployedBytecode.startsWith("0x")).toBe(true);

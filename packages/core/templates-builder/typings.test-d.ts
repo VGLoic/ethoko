@@ -1,30 +1,30 @@
 import { assertType, test } from "vitest";
+import type * as EthokoTypings from "./typings";
 import type {
-  EthokoContractArtifact as TypingsEthokoContractArtifact,
-  EthokoBuildInfoInput,
-  EthokoBuildInfoOutput,
-} from "./typings";
-import type {
+  EthokoContractOutputArtifact,
   EthokoInputArtifact,
-  EthokoOutputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
 import { ExportContractArtifactResult } from "@/cli-client";
 
-test("EthokoBuildInfoInput in generated typings is ok with Ethoko artifacts", () => {
-  assertType<EthokoBuildInfoInput>({} as unknown as EthokoInputArtifact);
+test("EthokoInputArtifact in generated typings is ok with Ethoko artifacts", () => {
+  assertType<EthokoTypings.EthokoInputArtifact>(
+    {} as unknown as EthokoInputArtifact,
+  );
 });
-test("EthokoBuildInfoOutput in generated typings is ok with Ethoko artifacts", () => {
-  assertType<EthokoBuildInfoOutput>({} as unknown as EthokoOutputArtifact);
+test("EthokoContractOutputArtifact in generated typings is ok with Ethoko artifacts", () => {
+  assertType<EthokoTypings.EthokoOutputContractArtifact>(
+    {} as unknown as EthokoContractOutputArtifact,
+  );
 });
 
-test("EthokoContractArtifact matches ContractArtifact in typings", () => {
-  assertType<TypingsEthokoContractArtifact>(
+test("ExportContractArtifactResult matches EthokoContractArtifact in typings", () => {
+  assertType<EthokoTypings.EthokoContractArtifact>(
     {} as unknown as ExportContractArtifactResult,
   );
 });
 
 test("EthokoContractArtifact ABI can be narrowed", () => {
-  const artifact = {} as TypingsEthokoContractArtifact<
+  const artifact = {} as EthokoTypings.EthokoContractArtifact<
     readonly [{ readonly type: "function"; readonly name: "increment" }]
   >;
   assertType<

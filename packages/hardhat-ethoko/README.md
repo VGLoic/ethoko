@@ -242,11 +242,11 @@ If typings have been generated from existing projects, the inputs of the utils w
 
 In case there are no projects or the projects have not been pulled, the generated typings are made in such a way that strong typecheck disappears and any string can be used with the helper functions.
 
-### Retrieve input and output compilation artifacts
+### Retrieve input and outputs compilation artifacts
 
-The input and output compilation artifacts of a tag can be retrieved using the `project("doubtful-project").tag("2026-02-02").{getInputCompilationArtifact, getOutputCompilationArtifact}` methods.
+The input and contract outputs compilation artifacts of a tag can be retrieved using the `project("doubtful-project").tag("2026-02-02").{getInputCompilationArtifact, getContractOutputCompilationArtifact}` methods.
 
-The input compilation artifact contains the sources and settings used for compilation, while the output compilation artifact contains the compiled contracts with their bytecode and ABI.
+The input compilation artifact contains the sources and settings used for compilation. There is one output compilation artifact per contract, each containing the ABI, bytecode and metadata for the contract.
 
 ### Example with hardhat-deploy v2
 

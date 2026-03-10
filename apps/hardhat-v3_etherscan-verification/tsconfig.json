@@ -17,5 +17,15 @@
     "./e2e-test/**/*",
     ".ethoko-typings/*",
     "./scripts/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "artifacts",
+    "cache",
+    "lib",
+    "ethoko-storage",
+    ".ethoko",
+    ".ethoko-typings"
   ]
 }

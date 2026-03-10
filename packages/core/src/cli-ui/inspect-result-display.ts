@@ -20,19 +20,6 @@ export function displayInspectResult(
   summaryLines.push(
     styleText(LOG_COLORS.log, `Origin: ${originToLabel(result.origin)}`),
   );
-  // One line for input and one line for output, since they can differ significantly in size and path
-  summaryLines.push(
-    styleText(
-      LOG_COLORS.log,
-      `Input artifact: ${result.artifacts.input.path} (${formatBytes(result.artifacts.input.size)})`,
-    ),
-  );
-  summaryLines.push(
-    styleText(
-      LOG_COLORS.log,
-      `Output artifact: ${result.artifacts.output.path} (${formatBytes(result.artifacts.output.size)})`,
-    ),
-  );
   summaryLines.push("");
   summaryLines.push(styleText(["bold", LOG_COLORS.log], "Compiler Settings:"));
   summaryLines.push(
@@ -87,18 +74,6 @@ export function displayInspectResultJson(
 ): void {
   if (silent) return;
   console.error(JSON.stringify(result, null, 2));
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  const kb = bytes / 1024;
-  if (kb < 1024) {
-    return `${kb.toFixed(1)} KB`;
-  }
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
 }
 
 function countContracts(result: InspectResult): number {

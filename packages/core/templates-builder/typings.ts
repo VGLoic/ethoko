@@ -123,7 +123,7 @@ export function project<TProject extends Project>(project: TProject) {
      * const v1_3_1Utils = project("my-project").tag("v1.3.1");
      * const availableContracts = v1_3_1Utils.getAvailableContracts();
      * const inputCompilationArtifact = await v1_3_1Utils.getInputCompilationArtifact();
-     * const outputCompilationArtifact = await v1_3_1Utils.getOutputCompilationArtifact();
+     * const contractOutputCompilationArtifact = await v1_3_1Utils.getContractOutputCompilationArtifact("src/IncrementOracle.sol:IncrementOracle");
      * const incrementOracleArtifact = await v1_3_1Utils.getContractArtifact("src/IncrementOracle.sol:IncrementOracle");
      * ```
      */
@@ -173,14 +173,26 @@ export function project<TProject extends Project>(project: TProject) {
         getInputCompilationArtifact() {
           return getInputCompilationArtifact(project, tag as string);
         },
-        getOutputCompilationArtifact() {
-          return getOutputCompilationArtifact(project, tag as string);
+        getContractOutputCompilationArtifact(
+          contractKey: AvailableContractForTag<TProject, TTag>,
+        ) {
+          return getContractOutputCompilationArtifact(
+            project,
+            tag as string,
+            contractKey as string,
+          );
         },
         getInputCompilationArtifactSync() {
           return getInputCompilationArtifactSync(project, tag as string);
         },
-        getOutputCompilationArtifactSync() {
-          return getOutputCompilationArtifactSync(project, tag as string);
+        getContractOutputCompilationArtifactSync(
+          contractKey: AvailableContractForTag<TProject, TTag>,
+        ) {
+          return getContractOutputCompilationArtifactSync(
+            project,
+            tag as string,
+            contractKey as string,
+          );
         },
       };
     },
@@ -192,18 +204,17 @@ async function getArtifact(
   tag: string,
   contractKey: string,
 ): Promise<EthokoContractArtifact> {
-  const buildInfoOutputResult = await toAsyncResult(
-    getOutputCompilationArtifact(project, tag),
+  const contractArtifactResult = await toAsyncResult(
+    getContractOutputCompilationArtifact(project, tag, contractKey),
   );
-  if (!buildInfoOutputResult.success) {
-    throw buildInfoOutputResult.error;
+  if (!contractArtifactResult.success) {
+    throw contractArtifactResult.error;
   }
 
-  return buildInfoToContractArtifact(
+  return contractOutputArtifactToExportedArtifact(
     project,
     tag,
-    contractKey,
-    buildInfoOutputResult.value,
+    contractArtifactResult.value,
   );
 }
 
@@ -212,74 +223,52 @@ function getArtifactSync(
   tag: string,
   contractKey: string,
 ): EthokoContractArtifact {
-  const buildInfoOutput = getOutputCompilationArtifactSync(project, tag);
-
-  return buildInfoToContractArtifact(
+  const contractArtifact = getContractOutputCompilationArtifactSync(
     project,
     tag,
     contractKey,
-    buildInfoOutput,
+  );
+
+  return contractOutputArtifactToExportedArtifact(
+    project,
+    tag,
+    contractArtifact,
   );
 }
 
-function buildInfoToContractArtifact(
+function contractOutputArtifactToExportedArtifact(
   project: string,
   tag: string,
-  contractKey: string,
-  buildInfoOutput: EthokoBuildInfoOutput,
+  contractArtifact: EthokoOutputContractArtifact,
 ): EthokoContractArtifact {
-  const contractPieces = contractKey.split(":");
-  const contractName = contractPieces.at(-1);
-  if (!contractName) {
-    throw new Error(
-      `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
-    );
-  }
-  const contractPath = contractPieces.at(0);
-  if (!contractPath) {
-    throw new Error(
-      `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
-    );
-  }
-  const output = buildInfoOutput.output;
-  if (!output) {
-    throw new Error(
-      `Contracts output not found for artifact ${project}:${tag}`,
-    );
-  }
-  const contractPathContracts = output.contracts[contractPath];
-  if (!contractPathContracts) {
-    throw new Error(
-      `Contract artifact not found for contract key: ${contractKey} with artifact ${project}:${tag}`,
-    );
-  }
-  const contractArtifact = contractPathContracts[contractName];
-  if (!contractArtifact) {
-    throw new Error(
-      `Contract artifact not found for contract key: ${contractKey} with artifact ${project}:${tag}`,
-    );
-  }
   return {
     tag,
-    _format: "ethoko-contract-artifact-v0",
-    id: buildInfoOutput.id,
+    _format: "exported-ethoko-contract-artifact-v0",
+    id: contractArtifact.id,
     project,
-    abi: contractArtifact.abi,
-    metadata: contractArtifact.metadata || "",
-    bytecode: prefixWith0x(contractArtifact.evm.bytecode.object),
-    deployedBytecode: contractArtifact.evm.deployedBytecode?.object
-      ? prefixWith0x(contractArtifact.evm.deployedBytecode.object)
+    abi: contractArtifact.output.contract.abi,
+    metadata: contractArtifact.output.contract.metadata || "",
+    bytecode: prefixWith0x(
+      contractArtifact.output.contract.evm.bytecode.object,
+    ),
+    deployedBytecode: contractArtifact.output.contract.evm.deployedBytecode
+      ?.object
+      ? prefixWith0x(
+          contractArtifact.output.contract.evm.deployedBytecode.object,
+        )
       : "0x",
-    linkReferences: contractArtifact.evm.bytecode.linkReferences,
-    deployedLinkReferences: contractArtifact.evm.deployedBytecode
-      ? contractArtifact.evm.deployedBytecode.linkReferences
+    linkReferences:
+      contractArtifact.output.contract.evm.bytecode.linkReferences,
+    deployedLinkReferences: contractArtifact.output.contract.evm
+      .deployedBytecode
+      ? contractArtifact.output.contract.evm.deployedBytecode.linkReferences
       : {},
-    contractName,
-    sourceName: contractPath,
-    userdoc: contractArtifact.userdoc,
-    devdoc: contractArtifact.devdoc,
-    storageLayout: contractArtifact.storageLayout,
-    evm: contractArtifact.evm,
+    contractName: contractArtifact.contract,
+    sourceName: contractArtifact.sourceName,
+    userdoc: contractArtifact.output.contract.userdoc,
+    devdoc: contractArtifact.output.contract.devdoc,
+    storageLayout: contractArtifact.output.contract.storageLayout,
+    evm: contractArtifact.output.contract.evm,
   };
 }
 
@@ -289,15 +278,18 @@ function prefixWith0x(s: string): `0x${string}` {
 }
 
 /**
- * Get a compilation artifact output
+ * Get a contract output compilation artifact
  * @param project Related project
  * @param tag Tag of the compilation
- * @returns The compilation artifact output
+ * @param contractKey Key of the contract formatted as "path/to/Contract.sol:Contract"
+ * @returns The contract output compilation artifact
+ * @throws If the artifact is not found or if the contract key is invalid
  */
-async function getOutputCompilationArtifact(
+async function getContractOutputCompilationArtifact(
   project: string,
   tag: string,
-): Promise<EthokoBuildInfoOutput> {
+  contractKey: string,
+): Promise<EthokoOutputContractArtifact> {
   const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
   const buildInfoExists = await fs.stat(manifestPath).catch(() => false);
   if (!buildInfoExists) {
@@ -312,53 +304,79 @@ async function getOutputCompilationArtifact(
   }
   const manifest = manifestContentResult.value as { id: string };
 
-  const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
-
-  const outputResult = await toAsyncResult(
-    fs.readFile(outputPath, "utf-8").then(JSON.parse),
-  );
-
-  if (!outputResult.success) {
-    console.error(outputResult.error);
-    throw outputResult.error;
+  const contractPieces = contractKey.split(":");
+  const contractName = contractPieces.at(-1);
+  if (!contractName) {
+    throw new Error(
+      `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
+    );
+  }
+  const contractPath = contractPieces.at(0);
+  if (!contractPath) {
+    throw new Error(
+      `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
+    );
   }
 
-  return {
-    id: manifest.id,
-    _format: outputResult.value._format,
-    output: outputResult.value.output,
-  };
+  const contractOutputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/outputs/${contractPath}/${contractName}.json`;
+
+  const contractOutputResult = await toAsyncResult(
+    fs.readFile(contractOutputPath, "utf-8").then(JSON.parse),
+  );
+
+  if (!contractOutputResult.success) {
+    console.error(contractOutputResult.error);
+    throw contractOutputResult.error;
+  }
+
+  return contractOutputResult.value as EthokoOutputContractArtifact;
 }
 
 /**
- * Get a compilation artifact output
+ * Get a contract output compilation artifact
  * @param project Related project
  * @param tag Tag of the compilation
- * @returns The compilation artifact output
+ * @param contractKey Key of the contract formatted as "path/to/Contract.sol:Contract"
+ * @returns The contract output compilation artifact
+ * @throws If the artifact is not found or if the contract key is invalid
  */
-function getOutputCompilationArtifactSync(
+function getContractOutputCompilationArtifactSync(
   project: string,
   tag: string,
-): EthokoBuildInfoOutput {
+  contractKey: string,
+): EthokoOutputContractArtifact {
+  const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
   try {
-    fsSync.statSync(`${ETHOKO_PATH}/${project}/tags/${tag}.json`);
+    fsSync.statSync(manifestPath);
   } catch {
     throw new Error(`artifact not found for "${project}:${tag}". Skipping`);
   }
-
   try {
-    const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
     const manifestContent = fsSync.readFileSync(manifestPath, "utf-8");
     const manifest = JSON.parse(manifestContent) as { id: string };
 
-    const outputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/output.json`;
-    const outputContent = fsSync.readFileSync(outputPath, "utf-8");
-    const output = JSON.parse(outputContent);
-    return {
-      id: manifest.id,
-      _format: output._format,
-      output: output.output,
-    };
+    const contractPieces = contractKey.split(":");
+    const contractName = contractPieces.at(-1);
+    if (!contractName) {
+      throw new Error(
+        `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
+      );
+    }
+    const contractPath = contractPieces.at(0);
+    if (!contractPath) {
+      throw new Error(
+        `Invalid contract key: ${contractKey}. Expected format: "path/to/Contract.sol:Contract"`,
+      );
+    }
+
+    const contractOutputPath = `${ETHOKO_PATH}/${project}/ids/${manifest.id}/outputs/${contractPath}/${contractName}.json`;
+
+    const contractOutputContent = fsSync.readFileSync(
+      contractOutputPath,
+      "utf-8",
+    );
+    const contractOutput = JSON.parse(contractOutputContent);
+    return contractOutput as EthokoOutputContractArtifact;
   } catch (e) {
     console.error(e);
     throw e;
@@ -374,7 +392,7 @@ function getOutputCompilationArtifactSync(
 async function getInputCompilationArtifact(
   project: string,
   tag: string,
-): Promise<EthokoBuildInfoInput> {
+): Promise<EthokoInputArtifact> {
   const manifestPath = `${ETHOKO_PATH}/${project}/tags/${tag}.json`;
   const buildInfoExists = await fs.stat(manifestPath).catch(() => false);
   if (!buildInfoExists) {
@@ -418,7 +436,7 @@ async function getInputCompilationArtifact(
 function getInputCompilationArtifactSync(
   project: string,
   tag: string,
-): EthokoBuildInfoInput {
+): EthokoInputArtifact {
   try {
     fsSync.statSync(`${ETHOKO_PATH}/${project}/tags/${tag}.json`);
   } catch {
@@ -497,17 +515,22 @@ type EthokoArtifactOrigin =
         outputFormat: string;
       }>;
     };
-export interface EthokoBuildInfoInput {
+export interface EthokoInputArtifact {
   id: string;
   _format: "ethoko-input-v0";
   solcLongVersion: string;
   origin: EthokoArtifactOrigin;
   input: CompilerInput;
 }
-export interface EthokoBuildInfoOutput {
+export interface EthokoOutputContractArtifact {
   id: string;
   _format: "ethoko-output-v0";
-  output: CompilerOutput;
+  sourceName: string;
+  contract: string;
+  output: {
+    contract: CompilerOutputContract;
+    source?: CompilerOutputSource;
+  };
 }
 
 interface CompilerInput {
@@ -516,7 +539,7 @@ interface CompilerInput {
   settings?: InputSettings;
 }
 
-type InputSource = {
+interface InputSource {
   license?: string;
   keccak256?: string;
   urls?: string[];
@@ -527,7 +550,7 @@ type InputSource = {
     ".data"?: Record<string, unknown>;
     sourceList?: string[];
   };
-};
+}
 
 interface InputSettings {
   stopAfter?: string;
@@ -546,20 +569,6 @@ interface OptimizerSettings {
   enabled?: boolean;
   runs?: number;
   details?: unknown;
-}
-
-interface CompilerOutput {
-  errors?: unknown[];
-  sources?: CompilerOutputSources;
-  contracts: {
-    [sourceName: string]: {
-      [contractName: string]: CompilerOutputContract;
-    };
-  };
-}
-
-interface CompilerOutputSources {
-  [sourceName: string]: CompilerOutputSource;
 }
 
 interface CompilerOutputSource {
@@ -628,9 +637,9 @@ export interface EthokoContractArtifact<
    */
   readonly tag: string | null;
   /**
-   * Format, hardcoded to `ethoko-contract-artifact-v0` for now
+   * Format, hardcoded to `exported-ethoko-contract-artifact-v0` for now
    */
-  readonly _format: "ethoko-contract-artifact-v0";
+  readonly _format: "exported-ethoko-contract-artifact-v0";
   /**
    * Ethoko artifact ID
    */

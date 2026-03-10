@@ -38,7 +38,7 @@ const ErrorSchema = z.object({
   formattedMessage: z.string().optional(),
 });
 
-const OutputSourceSchema = z.object({
+export const OutputSourceSchema = z.object({
   // Identifier of the source (used in source maps)
   id: z.number(),
   // The AST object

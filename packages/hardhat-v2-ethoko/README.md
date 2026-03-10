@@ -247,9 +247,9 @@ In case there are no projects or the projects have not been pulled, the generate
 
 ### Retrieve full compilation artifact
 
-The input and output compilation artifacts of a tag can be retrieved using the `project("doubtful-project").tag("2026-02-02").{getInputCompilationArtifact, getOutputCompilationArtifact}` methods.
+The input and contract outputs compilation artifacts of a tag can be retrieved using the `project("doubtful-project").tag("2026-02-02").{getInputCompilationArtifact, getContractOutputCompilationArtifact}` methods.
 
-The input compilation artifact contains the sources and settings used for compilation, while the output compilation artifact contains the compiled contracts with their bytecode and ABI.
+The input compilation artifact contains the sources and settings used for compilation. There is one output compilation artifact per contract, each containing the ABI, bytecode and metadata for the contract.
 
 ### Example with hardhat-deploy v0
 

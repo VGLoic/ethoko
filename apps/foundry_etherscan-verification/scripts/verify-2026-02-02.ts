@@ -1,5 +1,5 @@
 import SepoliaDeployedAddresses from "./../ignition/deployments/chain-11155111/deployed_addresses.json" with { type: "json" };
-import { EthokoBuildInfoInput, project } from "./../.ethoko-typings/index.js";
+import { EthokoInputArtifact, project } from "./../.ethoko-typings/index.js";
 import "dotenv/config";
 
 const DEPLOYER_ADDRESS = "0x25371B936fD45e67F00dfEa1cd6A3e77105DD0FA";
@@ -69,8 +69,8 @@ async function main() {
 }
 
 function patchInputSources(
-  input: EthokoBuildInfoInput["input"],
-): EthokoBuildInfoInput["input"] {
+  input: EthokoInputArtifact["input"],
+): EthokoInputArtifact["input"] {
   const updatedSources: Record<string, { content: string }> = {};
   for (const [key, source] of Object.entries(input.sources)) {
     const content = source.content;

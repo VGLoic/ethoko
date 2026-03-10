@@ -1,6 +1,6 @@
 import {
   EthokoInputArtifact,
-  EthokoOutputArtifact,
+  EthokoContractOutputArtifact,
 } from "../ethoko-artifacts-schemas/v0";
 import { mapForgeV1DefaultArtifactToEthokoArtifact } from "./forge-v1/map-default-to-ethoko-artifact";
 import { mapForgeV1FullBuildInfoToEthokoArtifact } from "./forge-v1/map-full-build-info-to-ethoko-artifact";
@@ -41,7 +41,7 @@ export function mapOriginalArtifactToEthokoArtifact(
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
-  outputArtifact: EthokoOutputArtifact;
+  outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContentPaths: string[];
 }> {
   if (paths.format === "hardhat-v3") {

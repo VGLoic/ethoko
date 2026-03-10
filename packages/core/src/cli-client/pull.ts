@@ -186,7 +186,7 @@ export async function pull(
           tag,
           downloadResult.value.id,
           downloadResult.value.input,
-          downloadResult.value.output,
+          downloadResult.value.contractOutputArtifacts,
         ),
         { debug: opts.debug },
       );
@@ -238,7 +238,7 @@ export async function pull(
           project,
           id,
           downloadResult.value.input,
-          downloadResult.value.output,
+          downloadResult.value.contractOutputArtifacts,
         ),
         { debug: opts.debug },
       );
