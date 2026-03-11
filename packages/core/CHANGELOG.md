@@ -1,5 +1,20 @@
 # @ethoko/core
 
+## 0.9.0
+
+### Minor Changes
+
+- 3f487b9: Support null gasEstimates field
+- 29aced9: Update typings to favor nodenext target
+- ed133f0: Generated typings generates constant for ABIs, helping for strong typing of the ABIs
+- 1b5026a: Complete the export command output and the `EthokoContractArtifact` in typings with the `expandedMetada`. This is a parsed version of the `metadata` field, the `sources` are completed with the `content` found in the `input` artifact.
+- 2aec2db: The handling of Hardhat v3 artifacts with multiple build info pairs is fixed
+- 2154b28: The enumeration in the step tracking CLI message has been removed
+- adc4cc7: Decouple retrieval methods for compilation input and output
+- 0e9ed15: Distinguish isolated from non isolated builds in Hardhat v3
+- c8fb6f3: Important changes have been done on the way to store the output compilation artifact. Previously, one single artifact contained the whole output. It has been migrated to one artifact per contract.
+- e522639: Allow to use default AWS credentials chain
+
 ## 0.8.0
 
 ### Minor Changes
