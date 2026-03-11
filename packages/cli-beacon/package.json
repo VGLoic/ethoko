@@ -38,6 +38,7 @@
   "scripts": {
     "build": "tsup",
     "build:binary": "bun scripts/build-binary.ts",
+    "publish-cli": "bun scripts/publish-cli.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src/**/*.ts",
     "check-format": "prettier --check src/**/*.ts",

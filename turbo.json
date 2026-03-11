@@ -21,7 +21,8 @@
       ]
     },
     "lint": {
-      "dependsOn": ["build", "^lint"]
+      "dependsOn": ["build", "^lint"],
+      "env": ["NPM_TOKEN"]
     },
     "format": {
       "dependsOn": ["^format"]

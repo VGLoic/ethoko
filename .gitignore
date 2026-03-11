@@ -30,6 +30,7 @@ out/
 build
 dist
 packages/cli-beacon/binaries/
+packages/tmp/
 
 
 # Ethoko
