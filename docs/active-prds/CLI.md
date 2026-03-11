@@ -1,7 +1,7 @@
 # Product Requirements Document: Ethoko Standalone CLI
 
-**Document Version:** 1.0  
-**Last Updated:** March 9, 2026  
+**Document Version:** 1.1  
+**Last Updated:** March 11, 2026  
 **Status:** Draft - Ready for Implementation  
 **Owner:** Engineering Team
 
@@ -11,7 +11,7 @@
 
 ### Overview
 
-Create a standalone `@ethoko/cli` tool that enables Foundry users and CI/CD pipelines to use Ethoko without requiring Hardhat installation. The CLI will be distributed as both an npm package and standalone binaries.
+Create a standalone Ethoko CLI tool that enables Foundry users and CI/CD pipelines to use Ethoko without requiring Hardhat installation. The CLI uses a **Beacon Pattern**: `@ethoko/cli-beacon` is the source package (managed by Changesets), while `@ethoko/cli` is a generated wrapper that resolves platform-specific binaries via `optionalDependencies`.
 
 ### Goals
 
@@ -21,23 +21,26 @@ Create a standalone `@ethoko/cli` tool that enables Foundry users and CI/CD pipe
 
 ### Key Decisions
 
-| Decision          | Choice                                  |
-| ----------------- | --------------------------------------- |
-| CLI Framework     | Commander.js                            |
-| Config Format     | JSON only (`ethoko.json`)               |
-| Binary Compiler   | Bun (`bun build --compile`)             |
-| Release Cadence   | Automatic with every Changesets release |
-| Platform Packages | Public on npm                           |
-| Versioning        | Independent from `@ethoko/core`         |
+| Decision           | Choice                                                                          |
+| ------------------ | ------------------------------------------------------------------------------- |
+| CLI Framework      | Commander.js                                                                    |
+| Config Format      | JSON only (`ethoko.json`)                                                       |
+| Binary Compiler    | Bun (`bun build --compile`)                                                     |
+| Distribution Model | Beacon Pattern (`@ethoko/cli-beacon` source + generated `@ethoko/cli` wrapper)  |
+| Release Cadence    | Automatic with every Changesets release of `@ethoko/cli-beacon`                 |
+| Platform Packages  | Public on npm (generated at publish time, not committed)                        |
+| Versioning         | Independent from `@ethoko/core`; `@ethoko/cli-beacon` starts at `0.1.1`         |
+| Node.js Fallback   | None — wrapper errors if binary not found; use `@ethoko/cli-beacon` for Node.js |
 
 ### Success Criteria
 
 - All 8 commands work identically to Hardhat plugin
 - Binaries build for 5 platforms (Linux x64/arm64, macOS x64/arm64, Windows x64)
-- npm installation works: `npm install -g @ethoko/cli`
+- npm installation works: `npm install -g @ethoko/cli` (resolves platform binary automatically)
 - Curl installation works: `curl -fsSL https://...install.sh | bash`
 - Zero breaking changes to existing Hardhat users
-- GitHub Actions automatically releases binaries with npm publish
+- GitHub Actions automatically builds binaries and publishes all packages when `@ethoko/cli-beacon` is released
+- Integration test apps use `@ethoko/cli-beacon` (Node.js mode) for E2E testing
 
 ---
 
@@ -157,22 +160,51 @@ ethoko push --tag v1.0.0
 
 ### What We're Building
 
-Standalone CLI package (`@ethoko/cli`) with:
+Two npm packages following the **Beacon Pattern**:
 
-- 8 commands matching Hardhat plugin functionality
-- JSON configuration file (`ethoko.config.json`)
-- Multiple distribution methods (npm, binary, GitHub Releases)
-- Cross-platform support (Linux, macOS, Windows)
+**1. `@ethoko/cli-beacon` (Source Package)**
+
+- Contains all CLI source code (8 commands, config system, Commander.js)
+- Managed by Changesets (versioning, changelogs, npm publish)
+- Can be installed directly for Node.js execution (`npx @ethoko/cli-beacon push ...`)
+- Lives in `packages/cli-beacon/` in the monorepo
+- Integration test apps depend on this package via `workspace:*`
+
+**2. `@ethoko/cli` (Generated Wrapper Package)**
+
+- Thin wrapper (~15 lines) with `bin/ethoko` that resolves the platform binary via `require.resolve`
+- Has `optionalDependencies` on 5 platform packages (`@ethoko/cli-{os}-{arch}`)
+- Generated at publish time by `scripts/publish-cli.ts` — NOT committed to git
+- This is what end-users install: `npm install -g @ethoko/cli`
+- No Node.js fallback — errors if binary not found
+
+**3. `@ethoko/cli-{os}-{arch}` (5 Generated Platform Packages)**
+
+- Each contains a single Bun-compiled binary for one platform
+- Generated at publish time alongside `@ethoko/cli`
+- npm's `os`/`cpu` fields ensure only the matching package is installed
 
 ### Architecture Principle
 
 ```
-Current:
-  hardhat-ethoko (wrapper) → @ethoko/core (business logic)
+Source (committed, Changesets-managed):
+  @ethoko/cli-beacon (packages/cli-beacon/)
+    ├── src/commands/*.ts → @ethoko/core (business logic)
+    ├── scripts/build-binary.ts → 5 Bun binaries
+    └── scripts/publish-cli.ts → generates:
 
-New:
-  @ethoko/cli (wrapper) → @ethoko/core (business logic)
-  hardhat-ethoko (unchanged) → @ethoko/core (business logic)
+Generated (at publish time, not committed):
+  @ethoko/cli (wrapper)
+    ├── bin/ethoko (require.resolve → platform binary)
+    └── optionalDependencies:
+        ├── @ethoko/cli-darwin-arm64
+        ├── @ethoko/cli-darwin-x64
+        ├── @ethoko/cli-linux-arm64
+        ├── @ethoko/cli-linux-x64
+        └── @ethoko/cli-windows-x64
+
+Unchanged:
+  hardhat-ethoko → @ethoko/core (business logic)
 ```
 
 **Key Insight:** `@ethoko/core` has ZERO Hardhat dependencies. All business logic already extracted.
@@ -191,15 +223,15 @@ New:
 
 ### Package Structure
 
-#### New Packages (7 total)
+#### Source Package: `@ethoko/cli-beacon`
 
-**1. `@ethoko/cli` (Main Package)**
+Lives in the monorepo at `packages/cli-beacon/`. Managed by Changesets. Published to npm for changelog tracking. Can be installed directly for Node.js execution.
 
 ```
-packages/cli/
+packages/cli-beacon/
 ├── src/
 │   ├── index.ts              # Commander.js entry point
-│   ├── config.ts             # Load ethoko.config.json
+│   ├── config.ts             # Load ethoko.json
 │   ├── commands/
 │   │   ├── push.ts
 │   │   ├── pull.ts
@@ -211,19 +243,37 @@ packages/cli/
 │   │   └── restore.ts
 │   └── utils/
 │       └── storage-provider.ts  # Factory for LocalStorage/S3
-├── bin/
-│   └── ethoko               # Node.js wrapper script
 ├── scripts/
-│   ├── build-binary.ts      # Bun build script
-│   └── publish-binary.ts    # Generate + publish platform packages
-├── package.json
+│   ├── build-binary.ts      # Bun build script (5 platform binaries)
+│   └── publish-cli.ts       # Generate + publish @ethoko/cli and platform packages
+├── package.json             # name: "@ethoko/cli-beacon"
 ├── tsup.config.ts
 └── README.md
 ```
 
-**2-6. Platform Binary Packages (Generated)**
+#### Generated Packages (not committed to git)
 
-Platform packages are generated during publishing into `packages/cli/dist/` and are not committed to git.
+The following packages are generated at publish time by `scripts/publish-cli.ts`. They are written to a temporary directory, published to npm, and never committed.
+
+**`@ethoko/cli` (Wrapper)**
+
+```
+@ethoko/cli/
+├── package.json             # bin, optionalDependencies
+└── bin/
+    └── ethoko               # Node.js wrapper (~15 lines, require.resolve)
+```
+
+**`@ethoko/cli-{os}-{arch}` (5 Platform Packages)**
+
+```
+@ethoko/cli-darwin-arm64/
+├── package.json             # os: ["darwin"], cpu: ["arm64"]
+└── bin/
+    └── ethoko               # Bun-compiled binary
+```
+
+Repeat for: `cli-darwin-x64`, `cli-linux-arm64`, `cli-linux-x64`, `cli-windows-x64`
 
 ---
 
@@ -237,34 +287,40 @@ npm install -g @ethoko/cli
 
 **Flow:**
 
-1. npm installs `@ethoko/cli` package
-2. npm resolves `optionalDependencies` → installs platform-specific package
-3. Wrapper script (`bin/ethoko`) detects platform → executes binary
+1. npm installs `@ethoko/cli` wrapper package
+2. npm resolves `optionalDependencies` → installs platform-specific binary package
+3. Wrapper script (`bin/ethoko`) uses `require.resolve` to find the platform binary → executes it
 
-**Implementation:**
+**Generated `@ethoko/cli/package.json`:**
 
 ```json
-// packages/cli/package.json
 {
+  "name": "@ethoko/cli",
+  "version": "0.1.1",
+  "description": "Ethoko CLI - Standalone tool for smart-contract artifact management",
   "bin": {
     "ethoko": "./bin/ethoko"
   },
   "optionalDependencies": {
-    "@ethoko/cli-linux-x64": "^0.1.0",
-    "@ethoko/cli-linux-arm64": "^0.1.0",
-    "@ethoko/cli-darwin-x64": "^0.1.0",
-    "@ethoko/cli-darwin-arm64": "^0.1.0",
-    "@ethoko/cli-windows-x64": "^0.1.0"
+    "@ethoko/cli-linux-x64": "0.1.1",
+    "@ethoko/cli-linux-arm64": "0.1.1",
+    "@ethoko/cli-darwin-x64": "0.1.1",
+    "@ethoko/cli-darwin-arm64": "0.1.1",
+    "@ethoko/cli-windows-x64": "0.1.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VGLoic/ethoko-monorepo"
   }
 }
 ```
 
+**Generated Wrapper Script (`bin/ethoko`):**
+
 ```javascript
-// packages/cli/bin/ethoko (Node.js wrapper)
 #!/usr/bin/env node
 const { spawnSync } = require("child_process");
-const { join } = require("path");
-const { existsSync } = require("fs");
 const os = require("os");
 
 const platformMap = { darwin: "darwin", linux: "linux", win32: "windows" };
@@ -278,33 +334,37 @@ if (!platform || !arch) {
   process.exit(1);
 }
 
-const packageName = `@ethoko/cli-${platform}-${arch}`;
 const binaryName = platform === "windows" ? "ethoko.exe" : "ethoko";
 
-function findBinary(startDir) {
-  let current = startDir;
-  while (true) {
-    const nodeModules = join(current, "node_modules");
-    if (existsSync(nodeModules)) {
-      const candidate = join(nodeModules, packageName, "bin", binaryName);
-      if (existsSync(candidate)) return candidate;
-    }
-    const parent = join(current, "..");
-    if (parent === current) break;
-    current = parent;
-  }
-  return null;
-}
-
-const binary = findBinary(__dirname);
-if (!binary) {
-  console.error(`Binary not found for ${platform}-${arch}. Reinstall @ethoko/cli.`);
+let binaryPath;
+try {
+  binaryPath = require.resolve(
+    `@ethoko/cli-${platform}-${arch}/bin/${binaryName}`,
+  );
+} catch {
+  console.error(
+    `Could not find Ethoko binary for ${os.platform()}-${os.arch()}.\n` +
+      `The platform package @ethoko/cli-${platform}-${arch} is not installed.\n` +
+      `Try reinstalling: npm install -g @ethoko/cli`,
+  );
   process.exit(1);
 }
 
-const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
+const result = spawnSync(binaryPath, process.argv.slice(2), {
+  stdio: "inherit",
+});
 process.exit(result.status ?? 1);
 ```
+
+**Key design decisions:**
+
+- Uses `require.resolve` instead of walking `node_modules` — simpler, works with all package managers
+- No Node.js fallback — if binary not found, errors with actionable message
+- Users who need Node.js execution install `@ethoko/cli-beacon` directly
+
+**For development / integration tests:**
+
+Integration test apps depend on `@ethoko/cli-beacon: "workspace:*"` and run CLI commands via Node.js directly (no binary needed during development).
 
 ---
 
@@ -337,7 +397,7 @@ Every release uploads 5 binaries:
 - `ethoko-windows-x64.exe`
 
 **Release Tag Format:** `cli-v{version}`  
-**Example:** `cli-v0.1.0`
+**Example:** `cli-v0.1.1`
 
 ---
 
@@ -762,25 +822,45 @@ All commands support:
 
 ## 7. Distribution Strategy
 
-### 7.1 npm Distribution
+### 7.1 npm Distribution (Beacon Pattern)
 
-**Package:** `@ethoko/cli`  
 **Registry:** npmjs.com  
-**Visibility:** Public
+**Visibility:** All packages public
+
+The npm distribution uses the **Beacon Pattern** — two published packages with distinct roles:
+
+**`@ethoko/cli-beacon` (Source Package)**
+
+- Published by Changesets as part of the normal release flow
+- Contains CLI source code compiled to JS (`dist/index.js`)
+- Can be installed directly for Node.js execution: `npx @ethoko/cli-beacon push ...`
+- Developers and integration test apps use this package
+- Starts at version `0.1.1`
+
+**`@ethoko/cli` (Generated Wrapper Package)**
+
+- Generated and published by `scripts/publish-cli.ts` AFTER `@ethoko/cli-beacon` is published
+- Contains only `bin/ethoko` wrapper script + `optionalDependencies`
+- This is the primary user-facing package
+- Version mirrors `@ethoko/cli-beacon` version
+- The existing `@ethoko/cli@0.1.0` on npm will be deprecated; generated versions start at the next available version
 
 **Installation:**
 
 ```bash
-# Global installation
+# End-users: binary execution (recommended)
 npm install -g @ethoko/cli
 pnpm add -g @ethoko/cli
 yarn global add @ethoko/cli
 
-# Local installation (CI/CD)
+# End-users: local project (CI/CD)
 npm install --save-dev @ethoko/cli
+
+# Developers: Node.js execution (no binary needed)
+npm install -g @ethoko/cli-beacon
 ```
 
-**Platform Packages:** All public on npm (generated during publish)
+**Platform Packages:** All public on npm (generated at publish time, not committed)
 
 - `@ethoko/cli-linux-x64`
 - `@ethoko/cli-linux-arm64`
@@ -790,8 +870,9 @@ npm install --save-dev @ethoko/cli
 
 **Version Strategy:** Independent from `@ethoko/core`
 
-- `@ethoko/cli` depends on `@ethoko/core` with `^` range
-- Example: `@ethoko/cli@0.1.0` depends on `@ethoko/core@^0.8.0`
+- `@ethoko/cli-beacon` depends on `@ethoko/core` with `^` range
+- Example: `@ethoko/cli-beacon@0.1.1` depends on `@ethoko/core@^0.8.0`
+- `@ethoko/cli` and platform packages mirror `@ethoko/cli-beacon` version
 
 ---
 
@@ -828,7 +909,7 @@ ETHOKO_INSTALL_DIR=/usr/local curl -fsSL https://...install.sh | bash
 
 **Repository:** `VGLoic/ethoko-monorepo`  
 **Release Tag Format:** `cli-v{version}`  
-**Example:** `cli-v0.1.0`
+**Example:** `cli-v0.1.1`
 
 **Release Assets:**
 
@@ -844,10 +925,10 @@ ETHOKO_INSTALL_DIR=/usr/local curl -fsSL https://...install.sh | bash
 
 ```bash
 # Linux x64
-curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.0/ethoko-linux-x64 -o ethoko
+curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.1/ethoko-linux-x64 -o ethoko
 
 # macOS ARM64
-curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.0/ethoko-darwin-arm64 -o ethoko
+curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.1/ethoko-darwin-arm64 -o ethoko
 
 chmod +x ethoko
 ./ethoko --version
@@ -855,13 +936,17 @@ chmod +x ethoko
 
 ---
 
-### 7.4 Future Distribution Channels (Phase 5+)
+### 7.4 Future Distribution Channels
+
+The following channels are planned as future work, after the core npm + curl distribution is stable:
 
 **Homebrew (macOS/Linux):**
 
 ```bash
 brew install ethoko/tap/ethoko
 ```
+
+Requires creating a Homebrew tap repository (`ethoko/homebrew-tap`) with a formula that downloads the correct binary from GitHub Releases. This is a natural next step once the release pipeline is proven.
 
 **AUR (Arch Linux):**
 
@@ -905,12 +990,12 @@ COPY ethoko /usr/local/bin/ethoko
 
 ---
 
-#### Part A: CLI Package Implementation (6.25 hours)
+#### Part A: CLI Beacon Package Implementation (6.25 hours)
 
 **Tasks:**
 
 1. **Create package structure** (30 min)
-   - Create `packages/cli/` directory
+   - Create `packages/cli-beacon/` directory
    - Setup `package.json` with Commander.js dependency
    - Setup `tsup.config.ts` for TypeScript build (ESM only)
    - Add shebang: `#!/usr/bin/env node`
@@ -982,7 +1067,7 @@ COPY ethoko /usr/local/bin/ethoko
 6. **Validation** (30 min)
 
    ```bash
-   cd packages/cli
+   cd packages/cli-beacon
    pnpm install
    pnpm build
    node dist/index.js --version
@@ -996,7 +1081,7 @@ COPY ethoko /usr/local/bin/ethoko
 
 **Deliverables:**
 
-- ✅ `packages/cli/` with full source code
+- ✅ `packages/cli-beacon/` with full source code
 - ✅ All 8 commands functional with Node.js
 - ✅ Config loading from `ethoko.json` (upward search)
 - ✅ Config paths resolved relative to `ethoko.json` location
@@ -1037,7 +1122,7 @@ COPY ethoko /usr/local/bin/ethoko
 ```json
 {
   "devDependencies": {
-    "@ethoko/cli": "workspace:*"
+    "@ethoko/cli-beacon": "workspace:*"
   }
 }
 ```
@@ -1375,7 +1460,7 @@ pnpm test:e2e:apps
 
 **Tasks:**
 
-1. ✅ Install Bun via pnpm devDependency in `packages/cli`
+1. ✅ Install Bun via pnpm devDependency in `packages/cli-beacon`
 2. ✅ Create build script (`scripts/build-binary.ts`) using Bun API
    - ✅ Loop through 5 platforms
    - ✅ Use `Bun.build({ compile: { ... } })` for each target
@@ -1387,7 +1472,7 @@ pnpm test:e2e:apps
 **Build Script Implementation:**
 
 ```typescript
-// packages/cli/scripts/build-binary.ts
+// packages/cli-beacon/scripts/build-binary.ts
 import { mkdirSync } from "fs";
 import { join } from "path";
 
@@ -1430,77 +1515,74 @@ ls -lh binaries/
 **CI Smoke Test (Ubuntu only):**
 
 ```bash
-pnpm --filter @ethoko/cli build:binary
-./packages/cli/binaries/ethoko-linux-x64 --version
+pnpm --filter @ethoko/cli-beacon build:binary
+./packages/cli-beacon/binaries/ethoko-linux-x64 --version
 ```
 
 **Deliverables:**
 
-- ✅ 5 compiled binaries in `packages/cli/binaries/`
+- ✅ 5 compiled binaries in `packages/cli-beacon/binaries/`
 - ✅ Binaries are 30-50MB each
 - ✅ Binaries run without Node.js
 
 **Implementation Notes:**
 
-- ✅ `packages/cli/scripts/build-binary.ts` (Bun API build script)
-- ✅ `packages/cli/package.json` includes `build:binary`, `bun`, `@types/bun`
-- ✅ `packages/cli/tsconfig.json` includes `scripts` + `bun` types
+- ✅ `packages/cli-beacon/scripts/build-binary.ts` (Bun API build script)
+- ✅ `packages/cli-beacon/package.json` includes `build:binary`, `bun`, `@types/bun`
+- ✅ `packages/cli-beacon/tsconfig.json` includes `scripts` + `bun` types
 - ✅ `.github/workflows/pr.yaml` runs Ubuntu smoke test
 - ✅ Root `package.json` allowlists Bun via `pnpm.onlyBuiltDependencies`
 
 ---
 
-### Phase 3: Wrapper + Dynamic Platform Packages (2-3 hours)
+### Phase 3: Beacon Pattern + Publish Script (2-3 hours)
 
-**Goal:** Generate platform packages dynamically at publish time (no committed platform package directories)
+**Goal:** Create `publish-cli.ts` that generates and publishes `@ethoko/cli` wrapper + 5 platform packages.
 
 **Overview:**
 
-Platform packages (`@ethoko/cli-linux-x64`, etc.) are generated into `packages/cli/dist/` during publishing. Only the wrapper and publish scripts are committed. This mirrors OpenCode's approach and keeps the repo clean.
+Changesets manages `@ethoko/cli-beacon` versioning and changelogs. A new `scripts/publish-cli.ts` script generates the wrapper and platform packages at publish time, keeping the repo clean with zero committed generated files.
 
 **Tasks:**
 
-1. Create Node.js wrapper script (`packages/cli/bin/ethoko`)
-   - Detect platform/arch
-   - Search `node_modules` for matching platform package
-   - Spawn binary with arguments
-2. Add `publish:binary` script (`packages/cli/scripts/publish-binary.ts`)
-   - Generate `dist/@ethoko/cli-<os>-<arch>/` with `package.json` + `bin/ethoko`
-   - Generate `dist/@ethoko/cli/` with wrapper + `optionalDependencies`
-   - Publish platform packages first, then main package
-3. Update `packages/cli/package.json`
-   - Add `bin` field for wrapper
-   - Add `publish:binary` script
-4. Update `.gitignore`
-   - Ignore `packages/cli/dist/`
+1. **Create publish-cli script entry** (`packages/cli-beacon/package.json`)
+   - Keep `"bin": { "ethoko": "./dist/index.js" }` for Node.js execution
+   - Add `"publish-cli"` script entry
 
-**Package Generation Example:**
+2. **Create `scripts/publish-cli.ts`**
+   - Read version from `packages/cli-beacon/package.json` (`@ethoko/cli-beacon`)
+   - Generate temporary directory structure:
+     ```
+     tmp/
+     ├── @ethoko/cli/
+     │   ├── package.json     # wrapper + optionalDependencies (exact versions)
+     │   └── bin/ethoko        # require.resolve wrapper script
+     ├── @ethoko/cli-darwin-arm64/
+     │   ├── package.json     # os: ["darwin"], cpu: ["arm64"]
+     │   └── bin/ethoko        # copied from binaries/ethoko-darwin-arm64
+     ├── @ethoko/cli-darwin-x64/
+     │   └── ...
+     ├── @ethoko/cli-linux-arm64/
+     │   └── ...
+     ├── @ethoko/cli-linux-x64/
+     │   └── ...
+     └── @ethoko/cli-windows-x64/
+         ├── package.json
+         └── bin/ethoko.exe
+     ```
+   - Publish platform packages first (all 5), then `@ethoko/cli` wrapper
+   - Support `--dry-run` flag for testing
+   - Use `npm publish` with `--access public` and `//registry.npmjs.org/:_authToken=${NPM_TOKEN}`
 
-```json
-// dist/@ethoko/cli-linux-x64/package.json
-{
-  "name": "@ethoko/cli-linux-x64",
-  "version": "0.1.0",
-  "description": "Ethoko CLI binary for Linux x64",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["bin"],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/VGLoic/ethoko-monorepo"
-  }
-}
-```
+3. **Update `.gitignore`**
+   - Ensure `packages/cli-beacon/binaries/` is ignored (already is)
+   - No new ignores needed (temp dir is cleaned up after publish)
 
-**Wrapper Script (simplified, no postinstall):**
+**Wrapper Script Template (generated by `publish-cli.ts`):**
 
 ```javascript
 #!/usr/bin/env node
-// packages/cli/bin/ethoko
 const { spawnSync } = require("child_process");
-const { join } = require("path");
-const { existsSync } = require("fs");
 const os = require("os");
 
 const platformMap = { darwin: "darwin", linux: "linux", win32: "windows" };
@@ -1514,28 +1596,18 @@ if (!platform || !arch) {
   process.exit(1);
 }
 
-const packageName = `@ethoko/cli-${platform}-${arch}`;
 const binaryName = platform === "windows" ? "ethoko.exe" : "ethoko";
 
-function findBinary(startDir) {
-  let current = startDir;
-  while (true) {
-    const nodeModules = join(current, "node_modules");
-    if (existsSync(nodeModules)) {
-      const candidate = join(nodeModules, packageName, "bin", binaryName);
-      if (existsSync(candidate)) return candidate;
-    }
-    const parent = join(current, "..");
-    if (parent === current) break;
-    current = parent;
-  }
-  return null;
-}
-
-const binaryPath = findBinary(__dirname);
-if (!binaryPath) {
+let binaryPath;
+try {
+  binaryPath = require.resolve(
+    `@ethoko/cli-${platform}-${arch}/bin/${binaryName}`,
+  );
+} catch {
   console.error(
-    `Binary not found for ${platform}-${arch}. Reinstall @ethoko/cli.`,
+    `Could not find Ethoko binary for ${os.platform()}-${os.arch()}.\n` +
+      `The platform package @ethoko/cli-${platform}-${arch} is not installed.\n` +
+      `Try reinstalling: npm install -g @ethoko/cli`,
   );
   process.exit(1);
 }
@@ -1549,34 +1621,44 @@ process.exit(result.status ?? 1);
 **Validation:**
 
 ```bash
-pnpm --filter @ethoko/cli build:binary
-bun packages/cli/scripts/publish-binary.ts --dry-run
-node packages/cli/bin/ethoko --version
+# Build binaries first
+pnpm --filter @ethoko/cli-beacon build:binary
+
+# Dry-run publish (generates packages without publishing)
+bun packages/cli-beacon/scripts/publish-cli.ts --dry-run
+
+# Verify generated structure
+ls -la tmp/@ethoko/cli/
+ls -la tmp/@ethoko/cli-darwin-arm64/bin/
+
+# Test wrapper locally (requires platform package in node_modules)
+node tmp/@ethoko/cli/bin/ethoko --version
 ```
 
 **Deliverables:**
 
-- ✅ Wrapper script committed
-- ✅ Publish script committed
-- ✅ Platform packages generated dynamically in `packages/cli/dist/`
-- ✅ Local npm install works
+- [ ] `publish-cli.ts` script committed and tested
+- [ ] Wrapper uses `require.resolve` (no `node_modules` walking)
+- [ ] No Node.js fallback in wrapper
+- [ ] `--dry-run` mode works
 
 ---
 
 ### Phase 4: GitHub Actions Integration (2-3 hours)
 
-**Goal:** Automatically build binaries and publish dynamic platform packages when Changesets publishes `@ethoko/cli`
+**Goal:** Automatically build binaries, publish `@ethoko/cli` wrapper + platform packages, and create GitHub Release when Changesets publishes `@ethoko/cli-beacon`.
 
 **Changesets Integration:**
 
-Binary publishing happens inside the existing `release` job after `changesets/action` runs. If `changesets.outputs.published == 'true'`, CI builds binaries, runs `publish:binary`, and uploads binaries to GitHub Releases.
+Binary publishing happens inside the existing `release` job after `changesets/action` runs. The flow detects whether `@ethoko/cli-beacon` was among the published packages. If so, it builds binaries, runs `publish-cli.ts`, and uploads binaries to GitHub Releases.
 
 **Tasks:**
 
 1. Install Bun in CI (using `oven-sh/setup-bun@v2`)
-2. Build binaries in CI
-3. Run `pnpm --filter @ethoko/cli publish:binary`
-4. Create GitHub Release with binaries
+2. Detect if `@ethoko/cli-beacon` was published (parse `changesets.outputs.publishedPackages`)
+3. Build binaries in CI (`pnpm --filter @ethoko/cli-beacon build:binary`)
+4. Run `publish-cli.ts` to generate and publish `@ethoko/cli` + 5 platform packages
+5. Create GitHub Release with `cli-v{version}` tag and 5 binary assets
 
 **GitHub Actions Update:**
 
@@ -1606,59 +1688,74 @@ release:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-    - name: Install Bun
+    # Detect if @ethoko/cli-beacon was published
+    - name: Check if CLI beacon was published
       if: steps.changesets.outputs.published == 'true'
+      id: cli_published
+      run: |
+        CLI_VERSION=$(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -r '.[] | select(.name == "@ethoko/cli-beacon") | .version')
+        if [ -n "$CLI_VERSION" ]; then
+          echo "published=true" >> $GITHUB_OUTPUT
+          echo "version=$CLI_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "published=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install Bun
+      if: steps.cli_published.outputs.published == 'true'
       uses: oven-sh/setup-bun@v2
       with:
         bun-version: latest
 
     - name: Build binaries
-      if: steps.changesets.outputs.published == 'true'
-      run: pnpm --filter @ethoko/cli build:binary
+      if: steps.cli_published.outputs.published == 'true'
+      run: pnpm --filter @ethoko/cli-beacon build:binary
 
-    - name: Get CLI version
-      if: steps.changesets.outputs.published == 'true'
-      id: cli_version
-      run: |
-        VERSION=$(node -p "require('./packages/cli/package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-    - name: Publish platform packages
-      if: steps.changesets.outputs.published == 'true'
-      run: pnpm --filter @ethoko/cli publish:binary
+    - name: Publish CLI wrapper and platform packages
+      if: steps.cli_published.outputs.published == 'true'
+      run: bun packages/cli-beacon/scripts/publish-cli.ts
       env:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     - name: Upload binaries to GitHub Release
-      if: steps.changesets.outputs.published == 'true'
+      if: steps.cli_published.outputs.published == 'true'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: "cli-v${{ steps.cli_version.outputs.version }}"
-        name: "CLI v${{ steps.cli_version.outputs.version }}"
+        tag_name: "cli-v${{ steps.cli_published.outputs.version }}"
+        name: "CLI v${{ steps.cli_published.outputs.version }}"
         files: |
-          packages/cli/binaries/ethoko-linux-x64
-          packages/cli/binaries/ethoko-linux-arm64
-          packages/cli/binaries/ethoko-darwin-x64
-          packages/cli/binaries/ethoko-darwin-arm64
-          packages/cli/binaries/ethoko-windows-x64.exe
+          packages/cli-beacon/binaries/ethoko-linux-x64
+          packages/cli-beacon/binaries/ethoko-linux-arm64
+          packages/cli-beacon/binaries/ethoko-darwin-x64
+          packages/cli-beacon/binaries/ethoko-darwin-arm64
+          packages/cli-beacon/binaries/ethoko-windows-x64.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+**Key differences from previous design:**
+
+- Detects `@ethoko/cli-beacon` (not `@ethoko/cli`) in published packages
+- Uses `publishedPackages` JSON output to extract version — only triggers if beacon was actually published
+- Runs `publish-cli.ts` instead of `publish:binary` — generates AND publishes wrapper + platform packages
+- Version is read from changesets output, not from `package.json`
+
 **Validation:**
 
-1. Create test changeset: `pnpm changeset add`
+1. Create test changeset: `pnpm changeset add` (select `@ethoko/cli-beacon`)
 2. Merge Version PR (triggers release)
-3. Verify GitHub Release created with 5 binaries
-4. Verify platform packages published to npm
-5. Test installation: `npm install -g @ethoko/cli`
+3. Verify `@ethoko/cli-beacon@0.1.1` published to npm by Changesets
+4. Verify `@ethoko/cli@0.1.1` published to npm by `publish-cli.ts`
+5. Verify 5 platform packages published to npm
+6. Verify GitHub Release created with `cli-v0.1.1` tag and 5 binaries
+7. Test installation: `npm install -g @ethoko/cli`
 
 **Deliverables:**
 
-- ✅ GitHub Actions workflow updated
-- ✅ Binaries uploaded to GitHub Releases
-- ✅ Platform packages published to npm
-- ✅ Automated with Changesets
+- [ ] GitHub Actions workflow updated with beacon detection
+- [ ] Binaries uploaded to GitHub Releases
+- [ ] `@ethoko/cli` + 5 platform packages published to npm
+- [ ] End-to-end: changeset merge → all packages published + GitHub Release created
 
 ---
 
@@ -1818,20 +1915,21 @@ ethoko --version
 
 **Tasks:**
 
-1. Write `packages/cli/README.md`
-   - Installation instructions (npm + curl)
+1. Write `packages/cli-beacon/README.md`
+   - Installation instructions: `npm install -g @ethoko/cli` (binary) and `npm install -g @ethoko/cli-beacon` (Node.js)
+   - Explain the two-package model briefly for contributors
    - Configuration guide
    - Command reference
    - Examples
    - Migration guide from Hardhat
-2. Write E2E tests (`packages/cli/test/e2e/cli.e2e.test.ts`)
+2. Write E2E tests (`packages/cli-beacon/test/e2e/cli.e2e.test.ts`)
    - Test each command
    - Test with both local and S3 storage
    - Test error cases
 3. Update root `README.md`
    - Add CLI installation section
    - Link to CLI package README
-4. Create migration guide (`packages/cli/MIGRATION.md`)
+4. Create migration guide (`packages/cli-beacon/MIGRATION.md`)
    - Hardhat → CLI conversion
    - Config migration
    - Command mapping
@@ -1845,11 +1943,21 @@ Standalone CLI for Ethoko artifact management.
 
 ## Installation
 
-### npm (recommended for Node.js projects)
+### npm — Binary (recommended)
 
 \`\`\`bash
 npm install -g @ethoko/cli
 \`\`\`
+
+This installs a thin wrapper that resolves the platform-specific binary automatically.
+
+### npm — Node.js (for development)
+
+\`\`\`bash
+npm install -g @ethoko/cli-beacon
+\`\`\`
+
+This installs the source package and runs via Node.js directly. Useful for contributors or environments where binaries aren't available.
 
 ### Direct binary download (no Node.js required)
 
@@ -1896,7 +2004,7 @@ curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install
 **E2E Test Structure:**
 
 ```typescript
-// packages/cli/test/e2e/cli.e2e.test.ts
+// packages/cli-beacon/test/e2e/cli.e2e.test.ts
 import { describe, test, expect, beforeAll } from "vitest";
 import { execSync } from "child_process";
 import fs from "fs/promises";
@@ -1939,9 +2047,9 @@ describe("CLI E2E", () => {
 **Validation:**
 
 ```bash
-pnpm --filter @ethoko/cli test:e2e
-pnpm --filter @ethoko/cli lint
-pnpm --filter @ethoko/cli check-types
+pnpm --filter @ethoko/cli-beacon test:e2e
+pnpm --filter @ethoko/cli-beacon lint
+pnpm --filter @ethoko/cli-beacon check-types
 ```
 
 **Deliverables:**
@@ -1955,15 +2063,15 @@ pnpm --filter @ethoko/cli check-types
 
 ### Timeline Summary
 
-| Phase                       | Duration        | Cumulative  |
-| --------------------------- | --------------- | ----------- |
-| Phase 1: CLI Structure      | 4-6 hours       | 4-6 hours   |
-| Phase 2: Binary Compilation | 2-3 hours       | 6-9 hours   |
-| Phase 3: Platform Packages  | 2-3 hours       | 8-12 hours  |
-| Phase 4: GitHub Actions     | 2-3 hours       | 10-15 hours |
-| Phase 5: Install Script     | 2 hours         | 12-17 hours |
-| Phase 6: Documentation      | 2-3 hours       | 14-20 hours |
-| **Total**                   | **14-20 hours** |             |
+| Phase                                 | Duration        | Cumulative  |
+| ------------------------------------- | --------------- | ----------- |
+| Phase 1: CLI Structure (✅ Completed) | 4-6 hours       | 4-6 hours   |
+| Phase 2: Binary Compilation (✅ Done) | 2-3 hours       | 6-9 hours   |
+| Phase 3: Beacon Pattern + Publish     | 2-3 hours       | 8-12 hours  |
+| Phase 4: GitHub Actions (CI)          | 2-3 hours       | 10-15 hours |
+| Phase 5: Install Script (curl)        | 2 hours         | 12-17 hours |
+| Phase 6: Documentation & Testing      | 2-3 hours       | 14-20 hours |
+| **Total**                             | **14-20 hours** |             |
 
 ---
 
@@ -2275,6 +2383,30 @@ pnpm --filter @ethoko/cli check-types
 
 ---
 
+### Q8: `@ethoko/cli-beacon` Starting Version ✅ DECIDED
+
+**Question:** What version should `@ethoko/cli-beacon` start at, given that `@ethoko/cli@0.1.0` already exists on npm?
+
+**Decision:** **`@ethoko/cli-beacon` starts at `0.1.1`**
+
+- `@ethoko/cli-beacon` is a new package name, so `0.1.1` is available
+- The existing `@ethoko/cli@0.1.0` on npm will be deprecated
+- The generated `@ethoko/cli` wrapper picks up from the next available version (matching `@ethoko/cli-beacon` version)
+
+---
+
+### Q9: Node.js Fallback in Wrapper ✅ DECIDED
+
+**Question:** Should the `@ethoko/cli` wrapper fall back to running via Node.js if the platform binary is not found?
+
+**Decision:** **No fallback**
+
+- If the platform binary is not found, the wrapper errors with an actionable message
+- Users who want Node.js execution install `@ethoko/cli-beacon` directly
+- This keeps the wrapper simple and avoids shipping Node.js source code in the wrapper package
+
+---
+
 ## 12. Appendices
 
 ### Appendix A: Command Porting Reference
@@ -2304,7 +2436,7 @@ export default async function (taskArguments, hre: HardhatRuntimeEnvironment) {
 **After (CLI Command):**
 
 ```typescript
-// packages/cli/src/commands/push.ts
+// packages/cli-beacon/src/commands/push.ts
 import { Command } from "commander";
 import { loadConfig } from "../config";
 import { createStorageProvider } from "../utils/storage-provider";
@@ -2332,29 +2464,29 @@ export function registerPushCommand(program: Command) {
 
 ### Appendix B: Platform Package Template
 
+Platform packages are **generated at publish time** by `scripts/publish-cli.ts` and are NOT committed to git.
+
 ```
-packages/cli-{os}-{arch}/
+@ethoko/cli-{os}-{arch}/
 ├── package.json
-├── binary/
-│   └── ethoko[.exe]
-└── README.md
+└── bin/
+    └── ethoko[.exe]
 ```
 
 **package.json Template:**
 
 ```json
 {
-  "name": "ethoko-{os}-{arch}",
-  "version": "0.1.0",
+  "name": "@ethoko/cli-{os}-{arch}",
+  "version": "0.1.1",
   "description": "Ethoko CLI binary for {OS} {ARCH}",
   "os": ["{os}"],
   "cpu": ["{arch}"],
-  "files": ["binary"],
+  "files": ["bin"],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VGLoic/ethoko-monorepo",
-    "directory": "packages/cli-{os}-{arch}"
+    "url": "https://github.com/VGLoic/ethoko-monorepo"
   },
   "homepage": "https://github.com/VGLoic/ethoko-monorepo#readme",
   "bugs": {
@@ -2366,7 +2498,7 @@ packages/cli-{os}-{arch}/
 **README.md Template:**
 
 ```markdown
-# ethoko-{os}-{arch}
+# @ethoko/cli-{os}-{arch}
 
 Ethoko CLI binary for {OS} {ARCH}.
 
@@ -2377,7 +2509,7 @@ This package is automatically installed as an optional dependency of `@ethoko/cl
 If you need to use this binary directly:
 
 \`\`\`bash
-./node_modules/ethoko-{os}-{arch}/binary/ethoko --version
+./node_modules/@ethoko/cli-{os}-{arch}/bin/ethoko --version
 \`\`\`
 
 ## Installation
@@ -2395,13 +2527,14 @@ npm install -g @ethoko/cli
 
 **Complete workflow file:** `.github/workflows/main.yaml`
 
-Key changes:
+Key changes for the Beacon Pattern:
 
-1. Add `outputs` to `release` job
-2. Add `build-and-upload-binaries` job after `release`
-3. Conditional execution: only if `published == 'true'`
+1. Detect if `@ethoko/cli-beacon` was published (parse `publishedPackages` JSON)
+2. Build binaries only when `@ethoko/cli-beacon` is in the published set
+3. Run `publish-cli.ts` to generate and publish `@ethoko/cli` + 5 platform packages
+4. Create GitHub Release with `cli-v{version}` tag
 
-See Phase 4 for full implementation.
+See Phase 4 for full workflow YAML.
 
 ---
 
@@ -2484,21 +2617,26 @@ const ConfigSchema = z.object({
 
 **Phase 3 Testing:**
 
-- [ ] Platform packages have correct `os`/`cpu` fields
-- [ ] Wrapper script detects platform correctly
-- [ ] Wrapper script executes correct binary
-- [ ] npm install selects correct optional dependency
-- [ ] Local npm install works
+- [ ] Source package renamed to `@ethoko/cli-beacon`
+- [ ] All workspace references updated (`apps/*/package.json`)
+- [ ] Pending changeset updated to `@ethoko/cli-beacon`
+- [ ] `publish-cli.ts` generates correct wrapper `package.json`
+- [ ] `publish-cli.ts` generates correct platform `package.json` (os/cpu fields)
+- [ ] Wrapper script uses `require.resolve` (no `node_modules` walking)
+- [ ] Wrapper errors with actionable message when binary not found (no fallback)
+- [ ] `--dry-run` mode generates packages without publishing
+- [ ] Generated `@ethoko/cli/bin/ethoko` resolves and spawns binary correctly
 
 **Phase 4 Testing:**
 
-- [ ] GitHub Actions job triggers on publish
+- [ ] GitHub Actions detects `@ethoko/cli-beacon` in published packages
 - [ ] Bun installs in CI
 - [ ] All binaries build in CI
-- [ ] GitHub Release created with correct tag
-- [ ] All 5 binaries uploaded
-- [ ] Platform packages published to npm
+- [ ] `publish-cli.ts` publishes `@ethoko/cli` + 5 platform packages
+- [ ] GitHub Release created with `cli-v{version}` tag
+- [ ] All 5 binaries uploaded to GitHub Release
 - [ ] No errors in CI logs
+- [ ] End-to-end: `npm install -g @ethoko/cli` resolves binary and runs
 
 **Phase 5 Testing:**
 
@@ -2543,22 +2681,25 @@ const ConfigSchema = z.object({
 
 ```bash
 pnpm changeset add
-# Select: @ethoko/cli (minor)
+# Select: @ethoko/cli-beacon (minor)
 # Summary: "Add standalone CLI for Foundry users"
 ```
 
 **Merge Version PR:**
 
-- [ ] Changesets bot creates PR
+- [ ] Changesets bot creates PR (bumps `@ethoko/cli-beacon`)
 - [ ] Review version bump
 - [ ] Merge PR → triggers release
 
 **Post-Release:**
 
-- [ ] Verify GitHub Release created
-- [ ] Verify binaries uploaded
-- [ ] Verify npm packages published
+- [ ] Verify `@ethoko/cli-beacon` published to npm (by Changesets)
+- [ ] Verify `@ethoko/cli` published to npm (by `publish-cli.ts`)
+- [ ] Verify 5 platform packages published to npm
+- [ ] Verify GitHub Release created with `cli-v{version}` tag
+- [ ] Verify binaries uploaded to GitHub Release
 - [ ] Test npm install: `npm install -g @ethoko/cli@latest`
+- [ ] Test wrapper resolves binary: `ethoko --version`
 - [ ] Test curl install
 - [ ] Announce release
 
@@ -2569,8 +2710,9 @@ pnpm changeset add
 **Issue: Binary not found after npm install**
 
 - Check platform: `node -p "os.platform() + '-' + os.arch()"`
-- Check optional dependency installed: `ls node_modules/ethoko-*/binary`
+- Check optional dependency installed: `ls node_modules/@ethoko/cli-*/bin/`
 - Reinstall: `npm uninstall -g @ethoko/cli && npm install -g @ethoko/cli`
+- Alternative: install Node.js version: `npm install -g @ethoko/cli-beacon`
 
 **Issue: Permission denied**
 
@@ -2579,22 +2721,23 @@ pnpm changeset add
 
 **Issue: Config file not found**
 
-- Check current directory: `ls ethoko.config.json`
-- Use explicit path: `ethoko push --config /path/to/ethoko.config.json`
+- Check current directory: `ls ethoko.json`
+- Use explicit path: `ethoko push --config /path/to/ethoko.json`
 
 **Issue: S3 authentication fails**
 
 - Check AWS credentials: `aws sts get-caller-identity`
-- Check config: `cat ethoko.config.json | jq .storage`
+- Check config: `cat ethoko.json | jq .storage`
 - Use debug mode: `ethoko push --debug`
 
 ---
 
 ## Document Change Log
 
-| Version | Date       | Author           | Changes           |
-| ------- | ---------- | ---------------- | ----------------- |
-| 1.0     | 2026-03-04 | Engineering Team | Initial PRD draft |
+| Version | Date       | Author           | Changes                                                                 |
+| ------- | ---------- | ---------------- | ----------------------------------------------------------------------- |
+| 1.0     | 2026-03-04 | Engineering Team | Initial PRD draft                                                       |
+| 1.1     | 2026-03-11 | Engineering Team | Beacon Pattern: two-package model, Q8/Q9 resolved, phases 3-4 rewritten |
 
 ---
 
