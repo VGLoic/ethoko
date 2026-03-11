@@ -1989,9 +1989,9 @@ pnpm --filter @ethoko/cli-beacon check-types
 | ------------------------------------- | --------------- | ----------- |
 | Phase 1: CLI Structure (✅ Completed) | 4-6 hours       | 4-6 hours   |
 | Phase 2: Binary Compilation (✅ Done) | 2-3 hours       | 6-9 hours   |
-| Phase 3: Beacon Pattern + Publish     | 2-3 hours       | 8-12 hours  |
-| Phase 4: GitHub Actions (CI)          | 2-3 hours       | 10-15 hours |
-| Phase 5: Install Script (curl)        | 2 hours         | 12-17 hours |
+| Phase 3: Beacon Pattern + Publish (✅)| 2-3 hours       | 8-12 hours  |
+| Phase 4: GitHub Actions (CI) (✅ Done)| 2-3 hours       | 10-15 hours |
+| Phase 5: Install Script (curl) (✅)   | 2 hours         | 12-17 hours |
 | Phase 6: Documentation                | 1-1.5 hours     | 13-18 hours |
 | **Total**                             | **13-18 hours** |             |
 
