@@ -1654,11 +1654,10 @@ Binary publishing happens inside the existing `release` job after `changesets/ac
 
 **Tasks:**
 
-1. Install Bun in CI (using `oven-sh/setup-bun@v2`)
-2. Detect if `@ethoko/cli-beacon` was published (parse `changesets.outputs.publishedPackages`)
-3. Build binaries in CI (`pnpm --filter @ethoko/cli-beacon build:binary`)
-4. Run `publish-cli.ts` to generate and publish `@ethoko/cli` + 5 platform packages
-5. Create GitHub Release with `cli-v{version}` tag and 5 binary assets
+1. ✅ Detect if `@ethoko/cli-beacon` was published (parse `changesets.outputs.publishedPackages`)
+2. ✅ Build binaries in CI (`pnpm --filter @ethoko/cli-beacon build:binary`)
+3. ✅ Run `publish-cli.ts` to generate and publish `@ethoko/cli` + 5 platform packages
+4. ✅ Create GitHub Release with `cli-v{version}` tag and 5 binary assets
 
 **GitHub Actions Update:**
 
@@ -1689,23 +1688,20 @@ release:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     # Detect if @ethoko/cli-beacon was published
-    - name: Check if CLI beacon was published
-      if: steps.changesets.outputs.published == 'true'
+    - name: Detect CLI beacon publish
       id: cli_published
       run: |
+        if [ "${{ steps.changesets.outputs.published }}" != "true" ]; then
+          echo "published=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
         CLI_VERSION=$(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -r '.[] | select(.name == "@ethoko/cli-beacon") | .version')
-        if [ -n "$CLI_VERSION" ]; then
+        if [ -n "$CLI_VERSION" ] && [ "$CLI_VERSION" != "null" ]; then
           echo "published=true" >> $GITHUB_OUTPUT
           echo "version=$CLI_VERSION" >> $GITHUB_OUTPUT
         else
           echo "published=false" >> $GITHUB_OUTPUT
         fi
-
-    - name: Install Bun
-      if: steps.cli_published.outputs.published == 'true'
-      uses: oven-sh/setup-bun@v2
-      with:
-        bun-version: latest
 
     - name: Build binaries
       if: steps.cli_published.outputs.published == 'true'
@@ -1713,11 +1709,11 @@ release:
 
     - name: Publish CLI wrapper and platform packages
       if: steps.cli_published.outputs.published == 'true'
-      run: bun packages/cli-beacon/scripts/publish-cli.ts
+      run: pnpm --filter @ethoko/cli-beacon exec bun scripts/publish-cli.ts
       env:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-    - name: Upload binaries to GitHub Release
+    - name: Upload CLI binaries to GitHub Release
       if: steps.cli_published.outputs.published == 'true'
       uses: softprops/action-gh-release@v2
       with:
@@ -1752,9 +1748,9 @@ release:
 
 **Deliverables:**
 
-- [ ] GitHub Actions workflow updated with beacon detection
-- [ ] Binaries uploaded to GitHub Releases
-- [ ] `@ethoko/cli` + 5 platform packages published to npm
+- [x] GitHub Actions workflow updated with beacon detection
+- [x] Binaries uploaded to GitHub Releases
+- [x] `@ethoko/cli` + 5 platform packages published to npm
 - [ ] End-to-end: changeset merge → all packages published + GitHub Release created
 
 ---
