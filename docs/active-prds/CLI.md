@@ -1909,9 +1909,9 @@ ethoko --version
 
 ---
 
-### Phase 6: Documentation & Testing (2-3 hours)
+### Phase 6: Documentation (1-1.5 hours)
 
-**Goal:** Complete documentation and E2E tests
+**Goal:** Complete documentation and polish user experience
 
 **Tasks:**
 
@@ -1921,18 +1921,12 @@ ethoko --version
    - Configuration guide
    - Command reference
    - Examples
-   - Migration guide from Hardhat
-2. Write E2E tests (`packages/cli-beacon/test/e2e/cli.e2e.test.ts`)
-   - Test each command
-   - Test with both local and S3 storage
-   - Test error cases
-3. Update root `README.md`
+2. Update root `README.md`
    - Add CLI installation section
    - Link to CLI package README
-4. Create migration guide (`packages/cli-beacon/MIGRATION.md`)
-   - Hardhat → CLI conversion
-   - Config migration
-   - Command mapping
+3. Improve error messages
+   - Review all error cases for clarity
+   - Ensure actionable error messages
 
 **CLI README Structure:**
 
@@ -1995,59 +1989,15 @@ curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install
 ## Commands
 
 [Full command reference]
-
-## Migration from Hardhat Plugin
-
-[Migration guide]
-```
-
-**E2E Test Structure:**
-
-```typescript
-// packages/cli-beacon/test/e2e/cli.e2e.test.ts
-import { describe, test, expect, beforeAll } from "vitest";
-import { execSync } from "child_process";
-import fs from "fs/promises";
-import path from "path";
-
-const CLI_PATH = path.join(__dirname, "../../dist/index.js");
-
-describe("CLI E2E", () => {
-  beforeAll(async () => {
-    // Setup test config
-    await fs.writeFile(
-      "ethoko.json",
-      JSON.stringify({
-        project: "test-project",
-        storage: { type: "local", path: ".ethoko-test" },
-      }),
-    );
-  });
-
-  test("ethoko --version", () => {
-    const output = execSync(`node ${CLI_PATH} --version`).toString();
-    expect(output).toMatch(/\d+\.\d+\.\d+/);
-  });
-
-  test("ethoko push", () => {
-    // Create test artifact
-    // Run push command
-    // Verify artifact uploaded
-  });
-
-  test("ethoko pull", () => {
-    // Run pull command
-    // Verify artifact downloaded
-  });
-
-  // More tests...
-});
 ```
 
 **Validation:**
 
 ```bash
-pnpm --filter @ethoko/cli-beacon test:e2e
+# Review README for clarity
+cat packages/cli-beacon/README.md
+
+# Test config examples in README
 pnpm --filter @ethoko/cli-beacon lint
 pnpm --filter @ethoko/cli-beacon check-types
 ```
@@ -2055,9 +2005,8 @@ pnpm --filter @ethoko/cli-beacon check-types
 **Deliverables:**
 
 - ✅ Complete CLI README
-- ✅ E2E tests passing
-- ✅ Migration guide
 - ✅ Root README updated
+- ✅ Clear error messages
 
 ---
 
@@ -2070,8 +2019,8 @@ pnpm --filter @ethoko/cli-beacon check-types
 | Phase 3: Beacon Pattern + Publish     | 2-3 hours       | 8-12 hours  |
 | Phase 4: GitHub Actions (CI)          | 2-3 hours       | 10-15 hours |
 | Phase 5: Install Script (curl)        | 2 hours         | 12-17 hours |
-| Phase 6: Documentation & Testing      | 2-3 hours       | 14-20 hours |
-| **Total**                             | **14-20 hours** |             |
+| Phase 6: Documentation                | 1-1.5 hours     | 13-18 hours |
+| **Total**                             | **13-18 hours** |             |
 
 ---
 
@@ -2095,7 +2044,7 @@ pnpm --filter @ethoko/cli-beacon check-types
 
 **Testing:**
 
-- ✅ E2E tests pass for all commands
+- ✅ Integration tests pass for all commands (via apps E2E tests)
 - ✅ Manual testing on all 5 platforms
 - ✅ Integration tests with real S3 and LocalStack
 - ✅ Zero linting/type errors
@@ -2208,7 +2157,6 @@ pnpm --filter @ethoko/cli-beacon check-types
 **Impact:** Medium  
 **Mitigation:**
 
-- Beta release to gather feedback
 - Promote in Foundry community channels
 - Create video tutorials and examples
 - Showcase in README with clear value proposition
@@ -2250,7 +2198,7 @@ pnpm --filter @ethoko/cli-beacon check-types
 **Mitigation:**
 
 - Automated releases (no manual steps)
-- Comprehensive E2E tests catch regressions
+- Comprehensive integration tests catch regressions (via apps E2E tests)
 - Clear contributor guidelines
 - Invest in documentation upfront
 
@@ -2333,33 +2281,7 @@ pnpm --filter @ethoko/cli-beacon check-types
 
 ---
 
-### Q6: Beta Testing Strategy
-
-**Question:** Release beta version first or go straight to stable?
-
-**Options:**
-
-1. **Beta release first:** `@ethoko/cli@0.1.0-beta.1`
-   - Pro: Gather feedback, fix bugs before stable
-   - Con: Slower path to stable release
-
-2. **Direct stable release:** `@ethoko/cli@0.1.0`
-   - Pro: Faster to market
-   - Con: Risk of issues in stable version
-
-**Recommendation:** Beta release
-
-- Publish `0.1.0-beta.1` after Phase 1 completion
-- Test with 2-3 early adopter projects
-- Gather feedback for 1-2 weeks
-- Fix critical issues
-- Promote to stable `0.1.0`
-
-**Decision:** ⏳ Pending
-
----
-
-### Q7: Auto-Update Mechanism
+### Q6: Auto-Update Mechanism
 
 **Question:** Should CLI support self-update?
 
@@ -2383,7 +2305,7 @@ pnpm --filter @ethoko/cli-beacon check-types
 
 ---
 
-### Q8: `@ethoko/cli-beacon` Starting Version ✅ DECIDED
+### Q7: `@ethoko/cli-beacon` Starting Version ✅ DECIDED
 
 **Question:** What version should `@ethoko/cli-beacon` start at, given that `@ethoko/cli@0.1.0` already exists on npm?
 
@@ -2395,7 +2317,7 @@ pnpm --filter @ethoko/cli-beacon check-types
 
 ---
 
-### Q9: Node.js Fallback in Wrapper ✅ DECIDED
+### Q8: Node.js Fallback in Wrapper ✅ DECIDED
 
 **Question:** Should the `@ethoko/cli` wrapper fall back to running via Node.js if the platform binary is not found?
 
@@ -2648,10 +2570,9 @@ const ConfigSchema = z.object({
 
 **Phase 6 Testing:**
 
-- [ ] All E2E tests pass
 - [ ] Documentation is accurate
 - [ ] Examples work as documented
-- [ ] Migration guide tested with real project
+- [ ] Error messages are clear and actionable
 
 **Integration Testing:**
 
