@@ -1,5 +1,11 @@
 # @ethoko/core
 
+## 0.10.0
+
+### Minor Changes
+
+- 72f85ae: Update ABI typings resolution
+
 ## 0.9.0
 
 ### Minor Changes
