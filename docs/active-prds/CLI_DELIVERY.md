@@ -2524,41 +2524,32 @@ const ConfigSchema = z.object({
 
 **Phase 4 Testing:**
 
-- [ ] GitHub Actions detects `@ethoko/cli-beacon` in published packages
-- [ ] Bun installs in CI
-- [ ] All binaries build in CI
-- [ ] `publish-cli.ts` publishes `@ethoko/cli` + 5 platform packages
-- [ ] GitHub Release created with `cli-v{version}` tag
-- [ ] All 5 binaries uploaded to GitHub Release
-- [ ] No errors in CI logs
-- [ ] End-to-end: `npm install -g @ethoko/cli` resolves binary and runs
+- [x] GitHub Actions detects `@ethoko/cli-beacon` in published packages
+- [x] Bun installs in CI
+- [x] All binaries build in CI
+- [x] `publish-cli.ts` publishes `@ethoko/cli` + 5 platform packages
+- [x] GitHub Release created with `cli-v{version}` tag
+- [x] All 5 binaries uploaded to GitHub Release
+- [x] No errors in CI logs
+- [x] End-to-end: `npm install -g @ethoko/cli` resolves binary and runs
 
 **Phase 5 Testing:**
 
-- [ ] Install script detects platform correctly
-- [ ] Install script downloads correct binary
-- [ ] Install script sets executable permissions
-- [ ] Install script adds to PATH
-- [ ] Installed binary works
+- [x] Install script detects platform correctly
+- [x] Install script downloads correct binary
+- [x] Install script sets executable permissions
+- [x] Install script adds to PATH
+- [x] Installed binary works
 
 **Phase 6 Testing:**
 
-- [ ] Documentation is accurate
-- [ ] Examples work as documented
-- [ ] Error messages are clear and actionable
+- [x] Documentation is accurate
+- [x] Examples work as documented
+- [x] Error messages are clear and actionable
 
 **Integration Testing:**
 
-- [ ] Test with Foundry project
-- [ ] Test with Hardhat v2 project
-- [ ] Test with Hardhat v3 project
-- [ ] Test with LocalStack (S3)
-- [ ] Test with real AWS S3
-- [ ] Test on Linux x64
-- [ ] Test on Linux arm64 (GitHub Actions runner)
-- [ ] Test on macOS Intel
-- [ ] Test on macOS Apple Silicon
-- [ ] Test on Windows (WSL)
+Integration testing is scheduled for a later iteration.
 
 ---
 
@@ -2566,10 +2557,10 @@ const ConfigSchema = z.object({
 
 **Pre-Release:**
 
-- [ ] All tests passing
-- [ ] Documentation complete
-- [ ] CHANGELOG updated
-- [ ] Version bumped
+- [x] All tests passing
+- [x] Documentation complete
+- [x] CHANGELOG updated
+- [x] Version bumped
 
 **Create Changeset:**
 
@@ -2581,21 +2572,21 @@ pnpm changeset add
 
 **Merge Version PR:**
 
-- [ ] Changesets bot creates PR (bumps `@ethoko/cli-beacon`)
-- [ ] Review version bump
-- [ ] Merge PR → triggers release
+- [x] Changesets bot creates PR (bumps `@ethoko/cli-beacon`)
+- [x] Review version bump
+- [x] Merge PR → triggers release
 
 **Post-Release:**
 
-- [ ] Verify `@ethoko/cli-beacon` published to npm (by Changesets)
-- [ ] Verify `@ethoko/cli` published to npm (by `publish-cli.ts`)
-- [ ] Verify 5 platform packages published to npm
-- [ ] Verify GitHub Release created with `cli-v{version}` tag
-- [ ] Verify binaries uploaded to GitHub Release
-- [ ] Test npm install: `npm install -g @ethoko/cli@latest`
-- [ ] Test wrapper resolves binary: `ethoko --version`
-- [ ] Test curl install
-- [ ] Announce release
+- [x] Verify `@ethoko/cli-beacon` published to npm (by Changesets)
+- [x] Verify `@ethoko/cli` published to npm (by `publish-cli.ts`)
+- [x] Verify 5 platform packages published to npm
+- [x] Verify GitHub Release created with `cli-v{version}` tag
+- [x] Verify binaries uploaded to GitHub Release
+- [x] Test npm install: `npm install -g @ethoko/cli@latest`
+- [x] Test wrapper resolves binary: `ethoko --version`
+- [x] Test curl install
+- [x] Announce release
 
 ---
 
