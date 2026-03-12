@@ -1,5 +1,16 @@
 # @ethoko/cli-beacon
 
+## 0.3.0
+
+### Minor Changes
+
+- 7ef260f: Expose upgrade and uninstall commands
+
+### Patch Changes
+
+- Updated dependencies [72f85ae]
+  - @ethoko/core@0.10.0
+
 ## 0.2.0
 
 ### Minor Changes
