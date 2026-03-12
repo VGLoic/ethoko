@@ -14,6 +14,8 @@ Ethoko is a warehouse for smart-contract compilation artifacts. It enables teams
 - `packages/typescript-config`: Shared TypeScript configurations
 - `apps/*`: Integration examples with different frameworks (e.g., Foundry, Hardhat V2, Hardhat V3)
 
+CLI delivery strategy overview: `docs/CLI_DELIVERY.md`
+
 ## Build System
 
 **Package Manager:** pnpm 9.0.0 (required)
