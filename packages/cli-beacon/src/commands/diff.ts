@@ -55,13 +55,13 @@ export function registerDiffCommand(
         return;
       }
       if (paramParsingResult.data.id && paramParsingResult.data.tag) {
-        cliError("The ID and tag parameters can not be used together");
+        cliError("Use either --id or --tag, not both");
         process.exitCode = 1;
         return;
       }
 
       if (!paramParsingResult.data.id && !paramParsingResult.data.tag) {
-        cliError("The artifact must be identified by a tag or an ID");
+        cliError("Provide --id or --tag to identify the artifact");
         process.exitCode = 1;
         return;
       }
@@ -71,7 +71,7 @@ export function registerDiffCommand(
 
       if (!finalArtifactPath) {
         cliError(
-          "Artifact path must be provided either via --artifact-path flag or compilationOutputPath in config",
+          "Artifact path is required. Provide --artifact-path or set compilationOutputPath in ethoko.json",
         );
         process.exitCode = 1;
         return;
@@ -83,7 +83,7 @@ export function registerDiffCommand(
       } else if (paramParsingResult.data.tag) {
         search = { type: "tag", tag: paramParsingResult.data.tag };
       } else {
-        cliError("The artifact must be identified by a tag or an ID");
+        cliError("Provide --id or --tag to identify the artifact");
         process.exitCode = 1;
         return;
       }

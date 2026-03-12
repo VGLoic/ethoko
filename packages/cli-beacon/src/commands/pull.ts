@@ -56,7 +56,7 @@ export function registerPullCommand(
       }
 
       if (optsParsingResult.data.id && optsParsingResult.data.tag) {
-        cliError("The ID and tag parameters can not be used together");
+        cliError("Use either --id or --tag, not both");
         process.exitCode = 1;
         return;
       }

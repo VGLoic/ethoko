@@ -87,7 +87,7 @@ function extractAwsRoleConfig(
 
   if (!config.awsAccessKeyId || !config.awsSecretAccessKey) {
     throw new Error(
-      "AWS role configuration requires awsAccessKeyId and awsSecretAccessKey",
+      "AWS role configuration requires awsAccessKeyId and awsSecretAccessKey when awsRoleArn is set",
     );
   }
 
@@ -105,8 +105,11 @@ function extractAwsRoleConfig(
   return roleParsingResult.data;
 }
 
-function buildConfigErrorMessage(): string {
-  return `Ethoko config not found. Create an ethoko.json file with the following example:
+function buildConfigErrorMessage(startDir: string): string {
+  return `Ethoko config not found. Searched from ${startDir} to the filesystem root.
+Create an ethoko.json file or pass --config <path>.
+
+Example ethoko.json:
 
 {
   "project": "my-contracts",
@@ -128,7 +131,7 @@ export async function loadConfig(
     : await findConfigPath(process.cwd());
 
   if (!resolvedPath) {
-    throw new Error(buildConfigErrorMessage());
+    throw new Error(buildConfigErrorMessage(process.cwd()));
   }
 
   const configRaw = await fs.readFile(resolvedPath, "utf-8");
@@ -136,12 +139,16 @@ export async function loadConfig(
   try {
     parsedJson = JSON.parse(configRaw);
   } catch {
-    throw new Error(`Invalid JSON in ethoko.json at ${resolvedPath}`);
+    throw new Error(
+      `Invalid JSON in ethoko.json at ${resolvedPath}. Check for trailing commas or missing quotes.`,
+    );
   }
 
   const parsingResult = EthokoConfigSchema.safeParse(parsedJson);
   if (!parsingResult.success) {
-    throw new Error(`Invalid ethoko.json configuration at ${resolvedPath}`);
+    throw new Error(
+      `Invalid ethoko.json configuration at ${resolvedPath}. Check required fields and storage settings.`,
+    );
   }
 
   const storage = parsingResult.data.storage;

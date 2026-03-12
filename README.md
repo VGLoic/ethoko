@@ -14,7 +14,7 @@
 Ethoko enables teams to **store** and **share** versionned smart-contract compilation artifacts.  
 As such, it decouples the compilation process from the operation processes.
 
-Define the storage backend of your choice, push your compilation artifacts to Ethoko and pull them back when you need them, in a safe and transparent way.  
+Define the storage backend of your choice, push your compilation artifacts to Ethoko and pull them back when you need them, in a safe and transparent way.
 
 Ethoko supports both Hardhat and Foundry development environments, compile once, operates safely.
 
@@ -24,9 +24,21 @@ Ethoko supports both Hardhat and Foundry development environments, compile once,
     <img alt="Ethoko workflow" src="images/ethoko-workflow-light.svg" />
 </picture>
 
+## CLI
+
+Ethoko ships as a standalone CLI for Foundry and CI/CD workflows, plus Hardhat plugins for existing projects.
+
+### Install the CLI
+
+```bash
+npm install -g @ethoko/cli
+```
+
+Developers who want Node.js execution (no binary) can install `@ethoko/cli-beacon` instead. See the CLI guide in `packages/cli-beacon/README.md` for configuration and commands.
+
 ## Hardhat Ethoko
 
-Ethoko is for now available as a Hardhat plugin.
+Ethoko is also available as a Hardhat plugin.
 
 It supports Hardhat v3, Hardhat v2 and Foundry as development environments.
 
@@ -121,7 +133,6 @@ The original compilation artifacts are never lost and always available for resto
   <img alt="Restore example" src="images/restore-example.png">
 </picture>
 
-
 ### Complete guide and examples
 
 Please refer to the [Hardhat Ethoko documentation](packages/hardhat-ethoko/README.md)
@@ -142,6 +153,7 @@ Integration examples with Foundry or Hardhat can be found in the `apps/` folder:
 ### When to use Ethoko?
 
 Use Ethoko when you want to
+
 - decouple the compilation process from the operation processes,
 - organize and version your compilation artifacts within your team(s),
 - build scripts or automation on top of static compilation artifacts.

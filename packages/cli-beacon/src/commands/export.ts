@@ -60,7 +60,7 @@ export function registerExportCommand(
       }
 
       if (optsParsingResult.data.id && optsParsingResult.data.tag) {
-        cliError("The ID and tag parameters can not be used together");
+        cliError("Use either --id or --tag, not both");
         process.exitCode = 1;
         return;
       }
@@ -71,7 +71,7 @@ export function registerExportCommand(
       } else if (optsParsingResult.data.tag) {
         search = { type: "tag", tag: optsParsingResult.data.tag };
       } else {
-        cliError("The artifact must be identified by a tag or an ID");
+        cliError("Provide --id or --tag to identify the artifact");
         process.exitCode = 1;
         return;
       }

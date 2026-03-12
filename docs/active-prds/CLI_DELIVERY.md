@@ -1888,18 +1888,18 @@ ethoko --version
 
 **Tasks:**
 
-1. Write `packages/cli-beacon/README.md`
-   - Installation instructions: `npm install -g @ethoko/cli` (binary) and `npm install -g @ethoko/cli-beacon` (Node.js)
-   - Explain the two-package model briefly for contributors
-   - Configuration guide
-   - Command reference
-   - Examples
-2. Update root `README.md`
-   - Add CLI installation section
-   - Link to CLI package README
-3. Improve error messages
-   - Review all error cases for clarity
-   - Ensure actionable error messages
+1. ✅ Write `packages/cli-beacon/README.md`
+   - ✅ Installation instructions: `npm install -g @ethoko/cli` (binary) and `npm install -g @ethoko/cli-beacon` (Node.js)
+   - ✅ Explain the two-package model briefly for contributors
+   - ✅ Configuration guide
+   - ✅ Command reference
+   - ✅ Examples
+2. ✅ Update root `README.md`
+   - ✅ Add CLI installation section
+   - ✅ Link to CLI package README
+3. ✅ Improve error messages
+   - ✅ Review all error cases for clarity
+   - ✅ Ensure actionable error messages
 
 **CLI README Structure:**
 
@@ -1985,15 +1985,15 @@ pnpm --filter @ethoko/cli-beacon check-types
 
 ### Timeline Summary
 
-| Phase                                 | Duration        | Cumulative  |
-| ------------------------------------- | --------------- | ----------- |
-| Phase 1: CLI Structure (✅ Completed) | 4-6 hours       | 4-6 hours   |
-| Phase 2: Binary Compilation (✅ Done) | 2-3 hours       | 6-9 hours   |
-| Phase 3: Beacon Pattern + Publish (✅)| 2-3 hours       | 8-12 hours  |
-| Phase 4: GitHub Actions (CI) (✅ Done)| 2-3 hours       | 10-15 hours |
-| Phase 5: Install Script (curl) (✅)   | 2 hours         | 12-17 hours |
-| Phase 6: Documentation                | 1-1.5 hours     | 13-18 hours |
-| **Total**                             | **13-18 hours** |             |
+| Phase                                  | Duration        | Cumulative  |
+| -------------------------------------- | --------------- | ----------- |
+| Phase 1: CLI Structure (✅ Completed)  | 4-6 hours       | 4-6 hours   |
+| Phase 2: Binary Compilation (✅ Done)  | 2-3 hours       | 6-9 hours   |
+| Phase 3: Beacon Pattern + Publish (✅) | 2-3 hours       | 8-12 hours  |
+| Phase 4: GitHub Actions (CI) (✅ Done) | 2-3 hours       | 10-15 hours |
+| Phase 5: Install Script (curl) (✅)    | 2 hours         | 12-17 hours |
+| Phase 6: Documentation (✅ Completed)  | 1-1.5 hours     | 13-18 hours |
+| **Total**                              | **13-18 hours** |             |
 
 ---
 

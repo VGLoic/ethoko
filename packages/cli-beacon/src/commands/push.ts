@@ -58,7 +58,7 @@ export function registerPushCommand(
 
       if (!finalArtifactPath) {
         cliError(
-          "Artifact path must be provided either via --artifact-path flag or compilationOutputPath in config",
+          "Artifact path is required. Provide --artifact-path or set compilationOutputPath in ethoko.json",
         );
         process.exitCode = 1;
         return;
