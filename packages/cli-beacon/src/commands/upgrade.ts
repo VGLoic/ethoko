@@ -4,7 +4,7 @@ import {
   error as cliError,
   info as cliInfo,
   success as cliSuccess,
-} from "@ethoko/core/cli-ui";
+} from "@/cli-ui";
 
 import {
   detectInstallMethod,

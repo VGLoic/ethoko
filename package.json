@@ -19,8 +19,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "test": "turbo run test",
-    "test:e2e:core": "pnpm --filter @ethoko/core test:e2e",
+    "test:unit": "turbo run test:unit",
+    "test:e2e:core": "pnpm --filter @ethoko/cli-beacon test:e2e",
     "test:e2e:apps": "turbo run test:e2e:apps",
     "lint": "turbo run lint",
     "format": "turbo run format",

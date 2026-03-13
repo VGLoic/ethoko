@@ -36,18 +36,29 @@
     }
   },
   "scripts": {
-    "build": "tsup",
-    "build:binary": "bun scripts/build-binary.ts",
+    "generate-template": "mkdir -p templates && cp templates-builder/typings.ts templates/typings.txt",
+    "build": "pnpm generate-template && tsup",
+    "build:binary": "pnpm generate-template &&  bun scripts/build-binary.ts",
     "publish-cli": "bun scripts/publish-cli.ts",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write src/**/*.ts",
-    "check-format": "prettier --check src/**/*.ts",
-    "check-types": "tsc --noEmit",
-    "test": "vitest run"
+    "format": "prettier --write src/**/*.ts test/**/*.ts scripts/**/*.ts templates-builder/**/*.ts",
+    "check-format": "prettier --check src/**/*.ts test/**/*.ts scripts/**/*.ts templates-builder/**/*.ts",
+    "check-types": "tsc --noEmit && vitest run --project typecheck",
+    "test:unit": "vitest run --project unit",
+    "test:e2e": "vitest run --project e2e",
+    "test:localstack:up": "docker compose -f compose.test.yml up -d",
+    "test:localstack:down": "docker compose -f compose.test.yml down -v",
+    "test:localstack:logs": "docker compose -f compose.test.yml logs -f"
   },
   "dependencies": {
-    "@ethoko/core": "workspace:*",
+    "@aws-sdk/client-s3": "^3.624.0",
+    "@aws-sdk/client-sts": "^3.624.0",
+    "@ethersproject/keccak256": "^5.7.0",
+    "@ethersproject/strings": "^5.7.0",
+    "@smithy/types": "^3.3.0",
+    "boxen": "5.1.2",
     "commander": "^12.1.0",
+    "ora": "5.4.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

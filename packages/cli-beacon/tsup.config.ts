@@ -17,6 +17,7 @@ export default defineConfig({
   banner: {
     js: "#!/usr/bin/env node",
   },
+  publicDir: "templates",
   define: {
     __ETHOKO_VERSION__: JSON.stringify(packageJson.version),
   },

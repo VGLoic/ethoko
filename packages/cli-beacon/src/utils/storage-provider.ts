@@ -1,7 +1,4 @@
-import {
-  LocalStorageProvider,
-  S3BucketProvider,
-} from "@ethoko/core/storage-provider";
+import { LocalStorageProvider, S3BucketProvider } from "@/storage-provider";
 
 import type { EthokoCliConfig } from "../config.js";
 

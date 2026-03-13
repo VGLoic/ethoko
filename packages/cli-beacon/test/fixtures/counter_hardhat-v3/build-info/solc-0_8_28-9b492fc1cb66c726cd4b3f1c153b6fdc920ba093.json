@@ -1,0 +1,46 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-9b492fc1cb66c726cd4b3f1c153b6fdc920ba093",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/Counter.sol": "project/contracts/Counter.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "metadata": {
+        "useLiteralContent": true
+      },
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "devdoc",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.gasEstimates",
+            "evm.methodIdentifiers",
+            "metadata",
+            "storageLayout",
+            "userdoc"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Counter.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract Counter {\n    uint256 public counter;\n\n    function increment() public {\n        counter += 1;\n    }\n}\n"
+      }
+    }
+  }
+}

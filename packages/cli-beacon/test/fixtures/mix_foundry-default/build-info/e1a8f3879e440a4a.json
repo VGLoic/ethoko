@@ -1,0 +1,12 @@
+{
+  "id": "e1a8f3879e440a4a",
+  "source_id_to_path": {
+    "0": "lib/openzeppelin-contracts/contracts/access/Ownable.sol",
+    "1": "lib/openzeppelin-contracts/contracts/utils/Context.sol",
+    "2": "src/Counter.sol",
+    "3": "src/ExternalMath.sol",
+    "4": "src/InternalMath.sol",
+    "5": "src/Oracle.sol"
+  },
+  "language": "Solidity"
+}

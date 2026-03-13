@@ -26,8 +26,8 @@ CLI delivery strategy overview: `docs/CLI_DELIVERY.md`
 ```bash
 # Root level
 pnpm build              # Build all packages
-pnpm test               # Run all tests
-pnpm test:e2e:core      # Run E2E tests for @ethoko/core
+pnpm test:unit          # Run all unit tests
+pnpm test:e2e:core      # Run E2E tests for @ethoko/cli-beacon
 pnpm test:e2e:apps      # Run E2E tests for integration apps
 pnpm lint               # Lint all packages
 pnpm format             # Format all packages

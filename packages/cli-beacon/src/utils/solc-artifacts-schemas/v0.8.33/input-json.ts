@@ -1,0 +1,285 @@
+import z from "zod";
+
+// This file contains the Zod schema for the input JSON structure as output by the Solidity compiler (solc).
+// Fields and comments are copied from https://docs.soliditylang.org/en/v0.8.33/using-the-compiler.html#input-description
+
+const Keccak256DigestSchema = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
+
+export const SolSourceSchema = z.object({
+  // [Added by me]
+  license: z.string().optional(),
+  // Optional: keccak256 hash of the source file
+  // It is used to verify the retrieved content if imported via URLs.
+  keccak256: Keccak256DigestSchema.optional(),
+  // Required (unless "content" is used, see below): URL(s) to the source file.
+  // URL(s) should be imported in this order and the result checked against the
+  // keccak256 hash (if available). If the hash doesn't match or none of the
+  // URL(s) result in success, an error should be raised.
+  // Using the commandline interface only filesystem paths are supported.
+  // With the JavaScript interface the URL will be passed to the user-supplied
+  // read callback, so any URL supported by the callback can be used.
+  urls: z.array(z.string()).optional(),
+  // Required (unless "urls" is used): literal contents of the source file
+  content: z.string().optional(),
+});
+
+const SolAstSourceSchema = z.object({
+  // If language is set to "SolidityAST", an AST needs to be supplied under the "ast" key
+  // and there can be only one source file present.
+  // The format is the same as used by the `ast` output.
+  // Note that importing ASTs is experimental and in particular that:
+  // - importing invalid ASTs can produce undefined results and
+  // - no proper error reporting is available on invalid ASTs.
+  // Furthermore, note that the AST import only consumes the fields of the AST as
+  // produced by the compiler in "stopAfter": "parsing" mode and then re-performs
+  // analysis, so any analysis-based annotations of the AST are ignored upon import.
+  ast: z.record(z.string(), z.unknown()),
+});
+
+const EvmAssemblySourceSchema = z.object({
+  // If language is set to "EVMAssembly", an EVM Assembly JSON object needs to be supplied
+  // under the "assemblyJson" key and there can be only one source file present.
+  // The format is the same as used by the `evm.legacyAssembly` output or `--asm-json` command line output.
+  // Note that importing EVM assembly is experimental.
+  assemblyJson: z.object({
+    ".code": z.array(z.unknown()),
+    ".data": z.record(z.string(), z.unknown()).optional(),
+    sourceList: z.array(z.string()).optional(),
+  }),
+});
+
+export const InputSourceSchema = SolSourceSchema.or(SolAstSourceSchema).or(
+  EvmAssemblySourceSchema,
+);
+
+const OptimizerDetailsSchema = z.object({
+  // Peephole optimizer (opcode-based). Optional. Default: true.
+  // Default for EVMAssembly input: false when optimization is not enabled.
+  // NOTE: Always runs (even with optimization disabled) except for EVMAssembly input or when explicitly turned off here.
+  peephole: z.boolean().optional(),
+  // Inliner (opcode-based). Optional. Default: true when optimization is enabled.
+  inliner: z.boolean().optional(),
+  // Unused JUMPDEST remover (opcode-based). Optional. Default: true.
+  // Default for EVMAssembly input: false when optimization is not enabled.
+  // NOTE: Always runs (even with optimization disabled) except for EVMAssembly input or when explicitly turned off here.
+  jumpdestRemover: z.boolean().optional(),
+  // Literal reordering (codegen-based). Optional. Default: true when optimization is enabled.
+  // Moves literals to the right of commutative binary operators during code generation, helping exploit associativity.
+  orderLiterals: z.boolean().optional(),
+  // Block deduplicator (opcode-based). Optional. Default: true when optimization is enabled.
+  // Unifies assembly code blocks that share content.
+  deduplicate: z.boolean().optional(),
+  // Common subexpression elimination (opcode-based). Optional. Default: true when optimization is enabled.
+  // This is the most complicated step but can also provide the largest gain.
+  cse: z.boolean().optional(),
+  // Constant optimizer (opcode-based). Optional. Default: true when optimization is enabled.
+  // Tries to find better representations of literal numbers and strings, that satisfy the
+  // size/cost trade-off determined by the 'runs' setting.
+  constantOptimizer: z.boolean().optional(),
+  // Unchecked loop increment (codegen-based). Optional. Default: true.
+  // Use unchecked arithmetic when incrementing the counter of 'for' loops under certain circumstances.
+  // NOTE: Always runs (even with optimization disabled) unless explicitly turned off here.
+  simpleCounterForLoopUncheckedIncrement: z.boolean().optional(),
+  // Yul optimizer. Optional. Default: true when optimization is enabled.
+  // Used to optimize the IR produced by the Yul IR-based pipeline as well as inline assembly
+  // and utility Yul code generated by the compiler.
+  // NOTE: Before Solidity 0.6.0 the default was false.
+  yul: z.boolean().optional(),
+  // Tuning options for the Yul optimizer. Optional.
+  yulDetails: z
+    .object({
+      // Improve allocation of stack slots for variables, can free up stack slots early.
+      // Optional. Default: true if Yul optimizer is enabled.
+      stackAllocation: z.boolean().optional(),
+      // Optimization step sequence.
+      // The general form of the value is "<main sequence>:<cleanup sequence>".
+      // The setting is optional and when omitted, default values are used for both sequences.
+      // If the value does not contain the ':' delimiter, it is interpreted as the main
+      // sequence and the default is used for the cleanup sequence.
+      // To make one of the sequences empty, the delimiter must be present at the first or last position.
+      // In particular if the whole value consists only of the delimiter, both sequences are empty.
+      // Note that there are several hard-coded steps that always run, even when both sequences are empty.
+      // For more information see "The Optimizer > Selecting Optimizations".
+      optimizerSteps: z.string().optional(),
+    })
+    .optional(),
+});
+
+const OptimizerSettingsSchema = z.object({
+  // Turn on the optimizer. Optional. Default: false.
+  // NOTE: The state of the optimizer is fully determined by the 'details' dict and this setting
+  // only affects its defaults - when enabled, all components default to being enabled.
+  // The opposite is not true - there are several components that always default to being
+  // enabled an can only be explicitly disabled via 'details'.
+  // WARNING: Before version 0.8.6 omitting this setting was not equivalent to setting
+  // it to false and would result in all components being disabled instead.
+  // WARNING: Enabling optimizations for EVMAssembly input is allowed but not necessary under normal
+  // circumstances. It forces the opcode-based optimizer to run again and can produce bytecode that
+  // is not reproducible from metadata.
+  enabled: z.boolean().optional(),
+  // Optimize for how many times you intend to run the code. Optional. Default: 200.
+  runs: z.number().optional(),
+  // State of all optimizer components. Optional.
+  // Default values are determined by whether the optimizer is enabled or not.
+  // Note that the 'enabled' setting only affects the defaults here and has no effect when
+  // all values are provided explicitly.
+  details: OptimizerDetailsSchema.optional(),
+});
+
+const DebugSettingsSchema = z.object({
+  // How to treat revert (and require) reason strings. Settings are
+  // "default", "strip", "debug" and "verboseDebug".
+  // "default" does not inject compiler-generated revert strings and keeps user-supplied ones.
+  // "strip" removes all revert strings (if possible, i.e. if literals are used) keeping side-effects
+  // "debug" injects strings for compiler-generated internal reverts, implemented for ABI encoders V1 and V2 for now.
+  // "verboseDebug" even appends further information to user-supplied revert strings (not yet implemented)
+  revertStrings: z
+    .enum(["default", "strip", "debug", "verboseDebug"])
+    .optional(),
+  // Optional: How much extra debug information to include in comments in the produced EVM
+  // assembly and Yul code. Available components are:
+  // - `location`: Annotations of the form `@src <index>:<start>:<end>` indicating the
+  //    location of the corresponding element in the original Solidity file, where:
+  //     - `<index>` is the file index matching the `@use-src` annotation,
+  //     - `<start>` is the index of the first byte at that location,
+  //     - `<end>` is the index of the first byte after that
+  // - `snippet`: A single-line code snippet from the location indicated by `@src`.
+  //     The snippet is quoted and follows the corresponding `@src` annotation.
+  // - `*`: Wildcard value that can be used to request everything.
+  debugInfo: z.array(z.enum(["location", "snippet", "*"])).optional(),
+});
+
+const MetadataSettingsSchema = z.object({
+  // The CBOR metadata is appended at the end of the bytecode by default.
+  // Setting this to false omits the metadata from the runtime and deploy time code.
+  appendCBOR: z.boolean().optional(),
+  // Use only literal content and not URLs (false by default)
+  useLiteralContent: z.boolean().optional(),
+  // Use the given hash method for the metadata hash that is appended to the bytecode.
+  // The metadata hash can be removed from the bytecode via option "none".
+  // The other options are "ipfs" and "bzzr1".
+  // If the option is omitted, "ipfs" is used by default.
+  bytecodeHash: z.enum(["none", "ipfs", "bzzr1"]).optional(),
+});
+
+const ModelCheckerSettingsSchema = z.object({
+  // Chose which contracts should be analyzed as the deployed one.
+  contracts: z.record(
+    z.string(), // Source file name
+    z.array(z.string()), // Contract names
+  ),
+  // Choose how division and modulo operations should be encoded.
+  // When using `false` they are replaced by multiplication with slack
+  // variables. This is the default.
+  // Using `true` here is recommended if you are using the CHC engine
+  // and not using Spacer as the Horn solver (using Eldarica, for example).
+  // See the Formal Verification section for a more detailed explanation of this option.
+  divModNoSlacks: z.boolean().optional(),
+  // Choose which model checker engine to use: all (default), bmc, chc, none.
+  engine: z.enum(["all", "bmc", "chc", "none"]).optional(),
+  // Choose whether external calls should be considered trusted in case the
+  // code of the called function is available at compile-time.
+  // For details see the SMTChecker section.
+  extCalls: z.string().optional(),
+  // Choose which types of invariants should be reported to the user: contract, reentrancy.
+  invariants: z.array(z.enum(["contract", "reentrancy"])).optional(),
+  // Choose whether to output all proved targets. The default is `false`.
+  showProvedSafe: z.boolean().optional(),
+  // Choose whether to output all unproved targets. The default is `false`.
+  showUnproved: z.boolean().optional(),
+  // Choose whether to output all unsupported language features. The default is `false`.
+  showUnsupported: z.boolean().optional(),
+  // Choose which solvers should be used, if available.
+  // See the Formal Verification section for the solvers description.
+  solvers: z.array(z.string()).optional(),
+  // Choose which targets should be checked: constantCondition,
+  // underflow, overflow, divByZero, balance, assert, popEmptyArray, outOfBounds.
+  // If the option is not given all targets are checked by default,
+  // except underflow/overflow for Solidity >=0.8.7.
+  // See the Formal Verification section for the targets description.
+  targets: z.array(z.string()).optional(),
+  // Timeout for each SMT query in milliseconds.
+  // If this option is not given, the SMTChecker will use a deterministic
+  // resource limit by default.
+  // A given timeout of 0 means no resource/time restrictions for any query.
+  timeout: z.number().optional(),
+});
+
+export const SettingsSchema = z.object({
+  // Optional: Stop compilation after the given stage. Currently only "parsing" is valid here
+  stopAfter: z.enum(["parsing"]).optional(),
+  // Optional: List of remappings
+  remappings: z.array(z.string()).optional(),
+  // Optional: Optimizer settings
+  optimizer: OptimizerSettingsSchema.optional(),
+  // Version of the EVM to compile for (optional).
+  // Affects type checking and code generation. Can be homestead,
+  // tangerineWhistle, spuriousDragon, byzantium, constantinople,
+  // petersburg, istanbul, berlin, london, paris, shanghai, cancun, prague or osaka (default).
+  evmVersion: z.string().optional(),
+  // EVM Object Format version to compile for (optional, experimental).
+  // Currently the only valid value is 1. If not specified, legacy non-EOF bytecode will be generated.
+  // Requires `evmVersion` >= osaka.
+  eofVersion: z.number().optional(),
+  // Optional: Change compilation pipeline to go through the Yul intermediate representation.
+  // This is false by default.
+  viaIR: z.boolean().optional(),
+  // Optional: Debugging settings
+  debug: DebugSettingsSchema.optional(),
+  // Metadata settings (optional)
+  metadata: MetadataSettingsSchema.optional(),
+  // Addresses of the libraries. If not all libraries are given here,
+  // it can result in unlinked objects whose output data is different.
+  libraries: z
+    .record(
+      // The top level key is the name of the source file where the library is used.
+      // If remappings are used, this source file should match the global path
+      // after remappings were applied.
+      // If this key is an empty string, that refers to a global level.
+      z.string(),
+      z.record(
+        z.string(), // Library name
+        z.string().regex(/^0x[0-9a-fA-F]{40}$/), // Library address
+      ),
+    )
+    .optional(),
+  // The following can be used to select desired outputs based
+  // on file and contract names.
+  // If this field is omitted, then the compiler loads and does type checking,
+  // but will not generate any outputs apart from errors.
+  // The first level key is the file name and the second level key is the contract name.
+  // An empty contract name is used for outputs that are not tied to a contract
+  // but to the whole source file like the AST.
+  // A star as contract name refers to all contracts in the file.
+  // Similarly, a star as a file name matches all files.
+  // To select all outputs the compiler can possibly generate, with the exclusion of
+  // Yul intermediate representation outputs, use
+  // "outputSelection: { "*": { "*": [ "*" ], "": [ "*" ] } }"
+  // but note that this might slow down the compilation process needlessly.
+  outputSelection: z
+    .record(
+      z.string(), // File name or "*"
+      z.record(
+        z.string(), // Contract name or ""
+        z.array(z.string()), // Output types
+      ),
+    )
+    .optional(),
+  // The modelChecker object is experimental and subject to changes.
+  modelChecker: ModelCheckerSettingsSchema.optional(),
+});
+
+/**
+ * This schema represents the input JSON structure as output by the Solidity compiler (solc).
+ * Field and comments are copied from https://docs.soliditylang.org/en/v0.8.33/using-the-compiler.html#input-description
+ *
+ * Taken at version v0.8.33
+ */
+export const SolcJsonInputSchema = z.object({
+  // Required: Source code language. Currently supported are "Solidity", "Yul", "SolidityAST" (experimental), "EVMAssembly" (experimental).
+  language: z.enum(["Solidity", "Yul", "SolidityAST", "EVMAssembly"]),
+  // Required: Record where keys are the "global" names of the source files, imports can use other files via remappings (see below)
+  sources: z.record(z.string(), InputSourceSchema),
+  // Optional
+  settings: SettingsSchema.optional(),
+});

@@ -184,7 +184,11 @@ const main = async () => {
   const wrapperBinDir = path.resolve(wrapperDir, "bin");
   await ensureDir(wrapperBinDir);
 
-  await fs.writeFile(path.resolve(wrapperBinDir, "ethoko"), wrapperScript, "utf8");
+  await fs.writeFile(
+    path.resolve(wrapperBinDir, "ethoko"),
+    wrapperScript,
+    "utf8",
+  );
   await fs.chmod(path.resolve(wrapperBinDir, "ethoko"), 0o755);
 
   const optionalDependencies = Object.fromEntries(

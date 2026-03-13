@@ -1,12 +1,8 @@
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  boxHeader,
-  displayRestoreResult,
-  error as cliError,
-} from "@ethoko/core/cli-ui";
-import { CliError, restore, type RestoreResult } from "@ethoko/core/cli-client";
-import { LocalStorage } from "@ethoko/core/local-storage";
+import { boxHeader, displayRestoreResult, error as cliError } from "@/cli-ui";
+import { CliError, restore, type RestoreResult } from "@/cli-client";
+import { LocalStorage } from "@/local-storage";
 
 import type { EthokoCliConfig } from "../config.js";
 import { createStorageProvider } from "../utils/storage-provider.js";

@@ -1,0 +1,14 @@
+services:
+  localstack:
+    container_name: ethoko-localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sts
+      - DEBUG=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

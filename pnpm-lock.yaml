@@ -434,12 +434,30 @@ importers:
 
   packages/cli-beacon:
     dependencies:
-      '@ethoko/core':
-        specifier: workspace:*
-        version: link:../core
+      '@aws-sdk/client-s3':
+        specifier: ^3.624.0
+        version: 3.978.0
+      '@aws-sdk/client-sts':
+        specifier: ^3.624.0
+        version: 3.981.0
+      '@ethersproject/keccak256':
+        specifier: ^5.7.0
+        version: 5.8.0
+      '@ethersproject/strings':
+        specifier: ^5.7.0
+        version: 5.8.0
+      '@smithy/types':
+        specifier: ^3.3.0
+        version: 3.7.2
+      boxen:
+        specifier: 5.1.2
+        version: 5.1.2
       commander:
         specifier: ^12.1.0
         version: 12.1.0
+      ora:
+        specifier: 5.4.1
+        version: 5.4.1
       zod:
         specifier: ^4.3.6
         version: 4.3.6

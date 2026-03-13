@@ -1,12 +1,8 @@
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  boxHeader,
-  displayPullResults,
-  error as cliError,
-} from "@ethoko/core/cli-ui";
-import { CliError, pull } from "@ethoko/core/cli-client";
-import { LocalStorage } from "@ethoko/core/local-storage";
+import { boxHeader, displayPullResults, error as cliError } from "@/cli-ui";
+import { CliError, pull } from "@/cli-client";
+import { LocalStorage } from "@/local-storage";
 
 import type { EthokoCliConfig } from "../config.js";
 import { createStorageProvider } from "../utils/storage-provider.js";

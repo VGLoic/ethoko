@@ -37,8 +37,8 @@
       "cache": false,
       "persistent": true
     },
-    "test": {
-      "dependsOn": ["build", "^test"]
+    "test:unit": {
+      "dependsOn": ["^test:unit"]
     },
     "test:e2e:apps": {
       "dependsOn": ["^build"]
