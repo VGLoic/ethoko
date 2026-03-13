@@ -295,7 +295,7 @@ This is acceptable because:
 
 This is the simplest approach that covers the primary use case well:
 
-1. **curl installs get full self-management** -- this is the primary use case for standalone CLI users (Foundry users, CI/CD)
+1. **curl installs get full self-management** -- this is the primary use case for standalone CLI users
 2. **npm/brew users get clear instructions** -- no risk of breaking their setup
 3. **npm global vs local distinction** -- users get the right command for their situation
 4. **No Windows-specific code** -- matches OpenCode's approach, keeps implementation simple

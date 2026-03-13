@@ -2567,7 +2567,7 @@ Integration testing is scheduled for a later iteration.
 ```bash
 pnpm changeset add
 # Select: @ethoko/cli-beacon (minor)
-# Summary: "Add standalone CLI for Foundry users"
+# Summary: "Add standalone CLI"
 ```
 
 **Merge Version PR:**
