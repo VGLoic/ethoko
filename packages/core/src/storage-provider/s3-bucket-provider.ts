@@ -65,44 +65,53 @@ export class S3BucketProvider implements StorageProvider {
       return this.client;
     }
 
-    if (!this.config.credentials?.role) {
-      const clientConfig = {
+    const credentialsConfig = this.config.credentials;
+    if (!credentialsConfig) {
+      if (this.config.debug) {
+        console.error(
+          styleText(
+            LOG_COLORS.log,
+            "No AWS credentials provided in config, using default credential provider chain",
+          ),
+        );
+      }
+      this.client = new S3Client({
         region: this.config.bucketRegion,
         endpoint: this.config.endpoint,
         forcePathStyle: this.config.forcePathStyle,
-      };
-
-      if (this.config.credentials) {
-        this.client = new S3Client({
-          ...clientConfig,
-          credentials: {
-            accessKeyId: this.config.credentials.accessKeyId,
-            secretAccessKey: this.config.credentials.secretAccessKey,
-          },
-        });
-        if (this.config.debug) {
-          console.error(
-            styleText(
-              LOG_COLORS.log,
-              "Using explicit AWS credentials from config",
-            ),
-          );
-        }
-      } else {
-        this.client = new S3Client(clientConfig);
-        if (this.config.debug) {
-          console.error(
-            styleText(
-              LOG_COLORS.log,
-              "Using AWS default credential provider chain",
-            ),
-          );
-        }
-      }
-
+      });
       return this.client;
     }
 
+    if (!credentialsConfig.role) {
+      if (this.config.debug) {
+        console.error(
+          styleText(
+            LOG_COLORS.log,
+            "No role configuration provided, using static credentials from config",
+          ),
+        );
+      }
+      this.client = new S3Client({
+        region: this.config.bucketRegion,
+        endpoint: this.config.endpoint,
+        forcePathStyle: this.config.forcePathStyle,
+        credentials: {
+          accessKeyId: credentialsConfig.accessKeyId,
+          secretAccessKey: credentialsConfig.secretAccessKey,
+        },
+      });
+      return this.client;
+    }
+
+    if (this.config.debug) {
+      console.error(
+        styleText(
+          LOG_COLORS.log,
+          `Role configuration provided, will attempt to assume role ${credentialsConfig.role.roleArn} before accessing S3`,
+        ),
+      );
+    }
     const roleCredentials = await this.getRoleCredentials();
     this.client = new S3Client({
       region: this.config.bucketRegion,
