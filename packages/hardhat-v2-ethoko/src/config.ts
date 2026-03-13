@@ -36,18 +36,20 @@ export type EthokoHardhatUserConfig = {
         type: "aws";
         awsRegion: string;
         awsBucketName: string;
-        credentials?: {
-          accessKeyId: string;
-          secretAccessKey: string;
-          role?: {
-            roleArn: string;
-            externalId?: string;
-            sessionName?: string;
-            durationSeconds?: number;
-          };
-        } | {
-          profile: string;
-        };
+        credentials?:
+          | {
+              accessKeyId: string;
+              secretAccessKey: string;
+              role?: {
+                roleArn: string;
+                externalId?: string;
+                sessionName?: string;
+                durationSeconds?: number;
+              };
+            }
+          | {
+              profile: string;
+            };
       }
     | {
         type: "local";
