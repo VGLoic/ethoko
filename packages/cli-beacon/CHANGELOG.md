@@ -1,5 +1,11 @@
 # @ethoko/cli-beacon
 
+## 0.5.0
+
+### Minor Changes
+
+- 13b72f9: Inherit from @ethoko/core structure
+
 ## 0.4.0
 
 ### Minor Changes
