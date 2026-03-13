@@ -4,7 +4,7 @@ import {
   error as cliError,
   info as cliInfo,
   success as cliSuccess,
-} from "@/cli-ui";
+} from "@/ui/index.js";
 
 import {
   detectInstallMethod,

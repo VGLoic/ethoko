@@ -5,8 +5,8 @@ import {
   displayListArtifactsResults,
   displayListArtifactsResultsJson,
   error as cliError,
-} from "@/cli-ui";
-import { CliError, listPulledArtifacts } from "@/cli-client";
+} from "@/ui/index.js";
+import { CliError, listPulledArtifacts } from "@/client/index.js";
 import { LocalStorage } from "@/local-storage";
 
 import type { EthokoCliConfig } from "../config.js";

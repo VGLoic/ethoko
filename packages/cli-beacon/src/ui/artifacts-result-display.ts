@@ -1,5 +1,5 @@
 import { styleText } from "node:util";
-import type { ListArtifactsResult } from "../cli-client";
+import type { ListArtifactsResult } from "../client";
 import { LOG_COLORS, warn } from "./utils";
 
 export function displayListArtifactsResultsJson(

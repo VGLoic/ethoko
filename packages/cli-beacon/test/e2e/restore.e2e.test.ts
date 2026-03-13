@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect } from "vitest";
-import { pull, push, restore } from "@/cli-client";
+import { pull, push, restore } from "@/client";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {

@@ -1,5 +1,5 @@
 import { styleText } from "node:util";
-import type { Difference, PullResult } from "../cli-client";
+import type { Difference, PullResult } from "../client";
 import { LOG_COLORS, success, boxSummary } from "./utils";
 
 // ##########################################

@@ -1,6 +1,6 @@
 import { styleText } from "node:util";
 
-import type { InspectResult } from "../cli-client/inspect";
+import type { InspectResult } from "../client/inspect";
 import { boxSummary, LOG_COLORS } from "./utils";
 
 export function displayInspectResult(

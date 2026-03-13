@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { inspectArtifact, pull, push } from "@/cli-client/index";
+import { inspectArtifact, pull, push } from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {

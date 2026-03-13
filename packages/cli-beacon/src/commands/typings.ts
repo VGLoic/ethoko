@@ -2,8 +2,8 @@ import { styleText } from "node:util";
 
 import { Command } from "commander";
 import { z } from "zod";
-import { boxHeader, error as cliError, LOG_COLORS } from "@/cli-ui";
-import { CliError, generateArtifactsSummariesAndTypings } from "@/cli-client";
+import { boxHeader, error as cliError, LOG_COLORS } from "@/ui/index.js";
+import { CliError, generateArtifactsSummariesAndTypings } from "@/client/index.js";
 import { LocalStorage } from "@/local-storage";
 
 import type { EthokoCliConfig } from "../config.js";

@@ -2,7 +2,7 @@ import { LocalStorage } from "../local-storage";
 import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";
 import { ContractMetadataSchema } from "@/utils/solc-artifacts-schemas/v0.8.33/contract-metadata-json";
-import { warn } from "@/cli-ui";
+import { warn } from "@/ui";
 import z from "zod";
 
 type ContractBytecode = {

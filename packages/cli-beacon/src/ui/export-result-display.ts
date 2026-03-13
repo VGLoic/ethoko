@@ -1,4 +1,4 @@
-import type { ExportContractArtifactResult } from "../cli-client/export-contract-artifact";
+import type { ExportContractArtifactResult } from "../client/export-contract-artifact";
 
 export function displayExportResult(
   result: ExportContractArtifactResult,

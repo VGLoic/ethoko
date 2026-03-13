@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { z } from "zod";
-import { boxHeader, displayPullResults, error as cliError } from "@/cli-ui";
-import { CliError, pull } from "@/cli-client";
+import { boxHeader, displayPullResults, error as cliError } from "@/ui/index.js";
+import { CliError, pull } from "@/client/index.js";
 import { LocalStorage } from "@/local-storage";
 
 import type { EthokoCliConfig } from "../config.js";

@@ -5,8 +5,8 @@ import {
   displayInspectResult,
   displayInspectResultJson,
   error as cliError,
-} from "@/cli-ui";
-import { CliError, inspectArtifact } from "@/cli-client";
+} from "@/ui/index.js";
+import { CliError, inspectArtifact } from "@/client/index.js";
 import { LocalStorage } from "@/local-storage";
 
 import type { EthokoCliConfig } from "../config.js";

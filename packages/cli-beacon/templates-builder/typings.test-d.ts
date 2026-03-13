@@ -4,7 +4,7 @@ import type {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
 } from "@/utils/ethoko-artifacts-schemas/v0";
-import { ExportContractArtifactResult } from "@/cli-client";
+import { ExportContractArtifactResult } from "@/client";
 
 test("EthokoInputArtifact in generated typings is ok with Ethoko artifacts", () => {
   assertType<EthokoTypings.EthokoInputArtifact>(

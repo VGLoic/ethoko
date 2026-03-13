@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import { describe, expect } from "vitest";
-import { listPulledArtifacts, pull, push } from "@/cli-client/index";
+import { listPulledArtifacts, pull, push } from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {

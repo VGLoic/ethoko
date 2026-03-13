@@ -1,5 +1,5 @@
 import { styleText } from "node:util";
-import type { RestoreResult } from "../cli-client";
+import type { RestoreResult } from "../client";
 import { LOG_COLORS, boxSummary, success } from "./utils";
 
 export function displayRestoreResult(
