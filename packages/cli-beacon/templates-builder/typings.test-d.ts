@@ -3,7 +3,7 @@ import type * as EthokoTypings from "./typings";
 import type {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
-} from "@/utils/ethoko-artifacts-schemas/v0";
+} from "@/ethoko-artifacts/v0";
 import { ExportContractArtifactResult } from "@/client";
 
 test("EthokoInputArtifact in generated typings is ok with Ethoko artifacts", () => {
