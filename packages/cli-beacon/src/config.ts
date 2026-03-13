@@ -11,6 +11,10 @@ const AwsStorageSchema = z
         1,
         'The "awsRegion" field is required when "type" is "aws". Provide a valid AWS region like "eu-west-3".',
       ),
+    awsProfile: z
+      .string('The "awsProfile" field must be a string when "type" is "aws"')
+      .min(1, 'If provided, the "awsProfile" field must not be an empty string when "type" is "aws". Provide the name of the AWS CLI profile to use for credentials.')
+      .optional(),
     awsBucketName: z
       .string('The "awsBucketName" field must be a string when "type" is "aws"')
       .min(
@@ -21,7 +25,7 @@ const AwsStorageSchema = z
       .string(
         'The "awsAccessKeyId" field must be a string when "type" is "aws"',
       )
-      .min(1)
+      .min(1, 'If provided, the "awsAccessKeyId" field must not be an empty string when "type" is "aws". Provide a valid AWS access key ID.')
       .optional(),
     awsSecretAccessKey: z
       .string(
@@ -29,7 +33,7 @@ const AwsStorageSchema = z
       )
       .min(
         1,
-        'If provided, the "awsSecretAccessKey" field must not be an empty string when "type" is "aws"',
+        'If provided, the "awsSecretAccessKey" field must not be an empty string when "type" is "aws". Provide a valid AWS secret access key.',
       )
       .optional(),
     awsRoleArn: z
@@ -75,39 +79,12 @@ const AwsStorageSchema = z
       .optional(),
   })
   .transform((data, ctx) => {
-    let credentials:
-      | {
-          accessKeyId: string;
-          secretAccessKey: string;
-          role?: {
-            roleArn: string;
-            externalId?: string;
-            sessionName?: string;
-            durationSeconds?: number;
-          };
-        }
-      | undefined = undefined;
-    // Access key and secret must be provided together
-    const accessKey = data.awsAccessKeyId;
-    const secretKey = data.awsSecretAccessKey;
-    if (accessKey && secretKey) {
-      credentials = {
-        accessKeyId: accessKey,
-        secretAccessKey: secretKey,
-      };
-    } else if (accessKey || secretKey) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          'Both "awsAccessKeyId" and "awsSecretAccessKey" must be provided together when "type" is "aws"',
-        input: data,
-      });
-      return z.NEVER;
-    }
-
-    // If no credentials provided, all the role related fields must be empty
-    if (!credentials) {
+    // If AWS profile is provided, use profile based credentials
+    if (data.awsProfile) {
+      // When using profile based credentials, role configuration fields must be empty
       if (
+        data.awsAccessKeyId ||
+        data.awsSecretAccessKey ||
         data.awsRoleArn ||
         data.awsRoleExternalId ||
         data.awsRoleSessionName ||
@@ -116,12 +93,26 @@ const AwsStorageSchema = z
         ctx.addIssue({
           code: "custom",
           message:
-            'When no AWS credentials are provided, role configuration fields ("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds") must be empty',
+            'When "awsProfile" is provided, credential fields ("awsAccessKeyId", "awsSecretAccessKey") and role configuration fields ("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds") must be empty',
           input: data,
         });
         return z.NEVER;
       }
-    } else {
+      return {
+        type: "aws" as const,
+        region: data.awsRegion,
+        bucketName: data.awsBucketName,
+        credentials: {
+          type: "profile" as const,
+          profile: data.awsProfile,
+        },
+      };
+    }
+
+    // For static configuration, access key and secret must be provided together
+    const accessKey = data.awsAccessKeyId;
+    const secretKey = data.awsSecretAccessKey;
+    if (accessKey && secretKey) {
       let roleConfig:
         | {
             roleArn: string;
@@ -155,14 +146,48 @@ const AwsStorageSchema = z
         }
       }
 
-      credentials.role = roleConfig;
+      return {
+        type: "aws" as const,
+        region: data.awsRegion,
+        bucketName: data.awsBucketName,
+        credentials: {
+          type: "static" as const,
+          accessKeyId: accessKey,
+          secretAccessKey: secretKey,
+          role: roleConfig,
+        },
+      };
+    }
+    if (accessKey || secretKey) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          'Both "awsAccessKeyId" and "awsSecretAccessKey" must be provided together when "type" is "aws"',
+        input: data,
+      });
+      return z.NEVER;
+    }
+
+    // Else, no credentials are provided, all the role related fields must be empty
+    if (
+      data.awsRoleArn ||
+      data.awsRoleExternalId ||
+      data.awsRoleSessionName ||
+      data.awsRoleDurationSeconds
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          'When no AWS credentials are provided, role configuration fields ("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds") must be empty',
+        input: data,
+      });
+      return z.NEVER;
     }
 
     return {
       type: "aws" as const,
       region: data.awsRegion,
       bucketName: data.awsBucketName,
-      credentials,
     };
   });
 

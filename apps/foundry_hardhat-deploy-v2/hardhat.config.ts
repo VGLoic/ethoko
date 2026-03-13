@@ -13,6 +13,9 @@ export default defineConfig({
       type: "aws",
       awsRegion: process.env.AWS_REGION || "abc",
       awsBucketName: process.env.AWS_S3_BUCKET || "abc",
+      credentials: {
+        profile: "ethoko"
+      }
     },
     debug: false,
   },

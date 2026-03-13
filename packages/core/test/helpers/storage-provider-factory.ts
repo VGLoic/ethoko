@@ -51,6 +51,7 @@ export class TestS3StorageProviderFactory extends StorageProviderFactory<S3Bucke
       bucketName: TEST_CONSTANTS.BUCKET_NAME,
       bucketRegion: TEST_CONSTANTS.LOCALSTACK.REGION,
       credentials: {
+        type: "static",
         accessKeyId: TEST_CONSTANTS.LOCALSTACK.ACCESS_KEY_ID,
         secretAccessKey: TEST_CONSTANTS.LOCALSTACK.SECRET_ACCESS_KEY,
       },

@@ -36,16 +36,20 @@ export type EthokoHardhatUserConfig = {
         type: "aws";
         awsRegion: string;
         awsBucketName: string;
-        credentials?: {
-          accessKeyId: string;
-          secretAccessKey: string;
-          role?: {
-            roleArn: string;
-            externalId?: string;
-            sessionName?: string;
-            durationSeconds?: number;
-          };
-        };
+        credentials?:
+          | {
+              accessKeyId: string;
+              secretAccessKey: string;
+              role?: {
+                roleArn: string;
+                externalId?: string;
+                sessionName?: string;
+                durationSeconds?: number;
+              };
+            }
+          | {
+              profile: string;
+            };
       }
     | {
         type: "local";
@@ -59,6 +63,39 @@ export type EthokoHardhatUserConfig = {
   debug?: boolean;
 };
 
+const StaticAwsCredentialsSchema = z
+  .object({
+    accessKeyId: z.string().min(1),
+    secretAccessKey: z.string().min(1),
+    role: z
+      .object({
+        roleArn: z.string().min(1),
+        externalId: z.string().min(1).optional(),
+        sessionName: z.string().min(1).default("ethoko-hardhat-session"),
+        durationSeconds: z.number().int().min(900).max(43200).default(3600),
+      })
+      .optional(),
+  })
+  .transform((creds) => {
+    return {
+      type: "static" as const,
+      accessKeyId: creds.accessKeyId,
+      secretAccessKey: creds.secretAccessKey,
+      role: creds.role,
+    };
+  });
+
+const ProfileAwsCredentialsSchema = z
+  .object({
+    profile: z.string().min(1),
+  })
+  .transform((creds) => {
+    return {
+      type: "profile" as const,
+      profile: creds.profile,
+    };
+  });
+
 export const EthokoHardhatConfigSchema = z.object({
   project: z.string().min(1),
   pulledArtifactsPath: z.string().default(".ethoko"),
@@ -70,23 +107,7 @@ export const EthokoHardhatConfigSchema = z.object({
       awsRegion: z.string().min(1),
       awsBucketName: z.string().min(1),
       credentials: z
-        .object({
-          accessKeyId: z.string().min(1),
-          secretAccessKey: z.string().min(1),
-          role: z
-            .object({
-              roleArn: z.string().min(1),
-              externalId: z.string().min(1).optional(),
-              sessionName: z.string().min(1).default("ethoko-hardhat-session"),
-              durationSeconds: z
-                .number()
-                .int()
-                .min(900)
-                .max(43200)
-                .default(3600),
-            })
-            .optional(),
-        })
+        .union([StaticAwsCredentialsSchema, ProfileAwsCredentialsSchema])
         .optional(),
     }),
     z.object({

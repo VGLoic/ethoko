@@ -137,6 +137,20 @@ describe('"loadConfig" must parse accordingly to rules', () => {
       /The "awsBucketName" field must be a string when "type" is "aws"/,
     ],
     [
+      '"awsAccessKeyId" cannot be provided if "awsProfile" filled',
+      {
+        project: "dummy",
+        storage: {
+          type: "aws",
+          awsRegion: "us-east-1",
+          awsBucketName: "my-bucket",
+          awsProfile: "profile",
+          awsAccessKeyId: "access-key-id",
+        },
+      },
+      /When "awsProfile" is provided, credential fields \("awsAccessKeyId", "awsSecretAccessKey"\) and role configuration fields \("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
+    ],
+    [
       '"awsAccessKeyId" empty while "awsSecretAccessKey" provided for "aws" storage',
       {
         project: "dummy",
@@ -240,7 +254,19 @@ describe('"loadConfig" must parse accordingly to rules', () => {
       },
     ],
     [
-      "Valid config with AWS storage and credentials",
+      "Minimal valid config with AWS and profile-based credentials",
+      {
+        project: "dummy",
+        storage: {
+          type: "aws",
+          awsRegion: "us-east-1",
+          awsBucketName: "my-bucket",
+          awsProfile: "profile",
+        },
+      },
+    ],
+    [
+      "Valid config with AWS storage and static credentials",
       {
         project: "dummy",
         storage: {

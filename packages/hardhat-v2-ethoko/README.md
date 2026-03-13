@@ -316,32 +316,9 @@ storageConfiguration: {
 }
 ```
 
-If you need to provide explicit credentials (for example in CI), use the optional `credentials` block:
+Regarding credentials, it is recommended to rely on the default credential provider chain and configure credentials using environment variables or AWS config/credentials files. This allows for better security practices and flexibility across different environments.
 
-```ts
-storageConfiguration: {
-  type: "aws",
-  awsRegion: "us-east-1",
-  awsBucketName: "my-ethoko-bucket",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
-  },
-}
-```
-
-Optionally, you can assume an IAM role using explicit credentials:
-
-- `credentials.role.roleArn`: ARN of the IAM role to assume
-- `credentials.role.externalId`: Optional external ID for cross-account role assumption
-- `credentials.role.sessionName`: Optional role session name (default: `ethoko-hardhat-session`)
-- `credentials.role.durationSeconds`: Optional session duration in seconds (900-43200)
-
-When `credentials.role` is provided, Ethoko assumes the role using the access key and secret key, and uses the temporary credentials for S3 operations. The credentials are cached in memory for the duration of the task.
-
-When `credentials` is omitted, Ethoko relies on the default credential provider chain.
-
-If you want role assumption while still relying on the default credential chain, configure it in your AWS config file using `role_arn` and `source_profile`.
+If working with a dedicated AWS profile, use the environment variable `AWS_PROFILE` or specify the profile name in the configuration:
 
 ```bash
 # ~/.aws/config
@@ -356,11 +333,46 @@ aws_access_key_id = YOUR_ACCESS_KEY_ID
 aws_secret_access_key = YOUR_SECRET_ACCESS_KEY
 ```
 
-Then use the profile in Ethoko configuration:
+```ts
+storageConfiguration: {
+  type: "aws",
+  awsRegion: "us-east-1",
+  awsBucketName: "my-ethoko-bucket",
+  credentials: { profile: "my-ethoko-profile" },
+}
+```
+or set the environment variable:
 
 ```bash
 AWS_PROFILE=my-ethoko-profile npx hardhat ethoko pull
 ```
+
+Alternatively, provide explicit static credentials (for example in CI):
+
+```ts
+storageConfiguration: {
+  type: "aws",
+  awsRegion: "us-east-1",
+  awsBucketName: "my-ethoko-bucket",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+}
+```
+
+Optionally, in the case of static credentials, you can assume an IAM role using explicit credentials:
+
+- `credentials.role.roleArn`: ARN of the IAM role to assume
+- `credentials.role.externalId`: Optional external ID for cross-account role assumption
+- `credentials.role.sessionName`: Optional role session name (default: `ethoko-hardhat-session`)
+- `credentials.role.durationSeconds`: Optional session duration in seconds (900-43200)
+
+When `credentials.role` is provided, Ethoko assumes the role using the access key and secret key, and uses the temporary credentials for S3 operations. The credentials are cached in memory for the duration of the task.
+
+When `credentials` is omitted, Ethoko relies on the default credential provider chain.
+
+If you want role assumption while still relying on the default credential chain, configure it in your AWS config file using `role_arn` and `source_profile`.
 
 It is possible to use a single bucket for multiple projects, Ethoko will handle the organization of the artifacts within the bucket.
 

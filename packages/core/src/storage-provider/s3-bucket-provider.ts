@@ -22,16 +22,22 @@ import fs from "fs/promises";
 type S3BucketProviderConfig = {
   bucketName: string;
   bucketRegion: string;
-  credentials?: {
-    accessKeyId: string;
-    secretAccessKey: string;
-    role?: {
-      roleArn: string;
-      externalId?: string;
-      sessionName?: string;
-      durationSeconds?: number;
-    };
-  };
+  credentials?:
+    | {
+        type: "static";
+        accessKeyId: string;
+        secretAccessKey: string;
+        role?: {
+          roleArn: string;
+          externalId?: string;
+          sessionName?: string;
+          durationSeconds?: number;
+        };
+      }
+    | {
+        type: "profile";
+        profile: string; // AWS CLI profile name to load credentials from
+      };
   endpoint?: string;
   forcePathStyle?: boolean;
   debug?: boolean;
@@ -65,44 +71,71 @@ export class S3BucketProvider implements StorageProvider {
       return this.client;
     }
 
-    if (!this.config.credentials?.role) {
-      const clientConfig = {
+    const credentialsConfig = this.config.credentials;
+    if (!credentialsConfig) {
+      if (this.config.debug) {
+        console.error(
+          styleText(
+            LOG_COLORS.log,
+            "No AWS credentials provided in config, using default credential provider chain",
+          ),
+        );
+      }
+      this.client = new S3Client({
         region: this.config.bucketRegion,
         endpoint: this.config.endpoint,
         forcePathStyle: this.config.forcePathStyle,
-      };
-
-      if (this.config.credentials) {
-        this.client = new S3Client({
-          ...clientConfig,
-          credentials: {
-            accessKeyId: this.config.credentials.accessKeyId,
-            secretAccessKey: this.config.credentials.secretAccessKey,
-          },
-        });
-        if (this.config.debug) {
-          console.error(
-            styleText(
-              LOG_COLORS.log,
-              "Using explicit AWS credentials from config",
-            ),
-          );
-        }
-      } else {
-        this.client = new S3Client(clientConfig);
-        if (this.config.debug) {
-          console.error(
-            styleText(
-              LOG_COLORS.log,
-              "Using AWS default credential provider chain",
-            ),
-          );
-        }
-      }
-
+      });
       return this.client;
     }
 
+    if (credentialsConfig.type === "profile") {
+      if (this.config.debug) {
+        console.error(
+          styleText(
+            LOG_COLORS.log,
+            `AWS credentials profile "${credentialsConfig.profile}" provided in config, loading credentials from profile`,
+          ),
+        );
+      }
+      this.client = new S3Client({
+        region: this.config.bucketRegion,
+        endpoint: this.config.endpoint,
+        forcePathStyle: this.config.forcePathStyle,
+        profile: credentialsConfig.profile,
+      });
+      return this.client;
+    }
+
+    if (!credentialsConfig.role) {
+      if (this.config.debug) {
+        console.error(
+          styleText(
+            LOG_COLORS.log,
+            "No role configuration provided, using static credentials from config",
+          ),
+        );
+      }
+      this.client = new S3Client({
+        region: this.config.bucketRegion,
+        endpoint: this.config.endpoint,
+        forcePathStyle: this.config.forcePathStyle,
+        credentials: {
+          accessKeyId: credentialsConfig.accessKeyId,
+          secretAccessKey: credentialsConfig.secretAccessKey,
+        },
+      });
+      return this.client;
+    }
+
+    if (this.config.debug) {
+      console.error(
+        styleText(
+          LOG_COLORS.log,
+          `Role configuration provided, will attempt to assume role ${credentialsConfig.role.roleArn} before accessing S3`,
+        ),
+      );
+    }
     const roleCredentials = await this.getRoleCredentials();
     this.client = new S3Client({
       region: this.config.bucketRegion,
@@ -119,7 +152,10 @@ export class S3BucketProvider implements StorageProvider {
 
   private async getRoleCredentials(): Promise<RoleCredentials> {
     const credentialsConfig = this.config.credentials;
-    const role = credentialsConfig?.role;
+    if (!credentialsConfig || credentialsConfig.type !== "static") {
+      throw new Error("Role credentials configuration is missing or invalid");
+    }
+    const role = credentialsConfig.role;
     if (!role) {
       throw new Error("Role configuration is missing");
     }
