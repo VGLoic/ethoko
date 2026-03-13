@@ -27,5 +27,3 @@
 .ethoko-typings/
 .ethoko-e2e/
 
-# Ethoko config - do not want to reveal AWS S3 bucket names. Credentials should not be in it but even though.
-ethoko.json
