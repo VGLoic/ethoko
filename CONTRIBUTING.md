@@ -17,8 +17,8 @@ nvm use
 - `apps/`: integration example of Ethoko with Hardhat v2, Hardhat v3 and Foundry with Ethoko,
 - `@ethoko/eslint-config`: `eslint` configurations,
 - `@ethoko/typescript-config`: `tsconfig.json`s used throughout the monorepo,
-- `hardhat-ethoko`: Hardhat Plugin to integrate Ethoko with Hardhat V3.
-- `hardhat-v2-ethoko`: Hardhat Plugin to integrate Ethoko with Hardhat V2.
+- `@ethoko/core`: core Ethoko libraries and CLI client logic.
+- `@ethoko/cli-beacon`: standalone Ethoko CLI package.
 
 ### Scripts
 
@@ -37,7 +37,7 @@ Check the available scripts in the root `package.json` file. The most used ones 
 We use [Changesets](https://github.com/changesets/changesets) to manage versioning and release notes.
 
 - Changes under `apps/` do not require a changeset (integration examples only).
-- Any change that impacts `@ethoko/core`, `hardhat-ethoko` or `hardhat-v2-ethoko` must include a changeset.
+- Any change that impacts `@ethoko/core` or `@ethoko/cli-beacon` must include a changeset.
 
 If a changeset is required, add one before opening your PR:
 

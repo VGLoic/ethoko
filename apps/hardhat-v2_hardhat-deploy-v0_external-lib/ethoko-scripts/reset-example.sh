@@ -13,11 +13,10 @@ rm -rf .ethoko-typings
 
 pnpm compile
 
-npx hardhat ethoko push --tag v1.0.1
+npx ethoko push --tag v1.0.1
 
-npx hardhat ethoko pull
+npx ethoko pull
 
-npx hardhat ethoko typings
+npx ethoko typings
 
 npx hardhat deploy --network sepolia --no-compile
-

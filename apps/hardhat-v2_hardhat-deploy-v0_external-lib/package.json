@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "ethoko": "ethoko",
-    "ethoko-typings": "hardhat ethoko typings",
+    "ethoko-typings": "ethoko typings",
     "test": "hardhat test",
     "lint": "pnpm run ethoko-typings && eslint . --max-warnings 0",
     "check-format": "prettier --check --ignore-unknown --plugin=prettier-plugin-solidity 'src/**/*.sol'",
@@ -30,7 +30,6 @@
     "ethers": "^6.16.0",
     "hardhat": "2.28.0",
     "hardhat-deploy": "^0.12.4",
-    "hardhat-v2-ethoko": "workspace:*",
     "prettier-plugin-solidity": "^2.2.1",
     "typescript": "5.9.2",
     "vitest": "^4.0.17",

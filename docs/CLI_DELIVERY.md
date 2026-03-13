@@ -2,7 +2,7 @@
 
 ## Goal
 
-Provide a standalone Ethoko CLI that works for Foundry and CI/CD without Hardhat, while keeping Hardhat plugin users fully supported.
+Provide a standalone Ethoko CLI that works for Foundry and CI/CD without Hardhat.
 
 ## Core Idea: Beacon Pattern
 
@@ -50,6 +50,5 @@ These packages contain the compiled Bun binary and are published alongside `@eth
 
 ## Compatibility Guarantees
 
-- All 8 commands mirror the Hardhat plugin behavior.
-- Hardhat plugins remain unchanged and continue to use `@ethoko/core`.
+- All 8 commands mirror the CLI behavior.
 - `@ethoko/core` has no Hardhat dependency, so logic is shared cleanly.

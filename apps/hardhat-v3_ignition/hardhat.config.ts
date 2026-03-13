@@ -1,18 +1,9 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
-import HardhatEthoko from "hardhat-ethoko";
 import "dotenv/config";
 
 export default defineConfig({
-  plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
-  ethoko: {
-    project: "ignited-counter",
-    compilationOutputPath: "./artifacts",
-    storageConfiguration: {
-      type: "local",
-      path: "./ethoko-storage",
-    },
-  },
+  plugins: [hardhatToolboxViemPlugin],
   solidity: {
     profiles: {
       default: {

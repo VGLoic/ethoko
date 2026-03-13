@@ -26,7 +26,7 @@ Ethoko supports both Hardhat and Foundry development environments, compile once,
 
 ## CLI
 
-Ethoko ships as a standalone CLI for Foundry and CI/CD workflows, plus Hardhat plugins for existing projects.
+Ethoko ships as a standalone CLI.
 
 ### Install the CLI
 
@@ -35,18 +35,6 @@ npm install -g @ethoko/cli
 ```
 
 Developers who want Node.js execution (no binary) can install `@ethoko/cli-beacon` instead. See the CLI guide in `packages/cli-beacon/README.md` for configuration and commands.
-
-## Hardhat Ethoko
-
-Ethoko is also available as a Hardhat plugin.
-
-It supports Hardhat v3, Hardhat v2 and Foundry as development environments.
-
-Ethoko stores compilation artifacts in your storage backend of choice, supporting AWS S3 and local filesystem storage providers.
-See the [Hardhat Ethoko documentation](packages/hardhat-ethoko/README.md)
-for a complete guide of the plugin, its commands, configuration options and features.
-
-For Hardhat v2 projects, refer to the [Hardhat v2 Ethoko plugin documentation](packages/hardhat-v2-ethoko/README.md).
 
 ### Development process
 
@@ -134,9 +122,6 @@ The original compilation artifacts are never lost and always available for resto
 </picture>
 
 ### Complete guide and examples
-
-Please refer to the [Hardhat Ethoko documentation](packages/hardhat-ethoko/README.md)
-for a complete guide of the plugin, its commands, configuration options and features.
 
 Integration examples with Foundry or Hardhat can be found in the `apps/` folder:
 

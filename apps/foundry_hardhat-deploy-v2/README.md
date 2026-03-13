@@ -36,7 +36,7 @@ The compilation artifacts will be pushed to `Ethoko`, hence freezing them for la
 
 ```bash
 # The tag 2026-02-04 is arbitrary, it can be any string identifying the release
-npx hardhat ethoko push --artifact-path ./out --tag 2026-02-04
+npx ethoko push --artifact-path ./out --tag 2026-02-04
 ```
 
 ### Deployment phase
@@ -45,13 +45,13 @@ Later on, the same developper or another one wants to deploy the contracts for t
 It will first pull the compilation artifacts from `Ethoko`:
 
 ```bash
-npx hardhat ethoko pull
+npx ethoko pull
 ```
 
 Then, generates the typings in order to write a type-safe deployment script:
 
 ```bash
-npx hardhat ethoko typings
+npx ethoko typings
 ```
 
 Finally, the deployer can write a deployment script, e.g. [00-deploy-counter-2026-02-04.ts](./deploy/00-deploy-counter-2026-02-04.ts), that will retrieve the compilation artifacts from `Ethoko` and deploy the contract accordingly.

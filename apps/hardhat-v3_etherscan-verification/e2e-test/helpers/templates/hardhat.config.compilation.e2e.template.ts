@@ -1,12 +1,11 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { defineConfig } from "hardhat/config";
-import HardhatEthoko from "hardhat-ethoko";
 
 /**
  * This is a template Hardhat config file for the E2E tests. The actual config file used in the tests is generated from this template by replacing the placeholders with the appropriate values.
  */
 export default defineConfig({
-  plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
+  plugins: [hardhatToolboxViemPlugin],
   solidity: {
     profiles: {
       default: {

@@ -1,19 +1,9 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
-import HardhatEthoko from "hardhat-ethoko";
 import "dotenv/config";
 
 export default defineConfig({
-  plugins: [hardhatToolboxViemPlugin, HardhatEthoko],
-  ethoko: {
-    project: "verified-forge-counter",
-    compilationOutputPath: "./out",
-    storageConfiguration: {
-      type: "local",
-      path: "./.ethoko-storage",
-    },
-    debug: false,
-  },
+  plugins: [hardhatToolboxViemPlugin],
   solidity: {
     profiles: {
       default: {

@@ -5,13 +5,13 @@
   "private": true,
   "scripts": {
     "ethoko": "ethoko",
-    "lint": "hardhat ethoko typings && eslint . --max-warnings 0",
+    "lint": "ethoko typings && eslint . --max-warnings 0",
     "check-format": "forge fmt --check",
     "format-contracts": "forge fmt",
     "format": "forge fmt",
     "hardhat": "hardhat",
     "compile": "forge build --skip test --skip script --force --use-literal-content",
-    "check-types": "hardhat ethoko typings && tsc --noEmit",
+    "check-types": "ethoko typings && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh",
     "verify-2026-02-02": "tsx ./scripts/verify-2026-02-02.ts"
@@ -28,7 +28,6 @@
     "eslint": "^9.39.1",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.1.7",
-    "hardhat-ethoko": "workspace:*",
     "tsx": "^4.21.0",
     "typescript": "~5.8.0",
     "viem": "^2.43.0",

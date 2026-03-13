@@ -18,9 +18,7 @@ export function testPushPullDeploy(payload: {
 
   // We generates the typings with the default project in the repository in order to have the deployment script ready for compilation
   test("it generates the typings", () =>
-    asyncExec(
-      `pnpm hardhat ethoko typings && ${payload.ethokoCommand} typings`,
-    ));
+    asyncExec(`pnpm ethoko typings && ${payload.ethokoCommand} typings`));
 
   // We allow for three retries as recognition of the fresh typings might take a bit of time, especially on CI
   test("it deploys", { retry: 3 }, () =>

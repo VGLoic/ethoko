@@ -14,11 +14,10 @@ rm -rf ethoko-storage
 
 pnpm compile
 
-npx hardhat ethoko push --tag 2026-02-02
+npx ethoko push --tag 2026-02-02
 
-npx hardhat ethoko pull
+npx ethoko pull
 
-npx hardhat ethoko typings
+npx ethoko typings
 
 npx hardhat ignition deploy ./ignition/modules/counter-2026-02-02.ts --network sepolia
-

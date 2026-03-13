@@ -16,11 +16,11 @@ import { project } from "../.ethoko-typings";
  * It is assumed that the tag `v1.0.1` exists in the Ethoko registry for this project.
  * It could have been created by running:
  * ```
- * npx hardhat ethoko push --tag v1.0.1 --artifact-path ./artifacts
+ * npx ethoko push --tag v1.0.1 --artifact-path ./artifacts
  * ```
  * The assumed commands that have been run prior to this deployment are:
- *  - `npx hardhat ethoko pull` to pull the project from the Ethoko registry,
- *  - `npx hardhat ethoko typings` to generate the typings for the project.
+ *  - `npx ethoko pull` to pull the project from the Ethoko registry,
+ *  - `npx ethoko typings` to generate the typings for the project.
  */
 
 const TARGET_RELEASE = "v1.0.1";

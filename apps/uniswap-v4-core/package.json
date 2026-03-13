@@ -17,7 +17,6 @@
     "@types/node": "^22.8.5",
     "eslint": "^9.39.1",
     "hardhat": "^3.1.7",
-    "hardhat-ethoko": "workspace:*",
     "typescript": "~5.8.0",
     "viem": "^2.43.0",
     "vitest": "^4.0.17"

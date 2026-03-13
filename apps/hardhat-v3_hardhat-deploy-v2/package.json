@@ -6,11 +6,11 @@
   "scripts": {
     "ethoko": "ethoko",
     "hardhat": "hardhat",
-    "lint": "hardhat ethoko typings && eslint . --max-warnings 0",
+    "lint": "ethoko typings && eslint . --max-warnings 0",
     "check-format": "prettier --check --ignore-unknown --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
     "format-contracts": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
     "format": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
-    "check-types": "hardhat ethoko typings && tsc --noEmit",
+    "check-types": "ethoko typings && tsc --noEmit",
     "compile": "pnpm format-contracts && hardhat compile --build-profile production",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh"
@@ -31,7 +31,6 @@
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.1.7",
     "hardhat-deploy": "2.0.0-next.76",
-    "hardhat-ethoko": "workspace:*",
     "prettier-plugin-solidity": "^2.2.1",
     "rocketh": "^0.18.1",
     "typescript": "~5.8.0",

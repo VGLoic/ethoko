@@ -1,24 +1,10 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
-import HardhatEthoko from "hardhat-ethoko";
 import HardhatDeploy from "hardhat-deploy";
 import "dotenv/config";
 
 export default defineConfig({
-  plugins: [hardhatToolboxViemPlugin, HardhatEthoko, HardhatDeploy],
-  ethoko: {
-    project: "forge-counter",
-    compilationOutputPath: "./out",
-    storageConfiguration: {
-      type: "aws",
-      awsRegion: process.env.AWS_REGION || "abc",
-      awsBucketName: process.env.AWS_S3_BUCKET || "abc",
-      credentials: {
-        profile: "ethoko"
-      }
-    },
-    debug: false,
-  },
+  plugins: [hardhatToolboxViemPlugin, HardhatDeploy],
   solidity: {
     profiles: {
       default: {

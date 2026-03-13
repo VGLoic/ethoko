@@ -8,11 +8,10 @@ Ethoko is a warehouse for smart-contract compilation artifacts. It enables teams
 **Monorepo Structure:**
 
 - `packages/core`: Core functionalities of the Ethoko CLI (main package)
-- `packages/hardhat-ethoko`: Hardhat V3 plugin for Ethoko
-- `packages/hardhat-v2-ethoko`: Hardhat V2 plugin for Ethoko
+- `packages/cli-beacon`: Standalone CLI for Ethoko artifact management
 - `packages/eslint-config`: Shared ESLint configurations
 - `packages/typescript-config`: Shared TypeScript configurations
-- `apps/*`: Integration examples with different frameworks (e.g., Foundry, Hardhat V2, Hardhat V3)
+- `apps/*`: Integration examples with different frameworks (e.g., Foundry and Hardhat)
 
 CLI delivery strategy overview: `docs/CLI_DELIVERY.md`
 
@@ -118,7 +117,6 @@ If any check fails, **immediately fix the issue** before proceeding with additio
 
 ### Key Notes
 
-- **Package Dependencies:** `hardhat-ethoko` and `hardhat-v2-ethoko` depend on `@ethoko/core`. When core changes, Turborepo automatically rebuilds dependent packages during `pnpm build`.
 - **When to Run:** After completing a logical unit of work, not after every single file edit.
 - **Root-Level Execution:** Always run these commands at the monorepo root to validate all packages.
 
@@ -217,7 +215,7 @@ export const LOG_COLORS = {
 **Use explicit types for public APIs:**
 
 ```typescript
-export type EthokoHardhatUserConfig = {
+export type EthokoCliUserConfig = {
   project: string;
   pulledArtifactsPath?: string;
   // ...
@@ -227,7 +225,7 @@ export type EthokoHardhatUserConfig = {
 **Prefer Zod schemas for runtime validation:**
 
 ```typescript
-const EthokoHardhatConfig = z.object({
+const EthokoCliConfig = z.object({
   project: z.string().min(1),
   pulledArtifactsPath: z.string().default(".ethoko"),
 });

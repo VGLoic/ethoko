@@ -1,34 +1,16 @@
 import { HardhatUserConfig } from "hardhat/config";
+import "hardhat-deploy";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
-import "hardhat-v2-ethoko";
 import "dotenv/config";
-import { EthokoHardhatUserConfig } from "hardhat-v2-ethoko";
 
-const ethokoConfig: EthokoHardhatUserConfig = {
-  project: "dummy-counter",
-  pulledArtifactsPath: ".ethoko",
-  typingsPath: ".ethoko-typings",
-  compilationOutputPath: "./artifacts",
-  storageConfiguration: {
-    type: "aws",
-    awsRegion: process.env.AWS_REGION || "",
-    awsBucketName: process.env.AWS_S3_BUCKET || "",
-    credentials: { profile: "ethoko" },
-  },
-};
-
-// Issue with hardhat config typing and module augmentation
-// It works fine when importing the build package directly but does not work in the monorepo setup
-// As a workaround, we cast the config to include the ethoko field
-export const config: HardhatUserConfig & { ethoko?: EthokoHardhatUserConfig } =
+export const config: HardhatUserConfig =
   {
     namedAccounts: {
       deployer: {
         default: 0, // First account is taken as deployer
       },
     },
-    ethoko: ethokoConfig,
     networks: {
       localhost: {
         chainId: 31337,
