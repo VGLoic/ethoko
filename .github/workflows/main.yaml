@@ -39,6 +39,10 @@ jobs:
           node-version-file: .nvmrc
           cache: "pnpm"
       - run: pnpm install
+      # For obscure reasons, the CLI needs to be explictly built and reinstalled
+      # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
+      - run: pnpm build --filter=@ethoko/cli-beacon
+      - run: pnpm install
       - run: pnpm check-types
   lint:
     runs-on: ubuntu-latest
@@ -49,6 +53,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
+      - run: pnpm install
+      # For obscure reasons, the CLI needs to be explictly built and reinstalled
+      # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
+      - run: pnpm build --filter=@ethoko/cli-beacon
       - run: pnpm install
       - run: pnpm lint
   test:
@@ -61,6 +69,10 @@ jobs:
           node-version-file: .nvmrc
           cache: "pnpm"
       - run: pnpm install
+      # For obscure reasons, the CLI needs to be explictly built and reinstalled
+      # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
+      - run: pnpm build --filter=@ethoko/cli-beacon
+      - run: pnpm install
       - run: pnpm test
   test-e2e-core:
     runs-on: ubuntu-latest
@@ -71,6 +83,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
+      - run: pnpm install
+      # For obscure reasons, the CLI needs to be explictly built and reinstalled
+      # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
+      - run: pnpm build --filter=@ethoko/cli-beacon
       - run: pnpm install
       - run: pnpm test:e2e:core
   test-e2e-apps:
