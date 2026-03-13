@@ -14,6 +14,7 @@ const ethokoConfig: EthokoHardhatUserConfig = {
     type: "aws",
     awsRegion: process.env.AWS_REGION || "",
     awsBucketName: process.env.AWS_S3_BUCKET || "",
+    credentials: { profile: "ethoko" },
   },
 };
 

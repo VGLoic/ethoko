@@ -45,6 +45,8 @@ export type EthokoHardhatUserConfig = {
             sessionName?: string;
             durationSeconds?: number;
           };
+        } | {
+          profile: string;
         };
       }
     | {
