@@ -490,55 +490,6 @@ importers:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
 
-  packages/core:
-    dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.624.0
-        version: 3.978.0
-      '@aws-sdk/client-sts':
-        specifier: ^3.624.0
-        version: 3.981.0
-      '@ethersproject/keccak256':
-        specifier: ^5.7.0
-        version: 5.8.0
-      '@ethersproject/strings':
-        specifier: ^5.7.0
-        version: 5.8.0
-      '@smithy/types':
-        specifier: ^3.3.0
-        version: 3.7.2
-      boxen:
-        specifier: 5.1.2
-        version: 5.1.2
-      ora:
-        specifier: 5.4.1
-        version: 5.4.1
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
-    devDependencies:
-      '@ethoko/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      '@ethoko/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^22.1.0
-        version: 22.15.3
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.1
-      tsup:
-        specifier: ^8.2.4
-        version: 8.5.1(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.2)
-      typescript:
-        specifier: 5.9.2
-        version: 5.9.2
-      vitest:
-        specifier: ^4.0.17
-        version: 4.0.18(@types/node@22.15.3)(tsx@4.21.0)
-
   packages/eslint-config:
     devDependencies:
       '@eslint/js':
