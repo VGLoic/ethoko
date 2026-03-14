@@ -2,7 +2,7 @@ import fs from "fs/promises";
 // Note: we load the template content directly here
 // The ideal would be to work only with the path but it does not work right now with tsup (and NPM package) AND Bun (and binaries)
 // There is a plan to migrate everything to Bun in the future, and rely on Bun's file loading capabilities, but in the meantime we need to support both environments
-import typingsTemplate from "../../templates/typings.txt"
+import typingsTemplate from "../../templates/typings.txt";
 import { LocalStorage } from "../local-storage/local-storage";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
