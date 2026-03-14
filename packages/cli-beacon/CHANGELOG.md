@@ -1,5 +1,11 @@
 # @ethoko/cli-beacon
 
+## 0.6.0
+
+### Minor Changes
+
+- 76ab8ef: Load template content directly in memory instead of relying on path
+
 ## 0.5.0
 
 ### Minor Changes
