@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO="VGLoic/ethoko-monorepo"
+REPO="VGLoic/ethoko"
 INSTALL_DIR="${ETHOKO_INSTALL_DIR:-$HOME/.ethoko}"
 BIN_DIR="$INSTALL_DIR/bin"
 
