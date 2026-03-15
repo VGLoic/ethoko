@@ -311,7 +311,7 @@ npm install -g @ethoko/cli
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VGLoic/ethoko-monorepo"
+    "url": "https://github.com/VGLoic/ethoko"
   }
 }
 ```
@@ -371,7 +371,7 @@ Integration test apps depend on `@ethoko/cli-beacon: "workspace:*"` and run CLI 
 #### Method 2: Direct Binary Installation (Alternative)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko/main/install.sh | bash
 ```
 
 **Flow:**
@@ -881,13 +881,13 @@ npm install -g @ethoko/cli-beacon
 **Install Script URL:**
 
 ```
-https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh
+https://raw.githubusercontent.com/VGLoic/ethoko/main/install.sh
 ```
 
 **Installation:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko/main/install.sh | bash
 
 # With custom install directory
 ETHOKO_INSTALL_DIR=/usr/local curl -fsSL https://...install.sh | bash
@@ -907,7 +907,7 @@ ETHOKO_INSTALL_DIR=/usr/local curl -fsSL https://...install.sh | bash
 
 ### 7.3 GitHub Releases
 
-**Repository:** `VGLoic/ethoko-monorepo`  
+**Repository:** `VGLoic/ethoko`  
 **Release Tag Format:** `cli-v{version}`  
 **Example:** `cli-v0.1.1`
 
@@ -925,10 +925,10 @@ ETHOKO_INSTALL_DIR=/usr/local curl -fsSL https://...install.sh | bash
 
 ```bash
 # Linux x64
-curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.1/ethoko-linux-x64 -o ethoko
+curl -L https://github.com/VGLoic/ethoko/releases/download/cli-v0.1.1/ethoko-linux-x64 -o ethoko
 
 # macOS ARM64
-curl -L https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v0.1.1/ethoko-darwin-arm64 -o ethoko
+curl -L https://github.com/VGLoic/ethoko/releases/download/cli-v0.1.1/ethoko-darwin-arm64 -o ethoko
 
 chmod +x ethoko
 ./ethoko --version
@@ -1777,7 +1777,7 @@ release:
 
 set -euo pipefail
 
-REPO="VGLoic/ethoko-monorepo"
+REPO="VGLoic/ethoko"
 INSTALL_DIR="${ETHOKO_INSTALL_DIR:-$HOME/.ethoko}"
 BIN_DIR="$INSTALL_DIR/bin"
 
@@ -1868,7 +1868,7 @@ bash install.sh
 ~/.ethoko/bin/ethoko --version
 
 # Test from URL (after pushing to main)
-curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko/main/install.sh | bash
 ethoko --version
 ```
 
@@ -1929,7 +1929,7 @@ This installs the source package and runs via Node.js directly. Useful for contr
 ### Direct binary download (no Node.js required)
 
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko/main/install.sh | bash
 \`\`\`
 
 ## Quick Start
@@ -2381,11 +2381,11 @@ Platform packages are **generated at publish time** by `scripts/publish-cli.ts` 
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VGLoic/ethoko-monorepo"
+    "url": "https://github.com/VGLoic/ethoko"
   },
-  "homepage": "https://github.com/VGLoic/ethoko-monorepo#readme",
+  "homepage": "https://github.com/VGLoic/ethoko#readme",
   "bugs": {
-    "url": "https://github.com/VGLoic/ethoko-monorepo/issues"
+    "url": "https://github.com/VGLoic/ethoko/issues"
   }
 }
 ```

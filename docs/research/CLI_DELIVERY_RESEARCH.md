@@ -686,7 +686,7 @@ for (const p of PLATFORMS) {
         license: "MIT",
         repository: {
           type: "git",
-          url: "https://github.com/VGLoic/ethoko-monorepo",
+          url: "https://github.com/VGLoic/ethoko",
         },
       },
       null,
@@ -723,7 +723,7 @@ writeFileSync(
       license: "MIT",
       repository: {
         type: "git",
-        url: "https://github.com/VGLoic/ethoko-monorepo",
+        url: "https://github.com/VGLoic/ethoko",
       },
     },
     null,
@@ -795,25 +795,25 @@ Create `VGLoic/homebrew-ethoko` repository with a formula. Auto-update via `dawi
 # Formula/ethoko.rb
 class Ethoko < Formula
   desc "Warehouse for smart-contract compilation artifacts"
-  homepage "https://github.com/VGLoic/ethoko-monorepo"
+  homepage "https://github.com/VGLoic/ethoko"
   version "0.2.0"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v#{version}/ethoko-darwin-arm64"
+      url "https://github.com/VGLoic/ethoko/releases/download/cli-v#{version}/ethoko-darwin-arm64"
       sha256 "..."
     else
-      url "https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v#{version}/ethoko-darwin-x64"
+      url "https://github.com/VGLoic/ethoko/releases/download/cli-v#{version}/ethoko-darwin-x64"
       sha256 "..."
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v#{version}/ethoko-linux-arm64"
+      url "https://github.com/VGLoic/ethoko/releases/download/cli-v#{version}/ethoko-linux-arm64"
       sha256 "..."
     else
-      url "https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v#{version}/ethoko-linux-x64"
+      url "https://github.com/VGLoic/ethoko/releases/download/cli-v#{version}/ethoko-linux-x64"
       sha256 "..."
     end
   end

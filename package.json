@@ -1,10 +1,10 @@
 {
-  "name": "ethoko-monorepo",
+  "name": "ethoko",
   "description": "Monorepo for Ethoko packages and applications, warehouse for smart contract compilation artifacts.",
   "author": "Loïc Vincent-Genod",
-  "homepage": "https://github.com/VGLoic/ethoko-monorepo",
+  "homepage": "https://github.com/VGLoic/ethoko",
   "bugs": {
-    "url": "https://github.com/VGLoic/ethoko-monorepo/issues"
+    "url": "https://github.com/VGLoic/ethoko/issues"
   },
   "private": true,
   "keywords": [

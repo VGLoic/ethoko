@@ -356,7 +356,7 @@ export function detectInstallMethod(): InstallMethod {
 
 export async function getLatestVersion(): Promise<string> {
   // Fetch from GitHub Releases API
-  // GET https://api.github.com/repos/VGLoic/ethoko-monorepo/releases
+  // GET https://api.github.com/repos/VGLoic/ethoko/releases
   // Filter for tags starting with "cli-v", extract version
 }
 
@@ -412,7 +412,7 @@ export function registerUpgradeCommand(program: Command) {
         case "unknown":
           console.error("Could not detect installation method.");
           console.error("Download the latest version from:");
-          console.error("  https://github.com/VGLoic/ethoko-monorepo/releases");
+          console.error("  https://github.com/VGLoic/ethoko/releases");
           break;
       }
     });

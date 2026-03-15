@@ -21,7 +21,7 @@ const UNINSTALL_INSTRUCTIONS: Record<Exclude<InstallMethod, "curl">, string> = {
   "npm-local": "npm uninstall @ethoko/cli",
   brew: "brew uninstall ethoko",
   unknown:
-    "See https://github.com/VGLoic/ethoko-monorepo/releases for manual cleanup steps",
+    "See https://github.com/VGLoic/ethoko/releases for manual cleanup steps",
 };
 
 /**

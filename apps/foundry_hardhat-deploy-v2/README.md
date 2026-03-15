@@ -1,6 +1,6 @@
 # Hardhat Ethoko - Example - Deploy Counter
 
-This is an example of integration between [Foundry](https://getfoundry.sh/) and [Ethoko](https://github.com/VGLoic/ethoko-monorepo).
+This is an example of integration between [Foundry](https://getfoundry.sh/) and [Ethoko](https://github.com/VGLoic/ethoko).
 
 The static compilation artifacts from `Ethoko` are used to deploy a simple `Counter` contract, see [Counter.sol](./src/Counter.sol).
 

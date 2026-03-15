@@ -14,7 +14,7 @@ export type InstallMethod =
   | "unknown";
 
 const RELEASES_URL =
-  "https://api.github.com/repos/VGLoic/ethoko-monorepo/releases";
+  "https://api.github.com/repos/VGLoic/ethoko/releases";
 
 const ReleasesSchema = z.array(
   z.object({
@@ -132,7 +132,7 @@ export async function downloadBinary(
 
   const ext = os === "windows" ? ".exe" : "";
   const filename = `ethoko-${os}-${cpu}${ext}`;
-  const url = `https://github.com/VGLoic/ethoko-monorepo/releases/download/cli-v${version}/${filename}`;
+  const url = `https://github.com/VGLoic/ethoko/releases/download/cli-v${version}/${filename}`;
 
   let response: Response;
   try {

@@ -18,7 +18,7 @@ const UPGRADE_INSTRUCTIONS: Record<Exclude<InstallMethod, "curl">, string> = {
   "npm-local": "npm install @ethoko/cli@latest",
   brew: "brew upgrade ethoko",
   unknown:
-    "See https://github.com/VGLoic/ethoko-monorepo/releases for manual downloads",
+    "See https://github.com/VGLoic/ethoko/releases for manual downloads",
 };
 
 /**

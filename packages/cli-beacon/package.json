@@ -4,9 +4,9 @@
   "private": false,
   "description": "Standalone CLI for Ethoko artifact management.",
   "author": "Loïc Vincent-Genod",
-  "homepage": "https://github.com/VGLoic/ethoko-monorepo",
+  "homepage": "https://github.com/VGLoic/ethoko",
   "bugs": {
-    "url": "https://github.com/VGLoic/ethoko-monorepo/issues"
+    "url": "https://github.com/VGLoic/ethoko/issues"
   },
   "keywords": [
     "web3",

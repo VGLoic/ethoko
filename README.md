@@ -115,7 +115,7 @@ Ethoko ships as a standalone CLI.
 
 The easiest way to install the Ethoko CLI is to through the installation script:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko-monorepo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/VGLoic/ethoko/main/install.sh | bash
 ```
 
 Alternatively, Ethoko can be installed globally or locally via npm:

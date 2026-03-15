@@ -67,12 +67,12 @@
       "libraries": {}
     },
     "allowPaths": [
-      "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_etherscan-verification",
-      "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_etherscan-verification/lib"
+      "/Users/slourp/personal/ethoko/ethoko/apps/foundry_etherscan-verification",
+      "/Users/slourp/personal/ethoko/ethoko/apps/foundry_etherscan-verification/lib"
     ],
-    "basePath": "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_etherscan-verification",
+    "basePath": "/Users/slourp/personal/ethoko/ethoko/apps/foundry_etherscan-verification",
     "includePaths": [
-      "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_etherscan-verification"
+      "/Users/slourp/personal/ethoko/ethoko/apps/foundry_etherscan-verification"
     ]
   },
   "output": {

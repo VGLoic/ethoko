@@ -1,6 +1,6 @@
 # Hardhat Ethoko - Example - Foundry with Etherscan verification
 
-This is an example of integration between [Foundry](https://getfoundry.sh/) and [Ethoko](https://github.com/VGLoic/ethoko-monorepo).
+This is an example of integration between [Foundry](https://getfoundry.sh/) and [Ethoko](https://github.com/VGLoic/ethoko).
 
 Deployments are managed using [Hardhat Ignition](https://hardhat.org/docs/guides/deployment/using-ignition).
 

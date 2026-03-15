@@ -41,12 +41,12 @@
       "libraries": {}
     },
     "allowPaths": [
-      "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_hardhat-deploy-v2",
-      "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_hardhat-deploy-v2/lib"
+      "/Users/slourp/personal/ethoko/ethoko/apps/foundry_hardhat-deploy-v2",
+      "/Users/slourp/personal/ethoko/ethoko/apps/foundry_hardhat-deploy-v2/lib"
     ],
-    "basePath": "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_hardhat-deploy-v2",
+    "basePath": "/Users/slourp/personal/ethoko/ethoko/apps/foundry_hardhat-deploy-v2",
     "includePaths": [
-      "/Users/slourp/personal/ethoko/ethoko-monorepo/apps/foundry_hardhat-deploy-v2"
+      "/Users/slourp/personal/ethoko/ethoko/apps/foundry_hardhat-deploy-v2"
     ]
   },
   "output": {

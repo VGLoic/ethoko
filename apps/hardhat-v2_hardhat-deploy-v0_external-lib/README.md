@@ -1,6 +1,6 @@
 # Hardhat Ethoko - Example - Deploy Counter with external library
 
-This is an example of integration between [Hardhat V2](https://v2.hardhat.org/) and [Ethoko](https://github.com/VGLoic/ethoko-monorepo).
+This is an example of integration between [Hardhat V2](https://v2.hardhat.org/) and [Ethoko](https://github.com/VGLoic/ethoko).
 
 The static compilation artifacts from `Ethoko` are used to deploy a simple `Counter` contract, see [Counter.sol](./src/Counter.sol), that depends on an external library `LibCounter`, see [LibCounter.sol](./src/LibCounter.sol).
 
