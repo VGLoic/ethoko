@@ -18,7 +18,7 @@ const program = new Command();
 program
   .name("ethoko")
   .description("Ethoko CLI")
-  .option("--config <path>", "Path to ethoko.json configuration file")
+  .option("--config <path>", "Path to ethoko.config.json configuration file")
   .version(VERSION);
 
 const getConfig = async () => loadConfig(program.opts().config);

@@ -28,7 +28,7 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     [
       'Empty "project" field',
       { project: "" },
-      /"project" field is required in ethoko.json/,
+      /"project" field is required in ethoko.config.json/,
     ],
     [
       'Missing "storage" field',
@@ -210,7 +210,7 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     let configPath: string;
     beforeAll(async () => {
       // Create a temporary config file with the provided configToTest
-      configPath = path.join(tmpDirPath, "ethoko.json");
+      configPath = path.join(tmpDirPath, "ethoko.config.json");
       await fs.writeFile(configPath, JSON.stringify(configToTest));
       return async () => {
         // Clean up the temporary config file after the test
@@ -301,7 +301,7 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     let configPath: string;
     beforeAll(async () => {
       // Create a temporary config file with the provided configToTest
-      configPath = path.join(tmpDirPath, "ethoko.json");
+      configPath = path.join(tmpDirPath, "ethoko.config.json");
       await fs.writeFile(configPath, JSON.stringify(configToTest));
       return async () => {
         // Clean up the temporary config file after the test
@@ -322,7 +322,7 @@ describe('"loadConfig" must parse accordingly to rules', () => {
       "non-existent-config.json",
     );
     await expect(loadConfig(nonExistentConfigPath)).rejects.toThrow(
-      /Failed to read ethoko.json at/,
+      /Failed to read ethoko.config.json at/,
     );
   });
 
@@ -344,7 +344,7 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     });
     test("should throw an error with invalid JSON content", async () => {
       await expect(loadConfig(invalidJsonConfigPath)).rejects.toThrow(
-        /Invalid JSON in ethoko.json at/,
+        /Invalid JSON in ethoko.config.json at/,
       );
     });
   });

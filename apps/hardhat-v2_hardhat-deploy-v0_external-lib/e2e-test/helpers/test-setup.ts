@@ -36,7 +36,7 @@ export class CliConfigSetup {
 
   constructor(config: ConfigSetup) {
     this.config = config;
-    this.cliConfigPath = `${config.testPath}/ethoko.json`;
+    this.cliConfigPath = `${config.testPath}/ethoko.config.json`;
   }
 
   async setup(): Promise<() => Promise<void>> {
@@ -57,7 +57,6 @@ export class CliConfigSetup {
     };
   }
 }
-
 
 export class DeployScriptSetup {
   private config: ConfigSetup;
@@ -81,19 +80,19 @@ export class DeployScriptSetup {
       .replace("PULLED_ARTIFACTS_PATH", pulledArtifactsPath)
       .replace("TYPINGS_PATH", this.config.typingsPath)
       .replace("STORAGE_PATH", `${this.config.storagePath}`);
-      
-      await fs.mkdir(this.deploymentScriptFolderPath, { recursive: true });
-      const deploymentScriptContent = await fs.readFile(
-        "deploy/00-deploy-counter-v1.0.1.ts",
-        "utf-8",
-      );
-      const updatedScriptContent = deploymentScriptContent
+
+    await fs.mkdir(this.deploymentScriptFolderPath, { recursive: true });
+    const deploymentScriptContent = await fs.readFile(
+      "deploy/00-deploy-counter-v1.0.1.ts",
+      "utf-8",
+    );
+    const updatedScriptContent = deploymentScriptContent
       .replace(/v1.0.1/g, this.config.testId)
       .replace(".ethoko-typings", this.config.typingsPath);
-      
-      const deploymentScriptPath = `${this.deploymentScriptFolderPath}/00-deploy-counter.ts`;
 
-      await fs.writeFile(this.hardhatConfigPath, hardhatConfigContent);
+    const deploymentScriptPath = `${this.deploymentScriptFolderPath}/00-deploy-counter.ts`;
+
+    await fs.writeFile(this.hardhatConfigPath, hardhatConfigContent);
     await fs.writeFile(deploymentScriptPath, updatedScriptContent);
 
     return async () => {

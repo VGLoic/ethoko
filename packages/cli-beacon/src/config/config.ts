@@ -213,7 +213,7 @@ const EthokoConfigSchema = z
   .object({
     project: z
       .string('"project" field must be a string')
-      .min(1, '"project" field is required in ethoko.json'),
+      .min(1, '"project" field is required in ethoko.config.json'),
     pulledArtifactsPath: z
       .string('"pulledArtifactsPath" field must be a string or left empty')
       .min(
@@ -307,9 +307,9 @@ export async function loadConfig(
 
   if (!resolvedPath) {
     throw new Error(`Ethoko config not found. Searched from ${process.cwd()} to the filesystem root.
-Create an ethoko.json file or pass --config <path>.
+Create an ethoko.config.json file or pass --config <path>.
 
-Example ethoko.json:
+Example ethoko.config.json:
 
 {
   "project": "my-contracts",
@@ -328,7 +328,7 @@ Example ethoko.json:
     configRaw = await fs.readFile(resolvedPath, "utf-8");
   } catch {
     throw new Error(
-      `Failed to read ethoko.json at ${resolvedPath}. Please ensure the file exists and is readable.`,
+      `Failed to read ethoko.config.json at ${resolvedPath}. Please ensure the file exists and is readable.`,
     );
   }
   let parsedJson: unknown;
@@ -336,14 +336,14 @@ Example ethoko.json:
     parsedJson = JSON.parse(configRaw);
   } catch {
     throw new Error(
-      `Invalid JSON in ethoko.json at ${resolvedPath}. Check for trailing commas or missing quotes.`,
+      `Invalid JSON in ethoko.config.json at ${resolvedPath}. Check for trailing commas or missing quotes.`,
     );
   }
 
   const parsingResult = EthokoConfigSchema.safeParse(parsedJson);
   if (!parsingResult.success) {
     throw new Error(
-      `Invalid ethoko.json configuration at ${resolvedPath}.
+      `Invalid ethoko.config.json configuration at ${resolvedPath}.
   The identified errors are:
     ${z.prettifyError(parsingResult.error)}`,
     );
@@ -355,7 +355,7 @@ Example ethoko.json:
 async function findConfigPath(startDir: string): Promise<string | null> {
   let currentDir = startDir;
   while (true) {
-    const candidate = path.join(currentDir, "ethoko.json");
+    const candidate = path.join(currentDir, "ethoko.config.json");
     const exists = await fs
       .stat(candidate)
       .then(() => true)

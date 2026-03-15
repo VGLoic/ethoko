@@ -36,7 +36,7 @@ export class CliConfigSetup {
 
   constructor(config: ConfigSetup) {
     this.config = config;
-    this.cliConfigPath = `${config.testPath}/ethoko.json`;
+    this.cliConfigPath = `${config.testPath}/ethoko.config.json`;
   }
 
   async setup(): Promise<() => Promise<void>> {

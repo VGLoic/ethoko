@@ -26,8 +26,6 @@ Ethoko supports both Hardhat and Foundry development environments, compile once,
 
 ## Overview
 
-
-
 ### Development process
 
 Once compilation is done, push the artifacts to Ethoko under a specific tag
@@ -114,11 +112,13 @@ Ethoko ships as a standalone CLI.
 ### Install
 
 The easiest way to install the Ethoko CLI is to through the installation script:
+
 ```bash
 curl -fsSL https://install.ethoko.com | bash
 ```
 
 Alternatively, Ethoko can be installed globally or locally via npm:
+
 ```bash
 npm install -g @ethoko/cli
 npm install --save-dev @ethoko/cli
@@ -126,7 +126,8 @@ npm install --save-dev @ethoko/cli
 
 ### Configuration
 
-Ethoko CLI can be configured through an `ethoko.json` file at the root of your project.
+Ethoko CLI can be configured through an `ethoko.config.json` file at the root of your project.
+
 ```json
 {
   "projectName": "<my-project>",
@@ -140,6 +141,7 @@ Ethoko CLI can be configured through an `ethoko.json` file at the root of your p
 ```
 
 Ethoko supports two types of storage backends for now:
+
 - `aws`: store the compilation artifacts in an AWS S3 bucket. The bucket must be created beforehand, and the AWS credentials must be configured locally for Ethoko to be able to access it.
 - `local`: store the compilation artifacts locally in the directory.
 

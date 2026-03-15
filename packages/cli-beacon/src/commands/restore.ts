@@ -39,7 +39,7 @@ export function registerRestoreCommand(
 
       if (!options.output && !config.pulledArtifactsPath) {
         cliError(
-          "Missing output path. Provide --output or set pulledArtifactsPath in ethoko.json",
+          "Missing output path. Provide --output or set pulledArtifactsPath in ethoko.config.json",
         );
         process.exitCode = 1;
         return;

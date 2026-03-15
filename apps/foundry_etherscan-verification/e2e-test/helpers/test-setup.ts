@@ -36,7 +36,7 @@ export class CliConfigSetup {
 
   constructor(config: ConfigSetup) {
     this.config = config;
-    this.cliConfigPath = `${config.testPath}/ethoko.json`;
+    this.cliConfigPath = `${config.testPath}/ethoko.config.json`;
   }
 
   async setup(): Promise<() => Promise<void>> {
@@ -80,15 +80,15 @@ export class DeployScriptSetup {
       .replace("PULLED_ARTIFACTS_PATH", pulledArtifactsPath)
       .replace("TYPINGS_PATH", this.config.typingsPath)
       .replace("STORAGE_PATH", `${this.config.storagePath}`);
-      const deploymentScriptContent = await fs.readFile(
-        "ignition/modules/release-2026-02-02.ts",
-        "utf-8",
-      );
-      const updatedScriptContent = deploymentScriptContent
+    const deploymentScriptContent = await fs.readFile(
+      "ignition/modules/release-2026-02-02.ts",
+      "utf-8",
+    );
+    const updatedScriptContent = deploymentScriptContent
       .replaceAll("2026-02-02", this.config.testId)
       .replaceAll(".ethoko-typings", this.config.typingsPath);
-      
-      await fs.writeFile(this.hardhatConfigPath, hardhatConfigContent);
+
+    await fs.writeFile(this.hardhatConfigPath, hardhatConfigContent);
     await fs.writeFile(this.ignitionDeployPath, updatedScriptContent);
 
     return async () => {
