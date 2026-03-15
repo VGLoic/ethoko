@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { createInterface } from "node:readline/promises";
 import { styleText } from "util";
-import { LOG_COLORS } from "@/ui/utils";
+import { LOG_COLORS } from "@/ui";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
 import {

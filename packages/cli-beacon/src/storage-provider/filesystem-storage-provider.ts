@@ -3,7 +3,7 @@ import path from "path";
 import { createReadStream, Dirent } from "fs";
 import { Stream } from "stream";
 import { styleText } from "node:util";
-import { LOG_COLORS } from "@/ui/utils";
+import { LOG_COLORS } from "@/ui";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,

@@ -1,11 +1,14 @@
+import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
 import {
   boxHeader,
-  displayPullResults,
+  boxSummary,
   error as cliError,
+  LOG_COLORS,
+  success,
 } from "@/ui/index.js";
-import { CliError, pull } from "@/client/index.js";
+import { CliError, pull, PullResult } from "@/client/index.js";
 import { LocalStorage } from "@/local-storage/local-storage.js";
 
 import type { EthokoCliConfig } from "../config/config.js";
@@ -118,4 +121,61 @@ export function registerPullCommand(
           process.exitCode = 1;
         });
     });
+}
+
+function displayPullResults(
+  project: string,
+  data: PullResult,
+  silent = false,
+): void {
+  if (data.remoteTags.length === 0 && data.remoteIds.length === 0) {
+    success("No artifacts to pull yet", silent);
+  } else if (
+    data.failedTags.length === 0 &&
+    data.failedIds.length === 0 &&
+    data.pulledTags.length === 0 &&
+    data.pulledIds.length === 0
+  ) {
+    success(`You're up to date with project "${project}"`, silent);
+  } else {
+    const summaryLines: string[] = [];
+
+    if (data.pulledTags.length > 0) {
+      summaryLines.push(
+        styleText(["bold", LOG_COLORS.success], "✔ Pulled Tags:"),
+      );
+      data.pulledTags.forEach((tag) => {
+        summaryLines.push(styleText(LOG_COLORS.success, `  • ${tag}`));
+      });
+    }
+    if (data.pulledIds.length > 0) {
+      if (summaryLines.length > 0) summaryLines.push("");
+      summaryLines.push(
+        styleText(["bold", LOG_COLORS.success], "✔ Pulled IDs:"),
+      );
+      data.pulledIds.forEach((id) => {
+        summaryLines.push(styleText(LOG_COLORS.success, `  • ${id}`));
+      });
+    }
+    if (data.failedTags.length > 0) {
+      if (summaryLines.length > 0) summaryLines.push("");
+      summaryLines.push(
+        styleText(["bold", LOG_COLORS.error], "✖ Failed Tags:"),
+      );
+      data.failedTags.forEach((tag) => {
+        summaryLines.push(styleText(LOG_COLORS.error, `  • ${tag}`));
+      });
+    }
+    if (data.failedIds.length > 0) {
+      if (summaryLines.length > 0) summaryLines.push("");
+      summaryLines.push(styleText(["bold", LOG_COLORS.error], "✖ Failed IDs:"));
+      data.failedIds.forEach((id) => {
+        summaryLines.push(styleText(LOG_COLORS.error, `  • ${id}`));
+      });
+    }
+
+    if (summaryLines.length > 0) {
+      boxSummary("Summary", summaryLines, silent);
+    }
+  }
 }

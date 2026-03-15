@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { createSpinner } from "../ui/utils";
+import { createSpinner } from "../ui";
 import { LocalStorage } from "../local-storage/local-storage";
 import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";

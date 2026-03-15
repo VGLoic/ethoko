@@ -1,11 +1,18 @@
+import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
 import {
   boxHeader,
-  displayDifferences,
+  boxSummary,
   error as cliError,
+  LOG_COLORS,
+  success,
 } from "@/ui/index.js";
-import { CliError, generateDiffWithTargetRelease } from "@/client/index.js";
+import {
+  CliError,
+  Difference,
+  generateDiffWithTargetRelease,
+} from "@/client/index.js";
 import { LocalStorage } from "@/local-storage/local-storage.js";
 
 import type { EthokoCliConfig } from "../config/config.js";
@@ -117,4 +124,55 @@ export function registerDiffCommand(
           process.exitCode = 1;
         });
     });
+}
+
+export function displayDifferences(
+  differences: Difference[],
+  silent = false,
+): void {
+  if (differences.length === 0) {
+    if (!silent) {
+      console.error("");
+      success("No differences found");
+      console.error("");
+    }
+    return;
+  }
+
+  const added = differences.filter((d) => d.status === "added");
+  const removed = differences.filter((d) => d.status === "removed");
+  const changed = differences.filter((d) => d.status === "changed");
+
+  const summaryLines: string[] = [];
+
+  if (changed.length > 0) {
+    summaryLines.push(styleText(["bold", LOG_COLORS.warn], "Changed:"));
+    changed.forEach((diff) => {
+      summaryLines.push(
+        styleText(LOG_COLORS.warn, `  • ${diff.name} (${diff.path})`),
+      );
+    });
+  }
+
+  if (added.length > 0) {
+    if (summaryLines.length > 0) summaryLines.push("");
+    summaryLines.push(styleText(["bold", LOG_COLORS.success], "Added:"));
+    added.forEach((diff) => {
+      summaryLines.push(
+        styleText(LOG_COLORS.success, `  • ${diff.name} (${diff.path})`),
+      );
+    });
+  }
+
+  if (removed.length > 0) {
+    if (summaryLines.length > 0) summaryLines.push("");
+    summaryLines.push(styleText(["bold", LOG_COLORS.error], "Removed:"));
+    removed.forEach((diff) => {
+      summaryLines.push(
+        styleText(LOG_COLORS.error, `  • ${diff.name} (${diff.path})`),
+      );
+    });
+  }
+
+  boxSummary("Differences Found", summaryLines, silent);
 }

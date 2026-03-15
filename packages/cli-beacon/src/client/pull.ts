@@ -1,6 +1,6 @@
 import { LocalStorage } from "../local-storage/local-storage";
 import { StorageProvider } from "../storage-provider";
-import { createSpinner } from "@/ui/utils";
+import { createSpinner } from "@/ui";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 

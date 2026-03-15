@@ -1,5 +1,5 @@
 import { StorageProvider } from "../storage-provider";
-import { createSpinner, warn } from "@/ui/utils";
+import { createSpinner, warn } from "@/ui";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import {

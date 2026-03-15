@@ -1,6 +1,12 @@
+import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import { boxHeader, error as cliError, displayPushResult } from "@/ui/index.js";
+import {
+  boxHeader,
+  error as cliError,
+  LOG_COLORS,
+  success,
+} from "@/ui/index.js";
 import { CliError, push } from "@/client/index.js";
 
 import type { EthokoCliConfig } from "../config/config.js";
@@ -102,4 +108,17 @@ export function registerPushCommand(
           process.exitCode = 1;
         });
     });
+}
+
+function displayPushResult(
+  project: string,
+  tag: string | undefined,
+  artifactId: string,
+  silent = false,
+): void {
+  if (silent) return;
+  console.error("");
+  success(`Artifact "${project}:${tag || artifactId}" pushed successfully`);
+  console.error(styleText(LOG_COLORS.log, `  ID: ${artifactId}`));
+  console.error("");
 }
