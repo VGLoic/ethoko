@@ -151,7 +151,7 @@ export async function generateDiffWithTargetRelease(
   // Step 1: Check if target artifact exists locally
 
   const spinner1 = createSpinner(
-    "Checking local artifact existence...",
+    "Checking artifact existence locally...",
     opts.silent,
   );
   const ensureResult = await toAsyncResult(
@@ -159,9 +159,9 @@ export async function generateDiffWithTargetRelease(
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    spinner1.fail("Failed to setup local storage");
+    spinner1.fail("Failed to setup pulled artifact store");
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -171,13 +171,13 @@ export async function generateDiffWithTargetRelease(
       { debug: opts.debug },
     );
     if (!hasTagResult.success) {
-      spinner1.fail("Failed to check local artifacts");
+      spinner1.fail("Failed to check pulled artifact store");
       throw new CliError(
-        "Error checking local storage, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+        "Error checking pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
     if (!hasTagResult.value) {
-      spinner1.fail("Local artifact not found");
+      spinner1.fail("Artifact not found locally");
       throw new CliError(
         `The artifact "${artifact.project}:${artifact.search.tag}" has not been found locally. Please, make sure to have the artifact locally before running the diff command. Run with debug mode for more info`,
       );
@@ -188,19 +188,19 @@ export async function generateDiffWithTargetRelease(
       { debug: opts.debug },
     );
     if (!hasIdResult.success) {
-      spinner1.fail("Failed to check local artifacts");
+      spinner1.fail("Failed to check pulled artifact store");
       throw new CliError(
-        "Error checking local storage, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+        "Error checking pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
     if (!hasIdResult.value) {
-      spinner1.fail("Local artifact not found");
+      spinner1.fail("Artifact not found locally");
       throw new CliError(
         `The artifact "${artifact.project}:${artifact.search.id}" has not been found locally. Please, make sure to have the artifact locally before running the diff command. Run with debug mode for more info`,
       );
     }
   }
-  spinner1.succeed("Local artifact found");
+  spinner1.succeed("Artifact found locally");
 
   // Step 2: Look for compilation artifact
   const spinner2 = createSpinner(

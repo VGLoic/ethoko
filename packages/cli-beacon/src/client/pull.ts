@@ -15,19 +15,19 @@ export type PullResult = {
 
 /**
  * Run the pull command of the CLI clients, it consists of four steps:
- * 1. Set up the local storage for the project
+ * 1. Set up the pulled artifact store for the project
  * 2. Fetch the list of remote tags and IDs from the storage provider, and filter them based on the provided tagOrId parameter
- * 3. Check which of the filtered tags and IDs are already present in the local storage, unless the force option is enabled
- * 4. Download the missing artifacts from the storage provider and save them to the local storage
+ * 3. Check which of the filtered tags and IDs are already present in the pulled artifact store, unless the force option is enabled
+ * 4. Download the missing artifacts from the storage provider and save them to the pulled artifact store
  *
  * The method returns an object containing the list of remote tags and IDs, the list of successfully pulled tags and IDs, and the list of tags and IDs that failed to be pulled.
- * @throws CliError if there is an error setting up the local storage, fetching the remote artifacts, checking the local artifacts, or downloading the artifacts. The error messages are meant to be user-friendly and can be directly shown to the user.
+ * @throws CliError if there is an error setting up the pulled artifact store, fetching the remote artifacts, checking the pulled artifact store, or downloading the artifacts. The error messages are meant to be user-friendly and can be directly shown to the user.
  * @param project The project name
  * @param search An optional object to specify a tag or ID to pull, if not provided all tags and IDs will be pulled
  * @param storageProvider The storage provider used to access remote artifacts
  * @param pulledArtifactStore The pulled artifact store used to persist pulled artifacts
  * @param opts Options for the pull command
- * @param opts.force Force the pull to skip checking existing local artifacts
+ * @param opts.force Force the pull to skip checking existing pulled artifacts
  * @param opts.debug Enable debug mode
  * @param opts.silent Suppress CLI output (errors and warnings still shown)
  * @returns An object with the remote tags and IDs, pulled tags and IDs, and failed tags and IDs
@@ -40,19 +40,22 @@ export async function pull(
   pulledArtifactStore: PulledArtifactStore,
   opts: { force: boolean; debug: boolean; silent?: boolean },
 ): Promise<PullResult> {
-  // Step 1: Set up local storage
-  const spinner1 = createSpinner("Setting up local storage...", opts.silent);
+  // Step 1: Set up pulled artifact store
+  const spinner1 = createSpinner(
+    "Setting up pulled artifact store...",
+    opts.silent,
+  );
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    spinner1.fail("Failed to setup local storage");
+    spinner1.fail("Failed to setup pulled artifact store");
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
-  spinner1.succeed("Local storage ready");
+  spinner1.succeed("Pulled artifact store ready");
 
   // Step 2: Fetch remote artifacts
   const spinner2 = createSpinner(
@@ -104,14 +107,17 @@ export async function pull(
     console.debug("");
   }
 
-  // Step 3: Check local artifacts
-  const spinner3 = createSpinner("Checking local artifacts...", opts.silent);
+  // Step 3: Check pulled artifact store
+  const spinner3 = createSpinner(
+    "Checking pulled artifact store...",
+    opts.silent,
+  );
   let filteredTagsToDownload: string[] = [];
   let filteredIdsToDownload: string[] = [];
   if (opts.force) {
     filteredTagsToDownload = tagsToDownload;
     filteredIdsToDownload = idsToDownload;
-    spinner3.succeed("Local artifacts check skipped (force mode)");
+    spinner3.succeed("Pulled artifact store check skipped (force mode)");
   } else {
     const localListingResult = await toAsyncResult(
       Promise.all([
@@ -131,9 +137,9 @@ export async function pull(
       { debug: opts.debug },
     );
     if (!localListingResult.success) {
-      spinner3.fail("Failed to check local artifacts");
+      spinner3.fail("Failed to check pulled artifact store");
       throw new CliError(
-        "Error checking local storage, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+        "Error checking pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
 
@@ -143,7 +149,7 @@ export async function pull(
       (tag) => !localTags.has(tag),
     );
     filteredIdsToDownload = idsToDownload.filter((id) => !localIds.has(id));
-    spinner3.succeed("Checked local artifacts");
+    spinner3.succeed("Checked pulled artifact store");
   }
 
   // Step 4: Download artifacts

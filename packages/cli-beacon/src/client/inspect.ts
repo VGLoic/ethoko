@@ -51,7 +51,7 @@ export async function inspectArtifact(
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -83,7 +83,7 @@ export async function inspectArtifact(
   );
   if (!artifactsResult.success) {
     throw new CliError(
-      "Unable to retrieve the artifact content, please ensure it exists locally. Run with debug mode for more info",
+      "Unable to retrieve the artifact content from the pulled artifact store, please ensure it exists locally. Run with debug mode for more info",
     );
   }
   const [inputArtifact, contractList] = artifactsResult.value;

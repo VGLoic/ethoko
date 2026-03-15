@@ -22,7 +22,7 @@ export const STORAGE_PROVIDER_STRATEGIES = [
 ] as const;
 
 /**
- * Vitest test helper that provides storage provider and local storage fixtures.
+ * Vitest test helper that provides storage provider and pulled artifact store fixtures.
  *
  * This extends the base `test` function with automatic setup/cleanup for:
  * - `storageProvider`: Storage backend (Filesystem or S3) for remote artifact storage

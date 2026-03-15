@@ -40,12 +40,12 @@ import { CliError } from "./error";
  * ```
  *
  * The function consists of the following steps:
- * 1. Set up the local storage and the typings folder
- * 2. Read the projects, tags and contracts from the local storage and generate a summary object
+ * 1. Set up the pulled artifact store and the typings folder
+ * 2. Read the projects, tags and contracts from the pulled artifact store and generate a summary object
  * 3. If no projects are found, generate empty summaries and typings files.
  *    Otherwise, generate the content of the `summary-exports.ts` file and write all the typings files to the typings folder.
  *
- * @throws CliError if there is an error while reading local storage or writing typings files.
+ * @throws CliError if there is an error while reading pulled artifact store or writing typings files.
  */
 export async function generateArtifactsSummariesAndTypings(
   ethokoTypingsPath: string,
@@ -58,7 +58,7 @@ export async function generateArtifactsSummariesAndTypings(
   );
   if (!ensurePulledArtifactStoreResult.success) {
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 

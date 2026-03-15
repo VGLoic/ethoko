@@ -67,7 +67,7 @@ export async function exportContractArtifact(
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 

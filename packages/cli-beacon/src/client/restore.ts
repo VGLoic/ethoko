@@ -30,9 +30,9 @@ export async function restore(
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    spinner1.fail("Failed to setup local storage");
+    spinner1.fail("Failed to setup pulled artifact store");
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 

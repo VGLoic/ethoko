@@ -12,18 +12,18 @@ export type ArtifactItem = {
 };
 
 /**
- * List the artifacts that have been pulled to the local storage, it consists of two steps:
- * 1. Fetch the list of projects, tags, and IDs from the local storage
+ * List the artifacts that have been pulled to the pulled artifact store, it consists of two steps:
+ * 1. Fetch the list of projects, tags, and IDs from the pulled artifact store
  * 2. Structure the data in a user-friendly format for display
  *
  * The method returns an array of artifact items containing the project, tag, ID, and last modified date.
  *
- * @throws CliError if there is an error fetching the data from the local storage. The error messages are meant to be user-friendly and can be directly shown to the user.
+ * @throws CliError if there is an error fetching the data from the pulled artifact store. The error messages are meant to be user-friendly and can be directly shown to the user.
  * @param pulledArtifactStore The pulled artifact store used to retrieve pulled artifacts
  * @param opts Options for the listing
  * @param opts.debug Enable debug mode
  * @param opts.silent Suppress CLI output (errors and warnings still shown)
- * @returns The list of artifacts in the local storage with their project, tag, ID, and last modified date
+ * @returns The list of artifacts in the pulled artifact store with their project, tag, ID, and last modified date
  */
 export async function listPulledArtifacts(
   pulledArtifactStore: PulledArtifactStore,
@@ -34,7 +34,7 @@ export async function listPulledArtifacts(
   });
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up local storage, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -46,7 +46,7 @@ export async function listPulledArtifacts(
   );
   if (!projectsResult.success) {
     throw new CliError(
-      "Error listing the projects, please run with debug mode for more info",
+      "Error listing the projects from the pulled artifact store, please run with debug mode for more info",
     );
   }
 
