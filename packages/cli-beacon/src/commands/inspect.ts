@@ -11,6 +11,7 @@ import { CliError, inspectArtifact, InspectResult } from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
 import type { EthokoCliConfig } from "../config/config.js";
+import { toAsyncResult } from "@/utils/result.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -28,14 +29,17 @@ export function registerInspectCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (options) => {
-      let config: EthokoCliConfig;
-      try {
-        config = await getConfig();
-      } catch (err) {
-        cliError(err instanceof Error ? err.message : String(err));
+      const configResult = await toAsyncResult(getConfig());
+      if (!configResult.success) {
+        cliError(
+          configResult.error instanceof Error
+            ? configResult.error.message
+            : String(configResult.error),
+        );
         process.exitCode = 1;
         return;
       }
+      const config = configResult.value.config;
 
       const optsParsingResult = z
         .object({

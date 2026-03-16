@@ -13,6 +13,7 @@ import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-sto
 
 import type { EthokoCliConfig } from "../config/config.js";
 import { createStorageProvider } from "./utils/storage-provider.js";
+import { toAsyncResult } from "@/utils/result.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -31,22 +32,17 @@ export function registerRestoreCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (options) => {
-      let config: EthokoCliConfig;
-      try {
-        config = await getConfig();
-      } catch (err) {
-        cliError(err instanceof Error ? err.message : String(err));
-        process.exitCode = 1;
-        return;
-      }
-
-      if (!options.output && !config.pulledArtifactsPath) {
+      const configResult = await toAsyncResult(getConfig());
+      if (!configResult.success) {
         cliError(
-          "Missing output path. Provide --output or set pulledArtifactsPath in ethoko.config.json",
+          configResult.error instanceof Error
+            ? configResult.error.message
+            : String(configResult.error),
         );
         process.exitCode = 1;
         return;
       }
+      const config = configResult.value.config;
 
       const optsParsingResult = z
         .object({
@@ -73,9 +69,8 @@ export function registerRestoreCommand(
             .string('The "output" option must be a string')
             .min(
               1,
-              'If provided, the "output" cannot be empty. Provide a valid output directory path.',
-            )
-            .optional(),
+              'The "output" cannot be empty. Provide a valid output directory path.',
+            ),
           force: z
             .boolean('The "force" option must be a boolean')
             .default(false),
@@ -135,10 +130,11 @@ export function registerRestoreCommand(
         optsParsingResult.data.silent,
       );
 
-      const storageProvider = createStorageProvider({
-        ...config,
-        debug: config.debug || optsParsingResult.data.debug,
-      });
+      const storageProvider = createStorageProvider(
+        config.storage,
+        optsParsingResult.data.debug,
+      );
+
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
       );
@@ -148,12 +144,12 @@ export function registerRestoreCommand(
           project: optsParsingResult.data.project,
           search: optsParsingResult.data.search,
         },
-        optsParsingResult.data.output ?? config.pulledArtifactsPath,
+        optsParsingResult.data.output,
         storageProvider,
         pulledArtifactStore,
         {
           force: optsParsingResult.data.force,
-          debug: config.debug || optsParsingResult.data.debug,
+          debug: optsParsingResult.data.debug,
           silent: optsParsingResult.data.silent,
         },
       )

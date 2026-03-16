@@ -294,9 +294,18 @@ const EthokoConfigSchema = z
     },
   );
 
-export type EthokoCliConfig = z.infer<typeof EthokoConfigSchema> & {
-  configPath: string;
-};
+type EthokoConfig = z.infer<typeof EthokoConfigSchema>;
+export type EthokoStorageConfig = EthokoConfig["storage"];
+
+export class EthokoCliConfig {
+  public config: z.infer<typeof EthokoConfigSchema> & { configPath: string };
+
+  constructor(
+    config: z.infer<typeof EthokoConfigSchema> & { configPath: string },
+  ) {
+    this.config = config;
+  }
+}
 
 export async function loadConfig(
   configPath?: string,
@@ -349,7 +358,10 @@ Example ethoko.config.json:
     );
   }
 
-  return { ...parsingResult.data, configPath: resolvedPath };
+  return new EthokoCliConfig({
+    ...parsingResult.data,
+    configPath: resolvedPath,
+  });
 }
 
 async function findConfigPath(startDir: string): Promise<string | null> {

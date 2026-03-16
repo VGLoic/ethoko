@@ -1,19 +1,25 @@
-import { FilesystemStorageProvider, S3BucketProvider } from "@/storage-provider";
+import {
+  FilesystemStorageProvider,
+  S3BucketProvider,
+} from "@/storage-provider";
 
-import type { EthokoCliConfig } from "../../config/config.js";
+import type { EthokoStorageConfig } from "../../config/config.js";
 
-export function createStorageProvider(config: EthokoCliConfig) {
-  if (config.storage.type === "aws") {
+export function createStorageProvider(
+  storageConfig: EthokoStorageConfig,
+  debug?: boolean,
+) {
+  if (storageConfig.type === "aws") {
     return new S3BucketProvider({
-      bucketName: config.storage.bucketName,
-      bucketRegion: config.storage.region,
-      credentials: config.storage.credentials,
-      debug: config.debug,
+      bucketName: storageConfig.bucketName,
+      bucketRegion: storageConfig.region,
+      credentials: storageConfig.credentials,
+      debug,
     });
   }
 
   return new FilesystemStorageProvider({
-    path: config.storage.path,
-    debug: config.debug,
+    path: storageConfig.path,
+    debug,
   });
 }
