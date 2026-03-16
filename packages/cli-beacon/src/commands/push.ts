@@ -38,19 +38,36 @@ export function registerPushCommand(
 
       const optsParsingResult = z
         .object({
-          artifactPath: z.string().min(1).optional(),
-          tag: z.string().optional(),
-          force: z.boolean().default(false),
-          debug: z.boolean().default(config.debug),
-          silent: z.boolean().default(false),
+          artifactPath: z
+            .string('The "artifactPath" option must be a string')
+            .min(
+              1,
+              'The "artifactPath" cannot be empty. Provide a valid path to compilation artifacts or set compilationOutputPath in ethoko.config.json',
+            )
+            .optional(),
+          tag: z
+            .string('The "tag" option must be a string')
+            .min(
+              1,
+              'If provided, the "tag" cannot be empty. Provide a meaningful tag like "v1.0.0" or "latest"',
+            )
+            .optional(),
+          force: z
+            .boolean('The "force" option must be a boolean')
+            .default(false),
+          debug: z
+            .boolean('The "debug" option must be a boolean')
+            .default(config.debug),
+          silent: z
+            .boolean('The "silent" option must be a boolean')
+            .default(false),
         })
         .safeParse(options);
 
       if (!optsParsingResult.success) {
-        cliError("Invalid arguments");
-        if (config.debug) {
-          console.error(optsParsingResult.error);
-        }
+        cliError(
+          `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
+        );
         process.exitCode = 1;
         return;
       }

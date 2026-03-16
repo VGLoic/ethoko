@@ -43,29 +43,73 @@ export function registerDiffCommand(
 
       const paramParsingResult = z
         .object({
-          artifactPath: z.string().min(1).optional(),
-          id: z.string().optional(),
-          tag: z.string().optional(),
-          debug: z.boolean().default(config.debug),
-          silent: z.boolean().default(false),
+          artifactPath: z
+            .string('The "artifactPath" option must be a string')
+            .min(
+              1,
+              'The "artifactPath" cannot be empty. Provide a valid path to compilation artifacts or set compilationOutputPath in ethoko.config.json',
+            )
+            .optional(),
+          id: z
+            .string('The "id" option must be a string')
+            .min(
+              1,
+              'If provided, the "id" cannot be empty. Provide a valid artifact ID.',
+            )
+            .optional(),
+          tag: z
+            .string('The "tag" option must be a string')
+            .min(
+              1,
+              'If provided, the "tag" cannot be empty. Provide a valid tag name.',
+            )
+            .optional(),
+          debug: z
+            .boolean('The "debug" option must be a boolean')
+            .default(config.debug),
+          silent: z
+            .boolean('The "silent" option must be a boolean')
+            .default(false),
+        })
+        .transform((data, ctx) => {
+          if (data.id && data.tag) {
+            ctx.addIssue({
+              code: "custom",
+              message:
+                "Provide either --id or --tag to identify the artifact, not both",
+            });
+            return z.NEVER;
+          }
+          let search:
+            | { type: "id"; id: string }
+            | { type: "tag"; tag: string }
+            | null = null;
+          if (data.id) {
+            search = { type: "id", id: data.id };
+          } else if (data.tag) {
+            search = { type: "tag", tag: data.tag };
+          }
+          if (!search) {
+            ctx.addIssue({
+              code: "custom",
+              message:
+                "Either --id or --tag is required to identify the artifact. Example: --tag v1.0.0 or --id abc123def",
+            });
+            return z.NEVER;
+          }
+
+          return {
+            artifactPath: data.artifactPath,
+            debug: data.debug,
+            silent: data.silent,
+            search,
+          };
         })
         .safeParse(options);
       if (!paramParsingResult.success) {
-        cliError("Invalid arguments");
-        if (config.debug) {
-          console.error(paramParsingResult.error);
-        }
-        process.exitCode = 1;
-        return;
-      }
-      if (paramParsingResult.data.id && paramParsingResult.data.tag) {
-        cliError("Use either --id or --tag, not both");
-        process.exitCode = 1;
-        return;
-      }
-
-      if (!paramParsingResult.data.id && !paramParsingResult.data.tag) {
-        cliError("Provide --id or --tag to identify the artifact");
+        cliError(
+          `Invalid command arguments:\n${z.prettifyError(paramParsingResult.error)}`,
+        );
         process.exitCode = 1;
         return;
       }
@@ -81,19 +125,8 @@ export function registerDiffCommand(
         return;
       }
 
-      let search: { type: "id"; id: string } | { type: "tag"; tag: string };
-      if (paramParsingResult.data.id) {
-        search = { type: "id", id: paramParsingResult.data.id };
-      } else if (paramParsingResult.data.tag) {
-        search = { type: "tag", tag: paramParsingResult.data.tag };
-      } else {
-        cliError("Provide --id or --tag to identify the artifact");
-        process.exitCode = 1;
-        return;
-      }
-
       boxHeader(
-        `Comparing with artifact "${config.project}:${search.type === "id" ? search.id : search.tag}"`,
+        `Comparing with artifact "${config.project}:${paramParsingResult.data.search.type === "id" ? paramParsingResult.data.search.id : paramParsingResult.data.search.tag}"`,
         paramParsingResult.data.silent,
       );
 
@@ -103,7 +136,7 @@ export function registerDiffCommand(
 
       await generateDiffWithTargetRelease(
         finalArtifactPath,
-        { project: config.project, search },
+        { project: config.project, search: paramParsingResult.data.search },
         pulledArtifactStore,
         {
           debug: paramParsingResult.data.debug,

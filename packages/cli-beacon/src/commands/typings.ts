@@ -34,16 +34,19 @@ export function registerTypingsCommand(
 
       const parsingResult = z
         .object({
-          debug: z.boolean().default(config.debug),
-          silent: z.boolean().default(false),
+          debug: z
+            .boolean('The "debug" option must be a boolean')
+            .default(config.debug),
+          silent: z
+            .boolean('The "silent" option must be a boolean')
+            .default(false),
         })
         .safeParse(options);
 
       if (!parsingResult.success) {
-        cliError("Invalid arguments");
-        if (config.debug) {
-          console.error(parsingResult.error);
-        }
+        cliError(
+          `Invalid command arguments:\n${z.prettifyError(parsingResult.error)}`,
+        );
         process.exitCode = 1;
         return;
       }

@@ -108,14 +108,19 @@ export function registerUninstallCommand(program: Command): void {
     .action(async (options) => {
       const optsParsingResult = z
         .object({
-          force: z.boolean().default(false),
-          debug: z.boolean().default(false),
+          force: z
+            .boolean('The "force" option must be a boolean')
+            .default(false),
+          debug: z
+            .boolean('The "debug" option must be a boolean')
+            .default(false),
         })
         .safeParse(options);
 
       if (!optsParsingResult.success) {
-        cliError("Invalid arguments");
-        console.error(optsParsingResult.error);
+        cliError(
+          `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
+        );
         process.exitCode = 1;
         return;
       }
