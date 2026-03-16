@@ -92,7 +92,7 @@ export function registerInspectCommand(
       }
 
       boxHeader(
-        `Inspecting artifact "${projectConfig.project}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
+        `Inspecting artifact "${projectConfig.name}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
         optsParsingResult.data.silent,
       );
 
@@ -102,7 +102,7 @@ export function registerInspectCommand(
 
       await inspectArtifact(
         {
-          project: projectConfig.project,
+          project: projectConfig.name,
           search: artifactKeyParsingResult.data.search,
         },
         pulledArtifactStore,

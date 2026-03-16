@@ -110,7 +110,7 @@ export function registerExportCommand(
 
       if (optsParsingResult.data.output) {
         boxHeader(
-          `Exporting contract artifact for "${optsParsingResult.data.contract}" from "${projectConfig.project}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
+          `Exporting contract artifact for "${optsParsingResult.data.contract}" from "${projectConfig.name}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
           optsParsingResult.data.silent,
         );
       }
@@ -121,7 +121,7 @@ export function registerExportCommand(
 
       await exportContractArtifact(
         {
-          project: projectConfig.project,
+          project: projectConfig.name,
           search: artifactKeyParsingResult.data.search,
         },
         optsParsingResult.data.contract,

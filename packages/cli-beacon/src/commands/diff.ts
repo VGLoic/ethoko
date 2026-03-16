@@ -114,7 +114,7 @@ export function registerDiffCommand(
       }
 
       boxHeader(
-        `Comparing with artifact "${projectConfig.project}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
+        `Comparing with artifact "${projectConfig.name}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
         paramParsingResult.data.silent,
       );
 
