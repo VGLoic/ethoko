@@ -13,7 +13,7 @@ rm -rf .ethoko-typings
 
 pnpm compile
 
-npx ethoko push --tag 2026-02-04
+npx ethoko push forge-counter:2026-02-04
 
 npx ethoko pull
 

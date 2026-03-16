@@ -17,6 +17,7 @@ import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-sto
 
 import type { EthokoCliConfig } from "../config/config.js";
 import { toAsyncResult } from "@/utils/result.js";
+import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -27,12 +28,14 @@ export function registerDiffCommand(
   program
     .command("diff")
     .description("Compare local artifacts with a pulled artifact")
+    .argument(
+      "<PROJECT[:TAG|@ID]>",
+      "Target project and artifact identifier (tag or ID)",
+    )
     .option("--artifact-path <path>", "Path to compilation artifacts")
-    .option("--id <id>", "Artifact ID")
-    .option("--tag <tag>", "Artifact tag")
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
-    .action(async (options) => {
+    .action(async (projectArg, options) => {
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
         cliError(
@@ -45,6 +48,25 @@ export function registerDiffCommand(
       }
       const config = configResult.value;
 
+      const artifactKeyParsingResult = ArtifactKeySchema.transform(
+        (artifactKey) => {
+          if (!artifactKey.artifact) {
+            return z.NEVER;
+          }
+          return {
+            project: artifactKey.project,
+            search: artifactKey.artifact,
+          };
+        },
+      ).safeParse(projectArg);
+      if (!artifactKeyParsingResult.success) {
+        cliError(
+          `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
       const paramParsingResult = z
         .object({
           artifactPath: z
@@ -54,60 +76,12 @@ export function registerDiffCommand(
               'The "artifactPath" cannot be empty. Provide a valid path to compilation artifacts or set compilationOutputPath in ethoko.config.json',
             )
             .optional(),
-          id: z
-            .string('The "id" option must be a string')
-            .min(
-              1,
-              'If provided, the "id" cannot be empty. Provide a valid artifact ID.',
-            )
-            .optional(),
-          tag: z
-            .string('The "tag" option must be a string')
-            .min(
-              1,
-              'If provided, the "tag" cannot be empty. Provide a valid tag name.',
-            )
-            .optional(),
           debug: z
             .boolean('The "debug" option must be a boolean')
             .default(config.debug),
           silent: z
             .boolean('The "silent" option must be a boolean')
             .default(false),
-        })
-        .transform((data, ctx) => {
-          if (data.id && data.tag) {
-            ctx.addIssue({
-              code: "custom",
-              message:
-                "Provide either --id or --tag to identify the artifact, not both",
-            });
-            return z.NEVER;
-          }
-          let search:
-            | { type: "id"; id: string }
-            | { type: "tag"; tag: string }
-            | null = null;
-          if (data.id) {
-            search = { type: "id", id: data.id };
-          } else if (data.tag) {
-            search = { type: "tag", tag: data.tag };
-          }
-          if (!search) {
-            ctx.addIssue({
-              code: "custom",
-              message:
-                "Either --id or --tag is required to identify the artifact. Example: --tag v1.0.0 or --id abc123def",
-            });
-            return z.NEVER;
-          }
-
-          return {
-            artifactPath: data.artifactPath,
-            debug: data.debug,
-            silent: data.silent,
-            search,
-          };
         })
         .safeParse(options);
       if (!paramParsingResult.success) {
@@ -129,8 +103,19 @@ export function registerDiffCommand(
         return;
       }
 
+      const projectConfig = config.getProjectConfig(
+        artifactKeyParsingResult.data.project,
+      );
+      if (!projectConfig) {
+        cliError(
+          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
       boxHeader(
-        `Comparing with artifact "${config.project}:${paramParsingResult.data.search.type === "id" ? paramParsingResult.data.search.id : paramParsingResult.data.search.tag}"`,
+        `Comparing with artifact "${projectConfig.project}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
         paramParsingResult.data.silent,
       );
 
@@ -140,7 +125,10 @@ export function registerDiffCommand(
 
       await generateDiffWithTargetRelease(
         finalArtifactPath,
-        { project: config.project, search: paramParsingResult.data.search },
+        {
+          project: artifactKeyParsingResult.data.project,
+          search: artifactKeyParsingResult.data.search,
+        },
         pulledArtifactStore,
         {
           debug: paramParsingResult.data.debug,

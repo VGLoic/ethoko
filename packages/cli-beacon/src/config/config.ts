@@ -296,9 +296,12 @@ const EthokoConfigSchema = z
 
 type EthokoConfig = z.infer<typeof EthokoConfigSchema>;
 export type EthokoStorageConfig = EthokoConfig["storage"];
+export interface ProjectConfig {
+  project: string;
+  storage: EthokoStorageConfig;
+}
 
 export class EthokoCliConfig {
-  public project: string;
   public pulledArtifactsPath: string;
   public typingsPath: string;
   public compilationOutputPath?: string;
@@ -307,13 +310,19 @@ export class EthokoCliConfig {
   public storage: EthokoStorageConfig;
 
   constructor(config: z.infer<typeof EthokoConfigSchema>, configPath: string) {
-    this.project = config.project;
     this.pulledArtifactsPath = config.pulledArtifactsPath;
     this.typingsPath = config.typingsPath;
     this.compilationOutputPath = config.compilationOutputPath;
     this.debug = config.debug;
     this.configPath = configPath;
     this.storage = config.storage;
+  }
+
+  public getProjectConfig(project: string): ProjectConfig | undefined {
+    return {
+      project,
+      storage: this.storage,
+    };
   }
 }
 

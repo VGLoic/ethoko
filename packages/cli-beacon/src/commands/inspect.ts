@@ -12,6 +12,7 @@ import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-sto
 
 import type { EthokoCliConfig } from "../config/config.js";
 import { toAsyncResult } from "@/utils/result.js";
+import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -22,13 +23,14 @@ export function registerInspectCommand(
   program
     .command("inspect")
     .description("Inspect a pulled artifact")
-    .option("--id <id>", "Artifact ID")
-    .option("--tag <tag>", "Artifact tag")
-    .option("--project <project>", "Project name")
+    .argument(
+      "<PROJECT[:TAG|@ID]>",
+      "Target project and artifact identifier (tag or ID)",
+    )
     .option("--json", "Output JSON", false)
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
-    .action(async (options) => {
+    .action(async (projectArg, options) => {
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
         cliError(
@@ -41,27 +43,27 @@ export function registerInspectCommand(
       }
       const config = configResult.value;
 
+      const artifactKeyParsingResult = ArtifactKeySchema.transform(
+        (artifactKey) => {
+          if (!artifactKey.artifact) {
+            return z.NEVER;
+          }
+          return {
+            project: artifactKey.project,
+            search: artifactKey.artifact,
+          };
+        },
+      ).safeParse(projectArg);
+      if (!artifactKeyParsingResult.success) {
+        cliError(
+          `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
       const optsParsingResult = z
         .object({
-          id: z
-            .string('The "id" option must be a string')
-            .min(
-              1,
-              'If provided, the "id" cannot be empty. Provide a valid artifact ID.',
-            )
-            .optional(),
-          tag: z
-            .string('The "tag" option must be a string')
-            .min(
-              1,
-              'If provided, the "tag" cannot be empty. Provide a valid tag name.',
-            )
-            .optional(),
-          project: z
-            .string('The "project" option must be a string')
-            .min(1, 'The "project" cannot be empty')
-            .optional()
-            .default(config.project),
           json: z.boolean('The "json" option must be a boolean').default(false),
           debug: z
             .boolean('The "debug" option must be a boolean')
@@ -69,40 +71,6 @@ export function registerInspectCommand(
           silent: z
             .boolean('The "silent" option must be a boolean')
             .default(false),
-        })
-        .transform((data, ctx) => {
-          if (data.id && data.tag) {
-            ctx.addIssue({
-              code: "custom",
-              message:
-                "Provide either --id or --tag to identify the artifact, not both",
-            });
-            return z.NEVER;
-          }
-          let search:
-            | { type: "id"; id: string }
-            | { type: "tag"; tag: string }
-            | null = null;
-          if (data.id) {
-            search = { type: "id", id: data.id };
-          } else if (data.tag) {
-            search = { type: "tag", tag: data.tag };
-          }
-          if (!search) {
-            ctx.addIssue({
-              code: "custom",
-              message:
-                "Either --id or --tag is required to identify the artifact. Example: --tag v1.0.0 or --id abc123def",
-            });
-            return z.NEVER;
-          }
-          return {
-            project: data.project,
-            json: data.json,
-            debug: data.debug,
-            silent: data.silent,
-            search,
-          };
         })
         .safeParse(options);
       if (!optsParsingResult.success) {
@@ -114,7 +82,7 @@ export function registerInspectCommand(
       }
 
       boxHeader(
-        `Inspecting artifact "${optsParsingResult.data.project}:${optsParsingResult.data.search.type === "tag" ? optsParsingResult.data.search.tag : optsParsingResult.data.search.id}"`,
+        `Inspecting artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
         optsParsingResult.data.silent,
       );
 
@@ -124,8 +92,8 @@ export function registerInspectCommand(
 
       await inspectArtifact(
         {
-          project: optsParsingResult.data.project,
-          search: optsParsingResult.data.search,
+          project: artifactKeyParsingResult.data.project,
+          search: artifactKeyParsingResult.data.search,
         },
         pulledArtifactStore,
         {

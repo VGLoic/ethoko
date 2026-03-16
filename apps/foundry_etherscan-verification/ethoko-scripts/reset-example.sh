@@ -14,7 +14,7 @@ rm -rf .ethoko-storage
 
 pnpm compile
 
-npx ethoko push --tag 2026-02-02
+npx ethoko push verified-forge-counter:2026-02-02
 
 npx ethoko pull
 

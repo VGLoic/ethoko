@@ -14,6 +14,7 @@ import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-sto
 import type { EthokoCliConfig } from "../config/config.js";
 import { createStorageProvider } from "./utils/storage-provider.js";
 import { toAsyncResult } from "@/utils/result.js";
+import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -24,13 +25,14 @@ export function registerPullCommand(
   program
     .command("pull")
     .description("Download artifacts from storage")
-    .option("--id <id>", "Artifact ID")
-    .option("--tag <tag>", "Artifact tag")
-    .option("--project <project>", "Project name")
+    .argument(
+      "<PROJECT[:TAG|@ID]>",
+      "Target project and optionally artifact tag or ID",
+    )
     .option("--force", "Overwrite existing local artifacts", false)
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
-    .action(async (options) => {
+    .action(async (projectArg, options) => {
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
         cliError(
@@ -43,27 +45,22 @@ export function registerPullCommand(
       }
       const config = configResult.value;
 
+      const artifactKeyParsingResult = ArtifactKeySchema.transform(
+        (artifactKey) => ({
+          project: artifactKey.project,
+          search: artifactKey.artifact,
+        }),
+      ).safeParse(projectArg);
+      if (!artifactKeyParsingResult.success) {
+        cliError(
+          `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
       const optsParsingResult = z
         .object({
-          id: z
-            .string('The "id" option must be a string')
-            .min(
-              1,
-              'If provided, the "id" cannot be empty. Provide a valid artifact ID.',
-            )
-            .optional(),
-          tag: z
-            .string('The "tag" option must be a string')
-            .min(
-              1,
-              'If provided, the "tag" cannot be empty. Provide a valid tag name.',
-            )
-            .optional(),
-          project: z
-            .string('The "project" option must be a string')
-            .min(1, 'The "project" cannot be empty')
-            .optional()
-            .default(config.project),
           force: z
             .boolean('The "force" option must be a boolean')
             .default(false),
@@ -74,32 +71,6 @@ export function registerPullCommand(
             .boolean('The "silent" option must be a boolean')
             .default(false),
         })
-        .transform((data, ctx) => {
-          if (data.id && data.tag) {
-            ctx.addIssue({
-              code: "custom",
-              message:
-                "Provide either --id or --tag to identify the artifact, not both",
-            });
-            return z.NEVER;
-          }
-          let search:
-            | { type: "id"; id: string }
-            | { type: "tag"; tag: string }
-            | null = null;
-          if (data.id) {
-            search = { type: "id", id: data.id };
-          } else if (data.tag) {
-            search = { type: "tag", tag: data.tag };
-          }
-          return {
-            project: data.project,
-            force: data.force,
-            debug: data.debug,
-            silent: data.silent,
-            search,
-          };
-        })
         .safeParse(options);
       if (!optsParsingResult.success) {
         cliError(
@@ -109,16 +80,25 @@ export function registerPullCommand(
         return;
       }
 
-      const search = optsParsingResult.data.search;
+      const projectConfig = config.getProjectConfig(
+        artifactKeyParsingResult.data.project,
+      );
+      if (!projectConfig) {
+        cliError(
+          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
+        );
+        process.exitCode = 1;
+        return;
+      }
 
-      if (search) {
+      if (artifactKeyParsingResult.data.search) {
         boxHeader(
-          `Pulling artifact "${optsParsingResult.data.project}:${search.type === "id" ? search.id : search.tag}"`,
+          `Pulling artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
           optsParsingResult.data.silent,
         );
       } else {
         boxHeader(
-          `Pulling artifacts for "${optsParsingResult.data.project}"`,
+          `Pulling artifacts for "${artifactKeyParsingResult.data.project}"`,
           optsParsingResult.data.silent,
         );
       }
@@ -131,8 +111,8 @@ export function registerPullCommand(
         config.pulledArtifactsPath,
       );
       await pull(
-        optsParsingResult.data.project,
-        search,
+        artifactKeyParsingResult.data.project,
+        artifactKeyParsingResult.data.search,
         storageProvider,
         pulledArtifactStore,
         {
@@ -143,7 +123,7 @@ export function registerPullCommand(
       )
         .then((result) =>
           displayPullResults(
-            optsParsingResult.data.project,
+            artifactKeyParsingResult.data.project,
             result,
             optsParsingResult.data.silent,
           ),

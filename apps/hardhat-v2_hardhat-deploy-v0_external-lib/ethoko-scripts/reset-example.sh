@@ -13,7 +13,7 @@ rm -rf .ethoko-typings
 
 pnpm compile
 
-npx ethoko push --tag v1.0.1
+npx ethoko push doubtful-counter:v1.0.1
 
 npx ethoko pull
 
