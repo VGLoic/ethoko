@@ -126,17 +126,19 @@ npm install --save-dev @ethoko/cli
 
 ### Configuration
 
-Ethoko CLI can be configured through an `ethoko.config.json` file at the root of your project.
+Ethoko CLI can be configured through an `ethoko.config.json` file at the root of your repository.
 
 ```json
 {
-  "projectName": "<my-project>",
   "compilationOutputPath": "out",
-  "storage": {
-    "type": "aws",
-    "awsBucket": "<my-ethoko-bucket>",
-    "awsRegion": "<my-aws-region>"
-  }
+  "projects": [{
+    "name": "<my-project>",
+    "storage": {
+      "type": "aws",
+      "awsBucket": "<my-ethoko-bucket>",
+      "awsRegion": "<my-aws-region>"
+    }
+  }]
 }
 ```
 
@@ -154,11 +156,6 @@ A unique **ID**, e.g. `b5e41181986a`, is derived for each compilation artifact. 
 A **tag**, e.g. `2026-02-02` or `v1.2.3`, can be associated to a compilation artifact when pushed.
 
 A **project**, e.g. `doubtful-project`, will gather many compilation artifacts.
-
-The project setup in the Hardhat Config will be used as
-
-- target project when pushing new compilation artifacts,
-- default project for pulling artifacts or other commands, different project can be specified for those commands.
 
 ### Commands
 

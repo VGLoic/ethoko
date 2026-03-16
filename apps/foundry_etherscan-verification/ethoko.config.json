@@ -1,8 +1,12 @@
 {
-  "project": "verified-forge-counter",
   "compilationOutputPath": "out",
-  "storage": {
-    "type": "filesystem",
-    "path": ".ethoko-storage"
-  }
+  "projects": [
+    {
+      "name": "verified-forge-counter",
+      "storage": {
+        "type": "filesystem",
+        "path": ".ethoko-storage"
+      }
+    }
+  ]
 }

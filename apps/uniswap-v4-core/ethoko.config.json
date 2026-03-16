@@ -1,8 +1,12 @@
 {
-  "project": "uniswap-v4-core-ethoko-test",
   "compilationOutputPath": "./out",
-  "storage": {
-    "type": "filesystem",
-    "path": "./ethoko-storage"
-  }
+  "projects": [
+    {
+      "name": "uniswap-v4-core-ethoko-test",
+      "storage": {
+        "type": "filesystem",
+        "path": "./ethoko-storage"
+      }
+    }
+  ]
 }

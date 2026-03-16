@@ -23,62 +23,51 @@ describe('"loadConfig" must parse accordingly to rules', () => {
    */
   const defaultStorageConfig = { type: "filesystem" };
   const invalidCases = [
-    // Without storage considerations
-    ['Missing "project" field', {}, /"project" field must be a string/],
-    [
-      'Empty "project" field',
-      { project: "" },
-      /"project" field is required in ethoko.config.json/,
-    ],
-    [
-      'Missing "storage" field',
-      { project: "dummy" },
-      /"storage" field must be a valid storage configuration object/,
-    ],
+    // Without projects considerations
     [
       "Typings path and pulled artifacts path are equal",
       {
-        project: "dummy",
         typingsPath: "path/to/typings",
         pulledArtifactsPath: "path/to/typings",
-        storage: defaultStorageConfig,
       },
       /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
     ],
     [
       "Typings path parent of pulled artifacts path",
       {
-        project: "dummy",
         typingsPath: "path/to/",
         pulledArtifactsPath: "path/to/typings",
-        storage: defaultStorageConfig,
       },
       /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
     ],
     [
       "Typings path child of pulled artifacts path",
       {
-        project: "dummy",
         typingsPath: "path/to/typings",
         pulledArtifactsPath: "path/to/",
-        storage: defaultStorageConfig,
       },
       /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
+    ],
+    // Bad project configuration
+    [
+      '"name" field is missing in project configuration',
+      {
+        projects: [{ storage: defaultStorageConfig }],
+      },
+      /"name" field must be a string/,
     ],
     // Bad storage configuration
     [
       'Storage "type" field is missing',
       {
-        project: "dummy",
-        storage: {},
+        projects: [{ name: "dummy", storage: {} }],
       },
       /"storage" field must be a valid storage configuration object/,
     ],
     [
       'Storage "type" field is invalid',
       {
-        project: "dummy",
-        storage: { type: "invalid" },
+        projects: [{ name: "dummy", storage: { type: "invalid" } }],
       },
       /"storage" field must be a valid storage configuration object/,
     ],
@@ -86,36 +75,52 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     [
       '"path" field is equal to "typingsPath"',
       {
-        project: "dummy",
         typingsPath: "path/to/typings",
-        storage: { type: "filesystem", path: "path/to/typings" },
+        projects: [
+          {
+            name: "dummy",
+            storage: { type: "filesystem", path: "path/to/typings" },
+          },
+        ],
       },
       /For "filesystem" storage, the "storage.path" cannot be in a child relationship with "typingsPath" or "pulledArtifactsPath"/,
     ],
     [
       '"path" field is equal to "pulledArtifactsPath"',
       {
-        project: "dummy",
         pulledArtifactsPath: "path/to/artifacts",
-        storage: { type: "filesystem", path: "path/to/artifacts" },
+        projects: [
+          {
+            name: "dummy",
+            storage: { type: "filesystem", path: "path/to/artifacts" },
+          },
+        ],
       },
       /For "filesystem" storage, the "storage.path" cannot be in a child relationship with "typingsPath" or "pulledArtifactsPath"/,
     ],
     [
       '"path" field is a child of "typingsPath"',
       {
-        project: "dummy",
         typingsPath: "path/to/typings",
-        storage: { type: "filesystem", path: "path/to/typings/subdir" },
+        projects: [
+          {
+            name: "dummy",
+            storage: { type: "filesystem", path: "path/to/typings/subdir" },
+          },
+        ],
       },
       /For "filesystem" storage, the "storage.path" cannot be in a child relationship with "typingsPath" or "pulledArtifactsPath"/,
     ],
     [
       '"path" field is a child of "pulledArtifactsPath"',
       {
-        project: "dummy",
         pulledArtifactsPath: "path/to/typings",
-        storage: { type: "filesystem", path: "path/to/typings/subdir" },
+        projects: [
+          {
+            name: "dummy",
+            storage: { type: "filesystem", path: "path/to/typings/subdir" },
+          },
+        ],
       },
       /For "filesystem" storage, the "storage.path" cannot be in a child relationship with "typingsPath" or "pulledArtifactsPath"/,
     ],
@@ -123,84 +128,109 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     [
       'Missing "awsRegion" field for "aws" storage',
       {
-        project: "dummy",
-        storage: { type: "aws", awsBucketName: "my-bucket" },
+        projects: [
+          {
+            name: "dummy",
+            storage: { type: "aws", awsBucketName: "my-bucket" },
+          },
+        ],
       },
       /The "awsRegion" field must be a string when "type" is "aws"/,
     ],
     [
       'Missing "awsBucketName" field for "aws" storage',
       {
-        project: "dummy",
-        storage: { type: "aws", awsRegion: "us-east-1" },
+        projects: [
+          { name: "dummy", storage: { type: "aws", awsRegion: "us-east-1" } },
+        ],
       },
       /The "awsBucketName" field must be a string when "type" is "aws"/,
     ],
     [
       '"awsAccessKeyId" cannot be provided if "awsProfile" filled',
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsProfile: "profile",
-          awsAccessKeyId: "access-key-id",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsProfile: "profile",
+              awsAccessKeyId: "access-key-id",
+            },
+          },
+        ],
       },
       /When "awsProfile" is provided, credential fields \("awsAccessKeyId", "awsSecretAccessKey"\) and role configuration fields \("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
     ],
     [
       '"awsAccessKeyId" empty while "awsSecretAccessKey" provided for "aws" storage',
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsSecretAccessKey: "secret",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsSecretAccessKey: "secret",
+            },
+          },
+        ],
       },
       /Both "awsAccessKeyId" and "awsSecretAccessKey" must be provided together when "type" is "aws"/,
     ],
     [
       '"awsSecretAccessKey" empty while "awsAccessKeyId" provided for "aws" storage',
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsAccessKeyId: "access-key-id",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsAccessKeyId: "access-key-id",
+            },
+          },
+        ],
       },
       /Both "awsAccessKeyId" and "awsSecretAccessKey" must be provided together when "type" is "aws"/,
     ],
     [
       '"awsRoleArn" cannot be provided if missing credentials for "aws" storage',
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsRoleArn: "arn:aws:iam::123456789012:role/MyRole",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsRoleArn: "arn:aws:iam::123456789012:role/MyRole",
+            },
+          },
+        ],
       },
       /When no AWS credentials are provided, role configuration fields \("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
     ],
     [
       '"awsRoleExternalId" cannot be provided if "awsRoleArn" is missing for "aws" storage',
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsAccessKeyId: "access-key-id",
-          awsSecretAccessKey: "secret",
-          awsRoleExternalId: "external-id",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsAccessKeyId: "access-key-id",
+              awsSecretAccessKey: "secret",
+              awsRoleExternalId: "external-id",
+            },
+          },
+        ],
       },
       /When "awsRoleArn" is not provided, role configuration fields \("awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
     ],
@@ -228,71 +258,90 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     [
       "Minimal valid config with filesystem storage",
       {
-        project: "dummy",
-        storage: { type: "filesystem" },
+        projects: [{ name: "dummy", storage: { type: "filesystem" } }],
       },
     ],
     [
       "Valid config with filesystem storage and custom paths",
       {
-        project: "dummy",
-        typingsPath: "path/to/typings",
-        pulledArtifactsPath: "path/to/artifacts",
-        storage: { type: "filesystem", path: "path/to/storage" },
+        projects: [
+          {
+            name: "dummy",
+            typingsPath: "path/to/typings",
+            pulledArtifactsPath: "path/to/artifacts",
+            storage: { type: "filesystem", path: "path/to/storage" },
+          },
+        ],
       },
     ],
     // AWS storage valid cases
     [
       "Minimal valid config with AWS storage and without credentials",
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+            },
+          },
+        ],
       },
     ],
     [
       "Minimal valid config with AWS and profile-based credentials",
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsProfile: "profile",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsProfile: "profile",
+            },
+          },
+        ],
       },
     ],
     [
       "Valid config with AWS storage and static credentials",
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsAccessKeyId: "access-key-id",
-          awsSecretAccessKey: "secret",
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsAccessKeyId: "access-key-id",
+              awsSecretAccessKey: "secret",
+            },
+          },
+        ],
       },
     ],
     [
       "Valid config with AWS storage and role configuration",
       {
-        project: "dummy",
-        storage: {
-          type: "aws",
-          awsRegion: "us-east-1",
-          awsBucketName: "my-bucket",
-          awsAccessKeyId: "access-key-id",
-          awsSecretAccessKey: "secret",
-          awsRoleArn: "arn:aws:iam::123456789012:role/MyRole",
-          awsRoleExternalId: "external-id",
-          awsRoleSessionName: "session-name",
-          awsRoleDurationSeconds: 3600,
-        },
+        projects: [
+          {
+            name: "dummy",
+            storage: {
+              type: "aws",
+              awsRegion: "us-east-1",
+              awsBucketName: "my-bucket",
+              awsAccessKeyId: "access-key-id",
+              awsSecretAccessKey: "secret",
+              awsRoleArn: "arn:aws:iam::123456789012:role/MyRole",
+              awsRoleExternalId: "external-id",
+              awsRoleSessionName: "session-name",
+              awsRoleDurationSeconds: 3600,
+            },
+          },
+        ],
       },
     ],
   ] as const;
@@ -312,7 +361,7 @@ describe('"loadConfig" must parse accordingly to rules', () => {
     test("should load config without errors", async () => {
       const loadedConfig = await loadConfig(configPath);
       expect(loadedConfig).toBeDefined();
-      expect(loadedConfig.getProjectConfig("dummy")?.project).toEqual("dummy");
+      expect(loadedConfig.getProjectConfig("dummy")?.name).toEqual("dummy");
       expect(loadedConfig.getProjectConfig("unknown")).toEqual(undefined);
     });
   });

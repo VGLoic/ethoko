@@ -1,10 +1,14 @@
 {
-  "project": "dummy-counter",
   "compilationOutputPath": "./artifacts",
-  "storage": {
-    "type": "aws",
-    "awsRegion": "eu-west-3",
-    "awsBucketName": "s3-soko-demo-c4a50549-5af4-444d-9ade-983644ab5fe8",
-    "awsProfile": "ethoko"
-  }
+  "projects": [
+    {
+      "name": "dummy-counter",
+      "storage": {
+        "type": "aws",
+        "awsRegion": "eu-west-3",
+        "awsBucketName": "s3-soko-demo-c4a50549-5af4-444d-9ade-983644ab5fe8",
+        "awsProfile": "ethoko"
+      }
+    }
+  ]
 }

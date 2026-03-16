@@ -209,11 +209,19 @@ const FilesystemStorageSchema = z.object({
     .transform((p) => path.resolve(p)),
 });
 
+const ProjectConfigSchema = z.object({
+  name: z
+    .string('"name" field must be a string')
+    .min(1, '"name" field must be a non-empty string'),
+  storage: z.discriminatedUnion(
+    "type",
+    [AwsStorageSchema, FilesystemStorageSchema],
+    '"storage" field must be a valid storage configuration object. Start with specifying the "type" field as either "aws" or "filesystem" and provide the corresponding configuration fields.',
+  ),
+});
+
 const EthokoConfigSchema = z
   .object({
-    project: z
-      .string('"project" field must be a string')
-      .min(1, '"project" field is required in ethoko.config.json'),
     pulledArtifactsPath: z
       .string('"pulledArtifactsPath" field must be a string or left empty')
       .min(
@@ -238,11 +246,12 @@ const EthokoConfigSchema = z
       )
       .transform((p) => path.resolve(p))
       .optional(),
-    storage: z.discriminatedUnion(
-      "type",
-      [AwsStorageSchema, FilesystemStorageSchema],
-      '"storage" field must be a valid storage configuration object. Start with specifying the "type" field as either "aws" or "filesystem" and provide the corresponding configuration fields.',
-    ),
+    projects: z
+      .array(
+        ProjectConfigSchema,
+        '"projects" field must be an array of project configurations',
+      )
+      .default([]),
     debug: z
       .boolean('"debug" field must be a boolean or left empty')
       .default(false),
@@ -271,20 +280,27 @@ const EthokoConfigSchema = z
   .refine(
     (data) => {
       // In case of storage type "filesystem", the storage path must not be a child of typings path or pulled artifacts path
-      if (data.storage.type === "filesystem") {
-        const resolvedStoragePath = path.resolve(data.storage.path);
+      const filesystemProjectPaths = [];
+      for (const project of data.projects) {
+        if (project.storage.type === "filesystem") {
+          filesystemProjectPaths.push(path.resolve(project.storage.path));
+        }
+      }
+      if (filesystemProjectPaths.length > 0) {
         const resolvedTypingsPath = path.resolve(data.typingsPath);
         const resolvedPulledArtifactsPath = path.resolve(
           data.pulledArtifactsPath,
         );
-        return (
-          resolvedTypingsPath !== resolvedStoragePath &&
-          resolvedPulledArtifactsPath !== resolvedStoragePath &&
-          !resolvedStoragePath.startsWith(resolvedTypingsPath + path.sep) &&
-          !resolvedStoragePath.startsWith(
-            resolvedPulledArtifactsPath + path.sep,
-          )
-        );
+        return filesystemProjectPaths.every((resolvedStoragePath) => {
+          return (
+            resolvedTypingsPath !== resolvedStoragePath &&
+            resolvedPulledArtifactsPath !== resolvedStoragePath &&
+            !resolvedStoragePath.startsWith(resolvedTypingsPath + path.sep) &&
+            !resolvedStoragePath.startsWith(
+              resolvedPulledArtifactsPath + path.sep,
+            )
+          );
+        });
       }
       return true;
     },
@@ -294,12 +310,8 @@ const EthokoConfigSchema = z
     },
   );
 
-type EthokoConfig = z.infer<typeof EthokoConfigSchema>;
-export type EthokoStorageConfig = EthokoConfig["storage"];
-export interface ProjectConfig {
-  project: string;
-  storage: EthokoStorageConfig;
-}
+type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
+export type EthokoStorageConfig = ProjectConfig["storage"];
 
 export class EthokoCliConfig {
   public pulledArtifactsPath: string;
@@ -315,16 +327,11 @@ export class EthokoCliConfig {
     this.compilationOutputPath = config.compilationOutputPath;
     this.debug = config.debug;
     this.configPath = configPath;
-    this.projects = [
-      {
-        project: config.project,
-        storage: config.storage,
-      },
-    ];
+    this.projects = config.projects;
   }
 
   public getProjectConfig(project: string): ProjectConfig | undefined {
-    return this.projects.find((p) => p.project === project);
+    return this.projects.find((p) => p.name === project);
   }
 }
 

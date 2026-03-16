@@ -1,8 +1,12 @@
 {
-  "project": "verified-counter",
   "compilationOutputPath": "./artifacts",
-  "storage": {
-    "type": "filesystem",
-    "path": "./ethoko-storage"
-  }
+  "projects": [
+    {
+      "name": "verified-counter",
+      "storage": {
+        "type": "filesystem",
+        "path": "./ethoko-storage"
+      }
+    }
+  ]
 }

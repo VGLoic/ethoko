@@ -1,8 +1,12 @@
 {
-  "project": "curious-counter",
   "compilationOutputPath": "./artifacts",
-  "storage": {
-    "type": "filesystem",
-    "path": "./ethoko-storage"
-  }
+  "projects": [
+    {
+      "name": "curious-counter",
+      "storage": {
+        "type": "filesystem",
+        "path": "./ethoko-storage"
+      }
+    }
+  ]
 }
