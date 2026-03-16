@@ -66,6 +66,16 @@ export function registerDiffCommand(
         process.exitCode = 1;
         return;
       }
+      const projectConfig = config.getProjectConfig(
+        artifactKeyParsingResult.data.project,
+      );
+      if (!projectConfig) {
+        cliError(
+          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
+        );
+        process.exitCode = 1;
+        return;
+      }
 
       const paramParsingResult = z
         .object({
@@ -98,17 +108,6 @@ export function registerDiffCommand(
       if (!finalArtifactPath) {
         cliError(
           "Artifact path is required. Provide --artifact-path or set compilationOutputPath in ethoko.config.json",
-        );
-        process.exitCode = 1;
-        return;
-      }
-
-      const projectConfig = config.getProjectConfig(
-        artifactKeyParsingResult.data.project,
-      );
-      if (!projectConfig) {
-        cliError(
-          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
         );
         process.exitCode = 1;
         return;

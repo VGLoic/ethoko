@@ -66,6 +66,16 @@ export function registerExportCommand(
         process.exitCode = 1;
         return;
       }
+      const projectConfig = config.getProjectConfig(
+        artifactKeyParsingResult.data.project,
+      );
+      if (!projectConfig) {
+        cliError(
+          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
+        );
+        process.exitCode = 1;
+        return;
+      }
 
       const optsParsingResult = z
         .object({
@@ -93,17 +103,6 @@ export function registerExportCommand(
       if (!optsParsingResult.success) {
         cliError(
           `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
-        );
-        process.exitCode = 1;
-        return;
-      }
-
-      const projectConfig = config.getProjectConfig(
-        artifactKeyParsingResult.data.project,
-      );
-      if (!projectConfig) {
-        cliError(
-          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
         );
         process.exitCode = 1;
         return;

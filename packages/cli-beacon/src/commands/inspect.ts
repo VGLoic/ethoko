@@ -61,6 +61,16 @@ export function registerInspectCommand(
         process.exitCode = 1;
         return;
       }
+      const projectConfig = config.getProjectConfig(
+        artifactKeyParsingResult.data.project,
+      );
+      if (!projectConfig) {
+        cliError(
+          `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
+        );
+        process.exitCode = 1;
+        return;
+      }
 
       const optsParsingResult = z
         .object({
@@ -82,7 +92,7 @@ export function registerInspectCommand(
       }
 
       boxHeader(
-        `Inspecting artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
+        `Inspecting artifact "${projectConfig.project}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
         optsParsingResult.data.silent,
       );
 
@@ -92,7 +102,7 @@ export function registerInspectCommand(
 
       await inspectArtifact(
         {
-          project: artifactKeyParsingResult.data.project,
+          project: projectConfig.project,
           search: artifactKeyParsingResult.data.search,
         },
         pulledArtifactStore,
