@@ -84,21 +84,46 @@ async function runInit(opts: {
 
   // Additional paths
 
-  // REMIND ME: improve this by checking in the repository
-  const compilationOutputResult = await prompts.text({
-    message:
-      "Input the path where your compilation output are stored (e.g. `./out` for Forge, `./artifacts` for Hardhat):",
-  });
-
-  if (prompts.isCancel(compilationOutputResult)) {
-    cliInfo("Configuration cancelled");
-    return;
+  const compilationOutputOptions = await deriveCompilationOutputPathsOptions();
+  let compilationOutputPath: string | undefined = undefined;
+  if (compilationOutputOptions.length > 0) {
+    const compilationOutputSelection = await prompts.select({
+      message: "Select the path where your compilation output are stored:",
+      options: [
+        ...compilationOutputOptions.map((option) => ({
+          value: option.path,
+          label: `${option.path} (${option.label})`,
+        })),
+        {
+          value: "other",
+          label: "Other",
+          hint: "Specify another path",
+        },
+      ],
+    });
+    if (prompts.isCancel(compilationOutputSelection)) {
+      cliInfo("Configuration cancelled");
+      return;
+    }
+    if (compilationOutputSelection !== "other") {
+      compilationOutputPath = compilationOutputSelection;
+    }
   }
+  if (!compilationOutputPath) {
+    const compilationOutputResult = await prompts.text({
+      message:
+        "Input the path where your compilation output are stored (e.g. `./out` for Forge, `./artifacts` for Hardhat, press Enter to skip):",
+    });
 
-  const compilationOutputPath =
-    compilationOutputResult.trim().length > 0
-      ? compilationOutputResult.trim()
-      : undefined;
+    if (prompts.isCancel(compilationOutputResult)) {
+      cliInfo("Configuration cancelled");
+      return;
+    }
+    compilationOutputPath =
+      compilationOutputResult.trim().length > 0
+        ? compilationOutputResult.trim()
+        : undefined;
+  }
 
   const pulledArtifactsPath = await prompts.text({
     message:
@@ -553,4 +578,87 @@ async function promptAwsS3Config(
   throw new Error(
     `Unsupported authentication method: ${authMethod satisfies never}`,
   );
+}
+
+async function deriveCompilationOutputPathsOptions(): Promise<
+  { path: string; label: string }[]
+> {
+  // Existence of
+  // - hardhat.config.{js,ts}
+  // - package.json with hardhat as dependency
+  // - artifacts/ directory
+  // -> suggest ./artifacts because likely a Hardhat project
+
+  // Existence of
+  // - foundry.toml
+  // - lib/ directory
+  // - out/ directory
+  // -> suggest ./out because likely a Foundry project
+
+  const options: { path: string; label: string }[] = [];
+
+  const hardhatConfigExists = await fs
+    .stat(path.resolve(process.cwd(), "hardhat.config.js"))
+    .then(() => true)
+    .catch(() => false);
+
+  const hardhatConfigTsExists = await fs
+    .stat(path.resolve(process.cwd(), "hardhat.config.ts"))
+    .then(() => true)
+    .catch(() => false);
+
+  const packageJsonPath = path.resolve(process.cwd(), "package.json");
+  const packageJsonExists = await fs
+    .stat(packageJsonPath)
+    .then(() => true)
+    .catch(() => false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let packageJson: any = {};
+  if (packageJsonExists) {
+    try {
+      const packageJsonContent = await fs.readFile(packageJsonPath, "utf-8");
+      packageJson = JSON.parse(packageJsonContent);
+    } catch {
+      // Ignore JSON parsing errors
+    }
+  }
+
+  const hardhatDependencyExists =
+    packageJson.dependencies?.hardhat || packageJson.devDependencies?.hardhat;
+
+  const artifactsDirExists = await fs
+    .stat(path.resolve(process.cwd(), "artifacts"))
+    .then(() => true)
+    .catch(() => false);
+
+  if (
+    hardhatConfigExists ||
+    hardhatConfigTsExists ||
+    hardhatDependencyExists ||
+    artifactsDirExists
+  ) {
+    options.push({ path: "./artifacts", label: "Hardhat default output" });
+  }
+
+  const foundryConfigExists = await fs
+    .stat(path.resolve(process.cwd(), "foundry.toml"))
+    .then(() => true)
+    .catch(() => false);
+
+  const libDirExists = await fs
+    .stat(path.resolve(process.cwd(), "lib"))
+    .then(() => true)
+    .catch(() => false);
+
+  const outDirExists = await fs
+    .stat(path.resolve(process.cwd(), "out"))
+    .then(() => true)
+    .catch(() => false);
+
+  if (foundryConfigExists || libDirExists || outDirExists) {
+    options.push({ path: "./out", label: "Foundry default output" });
+  }
+
+  return options;
 }
