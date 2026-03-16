@@ -4,6 +4,7 @@ import { loadConfig } from "./config/config.js";
 import { registerArtifactsCommand } from "./commands/artifacts.js";
 import { registerDiffCommand } from "./commands/diff.js";
 import { registerExportCommand } from "./commands/export.js";
+import { registerInitCommand } from "./commands/init.js";
 import { registerInspectCommand } from "./commands/inspect.js";
 import { registerPullCommand } from "./commands/pull.js";
 import { registerPushCommand } from "./commands/push.js";
@@ -23,6 +24,7 @@ program
 
 const getConfig = async () => loadConfig(program.opts().config);
 
+registerInitCommand(program);
 registerPushCommand(program, getConfig);
 registerPullCommand(program, getConfig);
 registerDiffCommand(program, getConfig);

@@ -1,6 +1,7 @@
 import ora, { Ora } from "ora";
 import boxen from "boxen";
 import { styleText } from "node:util";
+import * as clackPrompts from "@clack/prompts";
 
 export const LOG_COLORS = {
   log: "cyan",
@@ -89,3 +90,15 @@ export function info(message: string, silent = false): void {
 }
 
 export type { Ora };
+
+export const prompts = {
+  select: clackPrompts.select,
+  isCancel: clackPrompts.isCancel,
+  cancel: clackPrompts.cancel,
+  intro: clackPrompts.intro,
+  outro: clackPrompts.outro,
+  confirm: clackPrompts.confirm,
+  text: clackPrompts.text,
+  note: clackPrompts.note,
+  password: clackPrompts.password,
+};

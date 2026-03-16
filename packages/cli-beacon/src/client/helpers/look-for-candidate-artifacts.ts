@@ -1,8 +1,5 @@
 import fs from "fs/promises";
 import path from "path";
-import { createInterface } from "node:readline/promises";
-import { styleText } from "util";
-import { LOG_COLORS } from "@/ui";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
 import {
@@ -10,6 +7,7 @@ import {
   InferredArtifact,
 } from "@/supported-origins/infer-original-artifact-format";
 import { OriginalBuildInfoPaths } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import { prompts } from "@/ui";
 
 type CandidateBuildInfoOption = {
   display: string;
@@ -457,31 +455,19 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
  * @param options The list of options to choose from
  * @param timeoutMs Optional timeout in milliseconds (default: 30000ms = 30s). Set to 0 to disable timeout.
  * @returns The selected option
- * @throws CliError when timeout is reached
+ * @throws CliError when timeout is reached or user cancels
  */
 export async function promptUserSelection(
   message: string,
   options: CandidateBuildInfoOption[],
   timeoutMs: number = 30_000,
 ): Promise<OriginalBuildInfoPaths> {
-  const readline = createInterface({
-    input: process.stdin,
-    output: process.stderr,
-  });
-
-  let timeoutId: NodeJS.Timeout | null = null;
-  let isTimedOut = false;
-  let isClosed = false;
-
+  // Use Promise.race for timeout if enabled
+  let timeoutHandle: NodeJS.Timeout | null = null;
   const timeoutPromise =
     timeoutMs > 0
       ? new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            isTimedOut = true;
-            if (!isClosed) {
-              isClosed = true;
-              readline.close();
-            }
+          timeoutHandle = setTimeout(() => {
             reject(
               new CliError(
                 `User selection timed out after ${timeoutMs / 1_000}s.`,
@@ -491,84 +477,30 @@ export async function promptUserSelection(
         })
       : new Promise<never>(() => {}); // Never resolves if timeout is disabled
 
-  async function selectionPromise() {
-    console.error("");
-    console.error(styleText(LOG_COLORS.log, message));
-    options.forEach((option, index) => {
-      console.error(
-        styleText(LOG_COLORS.log, `  ${index + 1}. ${option.display}`),
-      );
+  const selectionPromise = prompts
+    .select<OriginalBuildInfoPaths>({
+      message,
+      options: options.map((opt) => ({
+        value: opt.value,
+        label: opt.display,
+        // We cast as any because `clack` expects to break the discriminated union of the options to include the label
+        // I did not succeed in making that smoothly with typescript
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      })) as any,
+    })
+    .then((result) => {
+      if (prompts.isCancel(result)) {
+        throw new CliError("Selection cancelled by user");
+      }
+      return result;
+    })
+    .finally(() => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
     });
-    console.error("");
 
-    let selectedIndex: number | null = null;
-    let warningLinesCount = 0;
-    let promptLinesCount = 0;
-
-    while (selectedIndex === null && !isTimedOut) {
-      promptLinesCount++;
-      const answer = await readline.question(
-        styleText(LOG_COLORS.log, "Enter your choice (number): "),
-      );
-
-      const parsed = parseInt(answer.trim(), 10);
-
-      if (isNaN(parsed) || parsed < 1 || parsed > options.length) {
-        console.error(
-          styleText(
-            LOG_COLORS.warn,
-            `⚠️  Invalid selection. Please enter a number between 1 and ${options.length}`,
-          ),
-        );
-        warningLinesCount++;
-      } else {
-        selectedIndex = parsed - 1;
-      }
-    }
-
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    if (!isClosed) {
-      isClosed = true;
-      readline.close();
-    }
-
-    const baseLinesCount = 2 + options.length + 1;
-    const linesToClear = baseLinesCount + promptLinesCount + warningLinesCount;
-
-    for (let i = 0; i < linesToClear; i++) {
-      process.stderr.write("\x1b[1A");
-      process.stderr.write("\x1b[2K");
-    }
-    process.stderr.write("\r");
-
-    if (selectedIndex === null) {
-      throw new Error("Selection was interrupted");
-    }
-
-    const selected = options[selectedIndex];
-    if (!selected) {
-      throw new Error(
-        `Failed to get selected option at index ${selectedIndex}`,
-      );
-    }
-
-    return selected.value;
-  }
-
-  return await Promise.race([selectionPromise(), timeoutPromise]).catch(
-    (error) => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      if (!isClosed) {
-        isClosed = true;
-        readline.close();
-      }
-      throw error;
-    },
-  );
+  return await Promise.race([selectionPromise, timeoutPromise]);
 }
 
 function formatTimeAgo(date: Date): string {
