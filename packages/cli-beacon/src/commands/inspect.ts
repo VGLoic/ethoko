@@ -66,21 +66,39 @@ export function registerInspectCommand(
             .boolean('The "silent" option must be a boolean')
             .default(false),
         })
-        .superRefine((data, ctx) => {
+        .transform((data, ctx) => {
           if (data.id && data.tag) {
             ctx.addIssue({
               code: "custom",
               message:
                 "Provide either --id or --tag to identify the artifact, not both",
             });
+            return z.NEVER;
           }
-          if (!data.id && !data.tag) {
+          let search:
+            | { type: "id"; id: string }
+            | { type: "tag"; tag: string }
+            | null = null;
+          if (data.id) {
+            search = { type: "id", id: data.id };
+          } else if (data.tag) {
+            search = { type: "tag", tag: data.tag };
+          }
+          if (!search) {
             ctx.addIssue({
               code: "custom",
               message:
                 "Either --id or --tag is required to identify the artifact. Example: --tag v1.0.0 or --id abc123def",
             });
+            return z.NEVER;
           }
+          return {
+            project: data.project,
+            json: data.json,
+            debug: data.debug,
+            silent: data.silent,
+            search,
+          };
         })
         .safeParse(options);
       if (!optsParsingResult.success) {
@@ -91,13 +109,8 @@ export function registerInspectCommand(
         return;
       }
 
-      const search: { type: "id"; id: string } | { type: "tag"; tag: string } =
-        optsParsingResult.data.id
-          ? { type: "id", id: optsParsingResult.data.id }
-          : { type: "tag", tag: optsParsingResult.data.tag! };
-
       boxHeader(
-        `Inspecting artifact "${optsParsingResult.data.project}:${search.type === "tag" ? search.tag : search.id}"`,
+        `Inspecting artifact "${optsParsingResult.data.project}:${optsParsingResult.data.search.type === "tag" ? optsParsingResult.data.search.tag : optsParsingResult.data.search.id}"`,
         optsParsingResult.data.silent,
       );
 
@@ -106,7 +119,10 @@ export function registerInspectCommand(
       );
 
       await inspectArtifact(
-        { project: optsParsingResult.data.project, search },
+        {
+          project: optsParsingResult.data.project,
+          search: optsParsingResult.data.search,
+        },
         pulledArtifactStore,
         {
           debug: optsParsingResult.data.debug,

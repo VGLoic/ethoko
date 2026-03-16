@@ -86,21 +86,40 @@ export function registerRestoreCommand(
             .boolean('The "silent" option must be a boolean')
             .default(false),
         })
-        .superRefine((data, ctx) => {
+        .transform((data, ctx) => {
           if (data.id && data.tag) {
             ctx.addIssue({
               code: "custom",
               message:
                 "Provide either --id or --tag to identify the artifact, not both",
             });
+            return z.NEVER;
           }
-          if (!data.id && !data.tag) {
+          let search:
+            | { type: "id"; id: string }
+            | { type: "tag"; tag: string }
+            | null = null;
+          if (data.id) {
+            search = { type: "id", id: data.id };
+          } else if (data.tag) {
+            search = { type: "tag", tag: data.tag };
+          }
+          if (!search) {
             ctx.addIssue({
               code: "custom",
               message:
                 "Either --id or --tag is required to identify the artifact. Example: --tag v1.0.0 or --id abc123def",
             });
+            return z.NEVER;
           }
+          return {
+            project: data.project,
+            output: data.output,
+            force: data.force,
+            debug: data.debug,
+            silent: data.silent,
+            search,
+          };
         })
         .safeParse(options);
       if (!optsParsingResult.success) {
@@ -111,13 +130,8 @@ export function registerRestoreCommand(
         return;
       }
 
-      const search: { type: "id"; id: string } | { type: "tag"; tag: string } =
-        optsParsingResult.data.id
-          ? { type: "id", id: optsParsingResult.data.id }
-          : { type: "tag", tag: optsParsingResult.data.tag! };
-
       boxHeader(
-        `Restoring artifact "${optsParsingResult.data.project}:${search.type === "id" ? search.id : search.tag}"`,
+        `Restoring artifact "${optsParsingResult.data.project}:${optsParsingResult.data.search.type === "id" ? optsParsingResult.data.search.id : optsParsingResult.data.search.tag}"`,
         optsParsingResult.data.silent,
       );
 
@@ -130,7 +144,10 @@ export function registerRestoreCommand(
       );
 
       await restore(
-        { project: optsParsingResult.data.project, search },
+        {
+          project: optsParsingResult.data.project,
+          search: optsParsingResult.data.search,
+        },
         optsParsingResult.data.output ?? config.pulledArtifactsPath,
         storageProvider,
         pulledArtifactStore,
