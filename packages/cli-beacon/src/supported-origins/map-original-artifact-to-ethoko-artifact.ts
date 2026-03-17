@@ -42,7 +42,10 @@ export function mapOriginalArtifactToEthokoArtifact(
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContentPaths: string[];
+  originalContent: {
+    rootPath: string;
+    paths: string[];
+  };
 }> {
   if (paths.format === "hardhat-v3") {
     return mapHardhatV3ArtifactsToEthokoArtifact(paths.buildInfoPaths, debug);

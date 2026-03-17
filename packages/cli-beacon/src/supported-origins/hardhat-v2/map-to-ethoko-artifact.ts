@@ -5,6 +5,7 @@ import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
 } from "@/ethoko-artifacts/v0";
+import path from "path";
 
 export async function mapHardhatV2ArtifactToEthokoArtifact(
   buildInfoPath: string,
@@ -12,7 +13,10 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContentPaths: string[];
+  originalContent: {
+    rootPath: string;
+    paths: string[];
+  };
 }> {
   const jsonContent = await fs
     .readFile(buildInfoPath, "utf-8")
@@ -67,9 +71,16 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
       });
     }
   }
+
+  const buildInfoDirPath = path.dirname(buildInfoPath);
+  const rootPath = path.dirname(buildInfoDirPath);
+
   return {
     inputArtifact,
     outputContractArtifacts,
-    originalContentPaths: [buildInfoPath],
+    originalContent: {
+      rootPath,
+      paths: [path.relative(rootPath, buildInfoPath)],
+    },
   };
 }

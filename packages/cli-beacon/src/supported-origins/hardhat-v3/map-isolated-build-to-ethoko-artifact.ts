@@ -35,7 +35,10 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContentPaths: string[];
+  originalContent: {
+    rootPath: string;
+    paths: string[];
+  };
 }> {
   const firstPair = pairs.at(0);
   if (!firstPair) {
@@ -148,8 +151,11 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
     }
   }
 
+  const buildInfoDirPath = path.dirname(firstPair.output);
+  const rootPath = path.dirname(buildInfoDirPath);
+
   const contractArtifactsPaths = await retrieveHardhatv3ContractArtifactsPaths(
-    path.dirname(firstPair.input),
+    buildInfoDirPath,
     originPairs.map((p) => p.id),
     userSourceNameMap,
     debug,
@@ -167,8 +173,12 @@ export async function mapHardhatV3ArtifactsToEthokoArtifact(
       input: solcInput,
     },
     outputContractArtifacts,
-    originalContentPaths: pairs
-      .flatMap((pair) => [pair.input, pair.output])
-      .concat(contractArtifactsPaths),
+    originalContent: {
+      rootPath,
+      paths: pairs
+        .flatMap((pair) => [pair.input, pair.output])
+        .concat(contractArtifactsPaths)
+        .map((p) => path.relative(rootPath, p)),
+    },
   };
 }

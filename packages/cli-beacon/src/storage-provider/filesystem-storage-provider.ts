@@ -108,7 +108,7 @@ export class FilesystemStorageProvider implements StorageProvider {
     inputArtifact: EthokoInputArtifact,
     outputContractArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContentPaths: string[],
+    originalContent: { rootPath: string; paths: string[] },
   ): Promise<void> {
     await this.ensureProjectSetup(project);
 
@@ -139,13 +139,16 @@ export class FilesystemStorageProvider implements StorageProvider {
       await fs.writeFile(tagFilePath, JSON.stringify(manifest));
     }
 
-    for (const originalContentPath of originalContentPaths) {
+    for (const originalContentPath of originalContent.paths) {
       const targetPath = this.originalContentPath(
         project,
         inputArtifact.id,
         originalContentPath,
       );
-      await this.copyOriginalContent(originalContentPath, targetPath);
+      await this.copyOriginalContent(
+        path.join(originalContent.rootPath, originalContentPath),
+        targetPath,
+      );
     }
 
     if (this.debug) {

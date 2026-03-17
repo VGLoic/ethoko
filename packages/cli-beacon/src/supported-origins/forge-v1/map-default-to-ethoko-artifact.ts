@@ -45,7 +45,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContentPaths: string[];
+  originalContent: { rootPath: string; paths: string[] };
 }> {
   const jsonContent = await fs
     .readFile(buildInfoPath, "utf-8")
@@ -263,7 +263,12 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   return {
     inputArtifact: inputArtifactResult.data,
     outputContractArtifacts,
-    originalContentPaths: additionalArtifactsPaths.concat(buildInfoPath),
+    originalContent: {
+      rootPath: rootArtifactsFolder,
+      paths: additionalArtifactsPaths
+        .concat(buildInfoPath)
+        .map((p) => path.relative(rootArtifactsFolder, p)),
+    },
   };
 }
 

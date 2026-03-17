@@ -34,7 +34,7 @@ export interface StorageProvider {
     inputArtifact: EthokoInputArtifact,
     contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContentPaths: string[],
+    originalContent: { rootPath: string; paths: string[] },
   ): Promise<void>;
   /** Download input/output artifact streams by ID. */
   downloadArtifactById(

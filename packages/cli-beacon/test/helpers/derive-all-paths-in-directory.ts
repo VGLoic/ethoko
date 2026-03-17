@@ -1,9 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
 
-export async function deriveAllPathsInDirectory(
+export async function deriveAllAbsolutePathsInDirectory(
   dirPath: string,
 ): Promise<string[]> {
+  const absoluteDirPath = path.resolve(dirPath);
   const paths: string[] = [];
   async function walk(currentPath: string) {
     const entries = await fs.readdir(currentPath, { withFileTypes: true });
@@ -16,6 +17,6 @@ export async function deriveAllPathsInDirectory(
       }
     }
   }
-  await walk(dirPath);
+  await walk(absoluteDirPath);
   return paths;
 }

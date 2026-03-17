@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import path from "path";
 import { describe, expect } from "vitest";
 import { listPulledArtifacts, pull, push } from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
@@ -8,7 +9,7 @@ import {
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
-import { deriveAllPathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
+import { deriveAllAbsolutePathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
@@ -77,8 +78,8 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           artifactId,
         );
 
-        const expectedBuildInfoPaths = await deriveAllPathsInDirectory(
-          `${artifactFixture.folderPath}/build-info`,
+        const expectedBuildInfoPaths = await deriveAllAbsolutePathsInDirectory(
+          path.join(artifactFixture.folderPath, "build-info"),
         );
         const expectedOriginalIds = await Promise.all(
           expectedBuildInfoPaths.map((path) =>

@@ -18,6 +18,7 @@ import {
 } from "../ethoko-artifacts/v0";
 import { StorageProvider } from "./storage-provider.interface";
 import fs from "fs/promises";
+import path from "path";
 
 type S3BucketProviderConfig = {
   bucketName: string;
@@ -323,7 +324,7 @@ export class S3BucketProvider implements StorageProvider {
     inputArtifact: EthokoInputArtifact,
     contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContentPaths: string[],
+    originalContent: { rootPath: string; paths: string[] },
   ): Promise<void> {
     const client = await this.getClient();
     const inputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/input.json`;
@@ -360,19 +361,13 @@ export class S3BucketProvider implements StorageProvider {
 
     // Upload original content files as well, using the artifact ID as reference
     // These files are stored under `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/` prefix, so they don't interfere with the main artifact JSON file and can be easily retrieved when downloading the artifact
-    for (const originalContentPath of originalContentPaths) {
-      const content = await fs.readFile(originalContentPath);
-      let sanitizedPath = originalContentPath;
-      // We remove any leading `/` or `./` from the path to avoid creating unnecessary folders in the storage and to ensure the key is valid
-      if (sanitizedPath.startsWith("/")) {
-        sanitizedPath = sanitizedPath.substring(1);
-      }
-      if (sanitizedPath.startsWith("./")) {
-        sanitizedPath = sanitizedPath.substring(2);
-      }
+    for (const originalContentPath of originalContent.paths) {
+      const content = await fs.readFile(
+        path.join(originalContent.rootPath, originalContentPath),
+      );
       const putCommand = new PutObjectCommand({
         Bucket: this.config.bucketName,
-        Key: `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/${sanitizedPath}`,
+        Key: `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/${originalContentPath}`,
         Body: content,
       });
       await client.send(putCommand);

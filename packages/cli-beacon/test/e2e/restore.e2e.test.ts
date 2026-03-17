@@ -10,7 +10,7 @@ import {
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
-import { deriveAllPathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
+import { deriveAllAbsolutePathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
@@ -326,15 +326,16 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         expect(result.project).toBe(project);
         expect(result.tag).toBe(tag);
-        const expectedOriginalPaths = await deriveAllPathsInDirectory(
-          artifactFixture.folderPath,
+        const expectedOriginalAbsolutePaths =
+          await deriveAllAbsolutePathsInDirectory(artifactFixture.folderPath);
+        const expectedRelativePaths = expectedOriginalAbsolutePaths.map((p) =>
+          path.relative(artifactFixture.folderPath, p),
         );
-        const expectedPaths = expectedOriginalPaths.map(sanitizePath);
 
-        expect(result.filesRestored.length).toBe(expectedPaths.length);
+        expect(result.filesRestored.length).toBe(expectedRelativePaths.length);
 
-        for (const expectedPath of expectedPaths) {
-          const fullPath = path.join(outputPath, expectedPath);
+        for (const expectedRelativePath of expectedRelativePaths) {
+          const fullPath = path.join(outputPath, expectedRelativePath);
           const stat = await fs.stat(fullPath);
           expect(stat.isFile()).toBe(true);
         }
@@ -384,15 +385,16 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(result.project).toBe(project);
         expect(result.tag).toBe(null);
         expect(result.id).toBe(artifactId);
-        const expectedOriginalPaths = await deriveAllPathsInDirectory(
-          artifactFixture.folderPath,
+        const expectedOriginalAbsolutePaths =
+          await deriveAllAbsolutePathsInDirectory(artifactFixture.folderPath);
+        const expectedRelativePaths = expectedOriginalAbsolutePaths.map((p) =>
+          path.relative(artifactFixture.folderPath, p),
         );
-        const expectedPaths = expectedOriginalPaths.map(sanitizePath);
 
-        expect(result.filesRestored.length).toBe(expectedPaths.length);
+        expect(result.filesRestored.length).toBe(expectedRelativePaths.length);
 
-        for (const expectedPath of expectedPaths) {
-          const fullPath = path.join(outputPath, expectedPath);
+        for (const expectedRelativePath of expectedRelativePaths) {
+          const fullPath = path.join(outputPath, expectedRelativePath);
           const stat = await fs.stat(fullPath);
           expect(stat.isFile()).toBe(true);
         }
@@ -400,13 +402,3 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     );
   },
 );
-
-function sanitizePath(filePath: string): string {
-  if (filePath.startsWith("/")) {
-    return filePath.substring(1);
-  }
-  if (filePath.startsWith("./")) {
-    return filePath.substring(2);
-  }
-  return filePath;
-}

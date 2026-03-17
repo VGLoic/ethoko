@@ -210,7 +210,7 @@ export async function push(
       ethokoArtifactParsingResult.value.inputArtifact,
       ethokoArtifactParsingResult.value.outputContractArtifacts,
       tag,
-      ethokoArtifactParsingResult.value.originalContentPaths,
+      ethokoArtifactParsingResult.value.originalContent,
     ),
     { debug: opts.debug },
   );
