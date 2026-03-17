@@ -34,12 +34,31 @@ type ConfigData = {
   pulledArtifactsPath: string;
   typingsPath: string;
   compilationOutputPath?: string;
-  projects: Array<{
-    name: string;
-    storage: StorageConfig;
-  }>;
+  projects: Array<ProjectConfig>;
   debug: boolean;
 };
+
+type ProjectConfig = {
+  name: string;
+  storage: StorageConfig;
+};
+type StorageConfig =
+  | {
+      type: "aws";
+      awsRegion: string;
+      awsBucketName: string;
+      awsProfile?: string;
+      awsAccessKeyId?: string;
+      awsSecretAccessKey?: string;
+      awsRoleArn?: string;
+      awsRoleExternalId?: string;
+      awsRoleSessionName?: string;
+      awsRoleDurationSeconds?: number;
+    }
+  | {
+      type: "filesystem";
+      path: string;
+    };
 
 async function runInit(opts: {
   config: string;
@@ -247,28 +266,11 @@ async function runInit(opts: {
   );
 }
 
-type StorageConfig =
-  | {
-      type: "aws";
-      awsRegion: string;
-      awsBucketName: string;
-      awsProfile?: string;
-      awsAccessKeyId?: string;
-      awsSecretAccessKey?: string;
-      awsRoleArn?: string;
-      awsRoleExternalId?: string;
-      awsRoleSessionName?: string;
-      awsRoleDurationSeconds?: number;
-    }
-  | {
-      type: "filesystem";
-      path: string;
-    };
-
-type ProjectConfig = {
-  name: string;
-  storage: StorageConfig;
-};
+/**
+ * Prompt the user to configure their first project, including storage type and related settings.
+ * Handles both AWS S3 and filesystem storage options with appropriate follow-up questions.
+ * @returns An object containing the configured project or a cancellation flag if the user cancels at any point.
+ */
 async function promptFirstProject(): Promise<
   { cancelled: false; project: ProjectConfig } | { cancelled: true }
 > {
@@ -353,6 +355,12 @@ async function promptFirstProject(): Promise<
   throw new Error(`Unsupported storage type: ${storageType satisfies never}`);
 }
 
+/**
+ * Prompt the user for AWS S3 configuration details, including region, bucket name, and authentication method.
+ * Supports multiple authentication methods: environment/default, AWS profile, or direct access keys with optional role assumption.
+ * @param projectName Project name for contextualizing the prompts
+ * @returns The AWS storage configuration or a cancellation flag if the user cancels at any point.
+ */
 async function promptAwsS3Config(
   projectName: string,
 ): Promise<
@@ -580,6 +588,12 @@ async function promptAwsS3Config(
   );
 }
 
+/**
+ * Identify potential compilation output paths based on common project structures (e.g., Hardhat, Foundry)
+ * For Hardhat, checks for hardhat.config.js/ts, package.json with hardhat dependency, or artifacts/ directory to suggest ./artifacts
+ * For Foundry, checks for foundry.toml, lib/ or out/ directory to suggest ./out
+ * @returns The list of suggested compilation output paths with labels for user selection
+ */
 async function deriveCompilationOutputPathsOptions(): Promise<
   { path: string; label: string }[]
 > {
