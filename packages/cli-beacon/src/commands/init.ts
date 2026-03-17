@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import fs from "fs/promises";
 import path from "path";
-import { prompts, error as cliError, info as cliInfo } from "@/ui";
+import { prompts, CommandLogger } from "@/ui";
 import { CliError } from "@/client/error";
 
 /**
@@ -14,13 +14,14 @@ export function registerInitCommand(program: Command): void {
     .option("--config <path>", "Custom config file path", "ethoko.config.json")
     .option("--force", "Overwrite existing config without prompting")
     .action(async (opts) => {
+      const logger = new CommandLogger();
       try {
-        await runInit(opts);
+        await runInit(logger, opts);
       } catch (err) {
         if (err instanceof CliError) {
-          cliError(err.message);
+          logger.error(err.message);
         } else {
-          cliError(
+          logger.error(
             "An unexpected error occurred, please fill an issue with the error details if the problem persists",
           );
           console.error(err);
@@ -60,11 +61,14 @@ type StorageConfig =
       path: string;
     };
 
-async function runInit(opts: {
-  config: string;
-  force?: boolean;
-}): Promise<void> {
-  prompts.intro("Welcome to Ethoko CLI Configuration");
+async function runInit(
+  logger: CommandLogger,
+  opts: {
+    config: string;
+    force?: boolean;
+  },
+): Promise<void> {
+  logger.intro("Welcome to Ethoko CLI Configuration");
 
   const configPath = path.resolve(process.cwd(), opts.config);
 
@@ -81,23 +85,23 @@ async function runInit(opts: {
     });
 
     if (prompts.isCancel(overwrite)) {
-      cliInfo("Configuration cancelled");
+      logger.cancel("Configuration cancelled");
       return;
     }
 
     if (!overwrite) {
-      cliInfo("Configuration cancelled");
+      logger.cancel("Configuration cancelled");
       return;
     }
   }
 
   const projectConfigResult = await promptFirstProject();
   if (projectConfigResult.cancelled) {
-    cliInfo("Operation cancelled during project configuration");
+    logger.cancel("Operation cancelled during project configuration");
     return;
   }
 
-  prompts.note(
+  logger.note(
     `Project "${projectConfigResult.project.name}" configured successfully!\nLet's finish with the last details!`,
   );
 
@@ -121,7 +125,7 @@ async function runInit(opts: {
       ],
     });
     if (prompts.isCancel(compilationOutputSelection)) {
-      cliInfo("Configuration cancelled");
+      logger.cancel("Configuration cancelled");
       return;
     }
     if (compilationOutputSelection !== "other") {
@@ -135,7 +139,7 @@ async function runInit(opts: {
     });
 
     if (prompts.isCancel(compilationOutputResult)) {
-      cliInfo("Configuration cancelled");
+      logger.cancel("Configuration cancelled");
       return;
     }
     compilationOutputPath =
@@ -157,7 +161,7 @@ async function runInit(opts: {
   });
 
   if (prompts.isCancel(pulledArtifactsPath)) {
-    cliInfo("Configuration cancelled");
+    logger.cancel("Configuration cancelled");
     return;
   }
 
@@ -174,7 +178,7 @@ async function runInit(opts: {
   });
 
   if (prompts.isCancel(typingsPath)) {
-    cliInfo("Configuration cancelled");
+    logger.cancel("Configuration cancelled");
     return;
   }
 
@@ -239,12 +243,12 @@ async function runInit(opts: {
   });
 
   if (prompts.isCancel(proceed)) {
-    cliInfo("Configuration cancelled");
+    logger.cancel("Configuration cancelled");
     return;
   }
 
   if (!proceed) {
-    cliInfo("Configuration cancelled");
+    logger.cancel("Configuration cancelled");
     return;
   }
 
@@ -261,7 +265,7 @@ async function runInit(opts: {
     );
   }
 
-  prompts.outro(
+  logger.outro(
     `Configuration saved to ${opts.config}\n\nEdit this file to add more projects or customize your configuration further.\nRun "ethoko pull ${projectConfigResult.project.name}" to pull artifacts for your project.`,
   );
 }

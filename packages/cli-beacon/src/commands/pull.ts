@@ -1,13 +1,7 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  boxHeader,
-  boxSummary,
-  error as cliError,
-  LOG_COLORS,
-  success,
-} from "@/ui/index.js";
+import { error as cliError, CommandLogger, LOG_COLORS } from "@/ui/index.js";
 import { CliError, pull, PullResult } from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
@@ -33,9 +27,10 @@ export function registerPullCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (projectArg, options) => {
+      const logger = new CommandLogger(options.silent);
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
-        cliError(
+        logger.error(
           configResult.error instanceof Error
             ? configResult.error.message
             : String(configResult.error),
@@ -52,7 +47,7 @@ export function registerPullCommand(
         }),
       ).safeParse(projectArg);
       if (!artifactKeyParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
         );
         process.exitCode = 1;
@@ -62,11 +57,25 @@ export function registerPullCommand(
         artifactKeyParsingResult.data.project,
       );
       if (!projectConfig) {
-        cliError(
+        logger.error(
           `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
         );
         process.exitCode = 1;
         return;
+      }
+
+      if (artifactKeyParsingResult.data.search) {
+        logger.intro(
+          `Pulling artifact "${artifactKeyParsingResult.data.project}:${
+            artifactKeyParsingResult.data.search.type === "id"
+              ? artifactKeyParsingResult.data.search.id
+              : artifactKeyParsingResult.data.search.tag
+          }"`,
+        );
+      } else {
+        logger.intro(
+          `Pulling artifacts for project "${artifactKeyParsingResult.data.project}"`,
+        );
       }
 
       const optsParsingResult = z
@@ -77,9 +86,6 @@ export function registerPullCommand(
           debug: z
             .boolean('The "debug" option must be a boolean')
             .default(config.debug),
-          silent: z
-            .boolean('The "silent" option must be a boolean')
-            .default(false),
         })
         .safeParse(options);
       if (!optsParsingResult.success) {
@@ -88,18 +94,6 @@ export function registerPullCommand(
         );
         process.exitCode = 1;
         return;
-      }
-
-      if (artifactKeyParsingResult.data.search) {
-        boxHeader(
-          `Pulling artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
-          optsParsingResult.data.silent,
-        );
-      } else {
-        boxHeader(
-          `Pulling artifacts for "${artifactKeyParsingResult.data.project}"`,
-          optsParsingResult.data.silent,
-        );
       }
 
       const storageProvider = createStorageProvider(
@@ -117,24 +111,24 @@ export function registerPullCommand(
         {
           force: optsParsingResult.data.force,
           debug: optsParsingResult.data.debug,
-          silent: optsParsingResult.data.silent,
+          silent: options.silent,
         },
       )
-        .then((result) =>
+        .then((result) => {
           displayPullResults(
+            logger,
             artifactKeyParsingResult.data.project,
             result,
-            optsParsingResult.data.silent,
-          ),
-        )
+          );
+        })
         .catch((err) => {
           if (err instanceof CliError) {
-            cliError(err.message);
+            logger.error(err.message);
           } else {
-            cliError(
+            logger.error(
               "An unexpected error occurred, please fill an issue with the error details if the problem persists",
             );
-            console.error(err);
+            logger.error(err);
           }
           process.exitCode = 1;
         });
@@ -142,19 +136,19 @@ export function registerPullCommand(
 }
 
 function displayPullResults(
+  logger: CommandLogger,
   project: string,
   data: PullResult,
-  silent = false,
 ): void {
   if (data.remoteTags.length === 0 && data.remoteIds.length === 0) {
-    success("No artifacts to pull yet", silent);
+    logger.success("No artifacts to pull yet");
   } else if (
     data.failedTags.length === 0 &&
     data.failedIds.length === 0 &&
     data.pulledTags.length === 0 &&
     data.pulledIds.length === 0
   ) {
-    success(`You're up to date with project "${project}"`, silent);
+    logger.success(`You're up to date with project "${project}"`);
   } else {
     const summaryLines: string[] = [];
 
@@ -193,7 +187,8 @@ function displayPullResults(
     }
 
     if (summaryLines.length > 0) {
-      boxSummary("Summary", summaryLines, silent);
+      logger.note(summaryLines.join("\n"), "Summary");
+      logger.outro(undefined);
     }
   }
 }

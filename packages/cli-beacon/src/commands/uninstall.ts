@@ -1,15 +1,10 @@
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import readline from "node:readline/promises";
 
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  error as cliError,
-  info as cliInfo,
-  success as cliSuccess,
-} from "@/ui/index.js";
+import { CommandLogger, prompts } from "@/ui/index.js";
 
 import {
   detectInstallMethod,
@@ -25,30 +20,10 @@ const UNINSTALL_INSTRUCTIONS: Record<Exclude<InstallMethod, "curl">, string> = {
 };
 
 /**
- * Prompt the user for confirmation unless --force is set.
- */
-async function confirmUninstall(force: boolean): Promise<boolean> {
-  if (force) {
-    return true;
-  }
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stderr,
-  });
-
-  try {
-    const answer = await rl.question("Proceed with uninstallation? (y/N): ");
-    return answer.trim().toLowerCase() === "y";
-  } finally {
-    rl.close();
-  }
-}
-
-/**
  * Remove Ethoko PATH entries from a shell profile file.
  */
 async function removePathFromProfile(
+  logger: CommandLogger,
   profilePath: string,
   opts: { debug: boolean },
 ): Promise<boolean> {
@@ -57,8 +32,8 @@ async function removePathFromProfile(
     contents = await readFile(profilePath, "utf8");
   } catch (err) {
     if (opts.debug) {
-      cliInfo(`Skipped missing profile ${profilePath}`, false);
-      cliError(err instanceof Error ? err.message : String(err));
+      logger.info(`Skipped missing profile ${profilePath}`);
+      logger.error(err instanceof Error ? err.message : String(err));
     }
     return false;
   }
@@ -80,6 +55,7 @@ async function removePathFromProfile(
  * Remove the Ethoko installation directory.
  */
 async function removeInstallDirectory(
+  logger: CommandLogger,
   installDir: string,
   opts: { debug: boolean },
 ): Promise<void> {
@@ -87,8 +63,8 @@ async function removeInstallDirectory(
     await stat(installDir);
   } catch (err) {
     if (opts.debug) {
-      cliInfo(`Install directory not found: ${installDir}`, false);
-      cliError(err instanceof Error ? err.message : String(err));
+      logger.info(`Install directory not found: ${installDir}`);
+      logger.error(err instanceof Error ? err.message : String(err));
     }
     return;
   }
@@ -106,6 +82,8 @@ export function registerUninstallCommand(program: Command): void {
     .option("--force", "Skip confirmation prompt", false)
     .option("--debug", "Enable debug logging", false)
     .action(async (options) => {
+      const logger = new CommandLogger();
+      logger.intro("Uninstalling Ethoko CLI");
       const optsParsingResult = z
         .object({
           force: z
@@ -118,7 +96,7 @@ export function registerUninstallCommand(program: Command): void {
         .safeParse(options);
 
       if (!optsParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
         );
         process.exitCode = 1;
@@ -130,27 +108,34 @@ export function registerUninstallCommand(program: Command): void {
 
       if (installMethod !== "curl") {
         const instruction = UNINSTALL_INSTRUCTIONS[installMethod];
-        cliError(
+        logger.error(
           `Self-uninstall is unavailable for ${installMethod} installs. Run: ${instruction}`,
         );
         process.exitCode = 1;
         return;
       }
 
-      cliInfo("This will remove:", false);
-      cliInfo("- ~/.ethoko/bin/ethoko (binary)", false);
-      cliInfo("- ~/.ethoko/ (all data and pulled artifacts)", false);
-      cliInfo("- PATH entries in ~/.bashrc and ~/.zshrc", false);
+      const shouldProceed = prompts.confirm({
+        message: `This will remove:
+- ~/.ethoko/bin/ethoko (binary)
+- ~/.ethoko/ (all data and pulled artifacts)
+- PATH entries in ~/.bashrc and ~/.zshrc
 
-      const shouldProceed = await confirmUninstall(opts.force);
+Proceed with uninstallation?`,
+      });
+      if (prompts.isCancel(shouldProceed)) {
+        logger.cancel("Uninstall cancelled.");
+        return;
+      }
+
       if (!shouldProceed) {
-        cliInfo("Uninstall cancelled.", false);
+        logger.cancel("Uninstall cancelled.");
         return;
       }
 
       try {
         const installDir = path.join(homedir(), ".ethoko");
-        await removeInstallDirectory(installDir, opts);
+        await removeInstallDirectory(logger, installDir, opts);
 
         const profiles = [
           path.join(homedir(), ".bashrc"),
@@ -158,17 +143,17 @@ export function registerUninstallCommand(program: Command): void {
         ];
 
         for (const profile of profiles) {
-          const removed = await removePathFromProfile(profile, opts);
+          const removed = await removePathFromProfile(logger, profile, opts);
           if (opts.debug && removed) {
-            cliInfo(`Removed PATH entry from ${profile}`, false);
+            logger.info(`Removed PATH entry from ${profile}`);
           }
         }
 
-        cliSuccess("Ethoko CLI uninstalled successfully");
+        logger.success("Ethoko CLI uninstalled successfully");
       } catch (err) {
-        cliError("Uninstall failed. Run with --debug for details.");
+        logger.error("Uninstall failed. Run with --debug for details.");
         if (opts.debug) {
-          cliError(err instanceof Error ? err.message : String(err));
+          logger.error(err instanceof Error ? err.message : String(err));
         }
         process.exitCode = 1;
       }

@@ -1,10 +1,6 @@
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  error as cliError,
-  info as cliInfo,
-  success as cliSuccess,
-} from "@/ui/index.js";
+import { CommandLogger } from "@/ui/index.js";
 
 import {
   detectInstallMethod,
@@ -29,6 +25,7 @@ export function registerUpgradeCommand(program: Command): void {
     .description("Upgrade the Ethoko CLI")
     .option("--debug", "Enable debug logging", false)
     .action(async (options) => {
+      const logger = new CommandLogger();
       const optsParsingResult = z
         .object({
           debug: z
@@ -38,7 +35,7 @@ export function registerUpgradeCommand(program: Command): void {
         .safeParse(options);
 
       if (!optsParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
         );
         process.exitCode = 1;
@@ -50,7 +47,7 @@ export function registerUpgradeCommand(program: Command): void {
 
       if (installMethod !== "curl") {
         const instruction = UPGRADE_INSTRUCTIONS[installMethod];
-        cliError(
+        logger.error(
           `Self-upgrade is unavailable for ${installMethod} installs. Run: ${instruction}`,
         );
         process.exitCode = 1;
@@ -58,19 +55,19 @@ export function registerUpgradeCommand(program: Command): void {
       }
 
       try {
-        cliInfo("Fetching latest CLI release...", !opts.debug);
+        logger.info("Fetching latest CLI release...");
         const latestVersion = await getLatestVersion({ debug: opts.debug });
-        cliInfo(`Latest version is ${latestVersion}`, !opts.debug);
+        logger.info(`Latest version is ${latestVersion}`);
 
         const targetPath = process.execPath;
-        cliInfo(`Downloading binary to ${targetPath}`, !opts.debug);
+        logger.info(`Downloading binary to ${targetPath}`);
         await downloadBinary(latestVersion, targetPath, { debug: opts.debug });
 
-        cliSuccess("Ethoko CLI upgraded successfully");
+        logger.success("Ethoko CLI upgraded successfully");
       } catch (err) {
-        cliError("Upgrade failed. Run with --debug for details.");
+        logger.error("Upgrade failed. Run with --debug for details.");
         if (opts.debug) {
-          cliError(err instanceof Error ? err.message : String(err));
+          logger.error(err instanceof Error ? err.message : String(err));
         }
         process.exitCode = 1;
       }

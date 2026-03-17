@@ -75,6 +75,104 @@ export function boxSummary(
   });
 }
 
+export class CommandLogger {
+  public silent: boolean;
+  private active: boolean = false;
+
+  constructor(silent = false) {
+    this.silent = silent;
+  }
+
+  public intro(message: string): CommandLogger {
+    if (!this.silent) {
+      clackPrompts.intro(message, { output: process.stderr });
+    }
+    this.active = true;
+    return this;
+  }
+
+  public outro(message?: string): CommandLogger {
+    if (!this.silent) {
+      clackPrompts.outro(message, { output: process.stderr });
+    }
+    return this;
+  }
+
+  public error(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.error, `✖ ${message}`));
+      } else {
+        clackPrompts.log.error(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public info(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
+      } else {
+        clackPrompts.log.message(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public warn(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.warn, `⚠ ${message}`));
+      } else {
+        clackPrompts.log.warn(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public success(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.success, `✔ ${message}`));
+      } else {
+        clackPrompts.log.success(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public message(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
+      } else {
+        clackPrompts.log.message(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public cancel(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.error, `✖ ${message}`));
+      } else {
+        clackPrompts.cancel(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public note(content: string, title?: string): CommandLogger {
+    if (this.silent) return this;
+    clackPrompts.note(content, title, {
+      output: process.stderr,
+    });
+    return this;
+  }
+}
+
 /**
  * Enhanced success message
  */
