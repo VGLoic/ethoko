@@ -1,5 +1,15 @@
 # @ethoko/cli-beacon
 
+## 0.7.0
+
+### Minor Changes
+
+- 421c051: Update configuration object to support multiple projects by default
+- 4dfd5f3: Rename config ethoko.json to ethoko.config.json
+- 47cd178: Update CLI log output
+- 0c8963a: Rename "local" storage type to "filesystem"
+- 5977b0f: Improve command parsing error messages
+
 ## 0.6.0
 
 ### Minor Changes
