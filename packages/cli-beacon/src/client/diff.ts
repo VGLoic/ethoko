@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CommandLogger, createSpinner } from "../ui";
+import { CommandLogger } from "../ui";
 import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-store";
 import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";
@@ -149,9 +149,8 @@ export async function generateDiffWithTargetRelease(
 ): Promise<Difference[]> {
   // Step 1: Check if target artifact exists locally
 
-  const spinner1 = createSpinner(
+  const spinner1 = opts.logger.createSpinner(
     "Checking artifact existence locally...",
-    opts.logger.silent,
   );
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifact.project),
@@ -202,9 +201,8 @@ export async function generateDiffWithTargetRelease(
   spinner1.succeed("Artifact found locally");
 
   // Step 2: Look for compilation artifact
-  const spinner2 = createSpinner(
+  const spinner2 = opts.logger.createSpinner(
     "Looking for compilation artifact...",
-    opts.logger.silent,
   );
   const candidateArtifactsResult = await toAsyncResult(
     lookForCandidateArtifacts(artifactPath, {
@@ -254,9 +252,8 @@ export async function generateDiffWithTargetRelease(
   spinner2.succeed(buildInfoPathToSuccessText(selectedBuildInfoPaths));
 
   // Step 3: Parse the compilation artifact, mapping it to the Ethoko format
-  const spinner3 = createSpinner(
+  const spinner3 = opts.logger.createSpinner(
     "Analyzing compilation artifact...",
-    opts.logger.silent,
   );
   const ethokoArtifactParsingResult = await toAsyncResult(
     mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
@@ -285,10 +282,7 @@ export async function generateDiffWithTargetRelease(
   }
   spinner3.succeed("Fresh artifact loaded");
 
-  const spinner4 = createSpinner(
-    "Reading target artifact...",
-    opts.logger.silent,
-  );
+  const spinner4 = opts.logger.createSpinner("Reading target artifact...");
   let artifactId: string;
   if (artifact.search.type === "id") {
     artifactId = artifact.search.id;
@@ -358,10 +352,7 @@ export async function generateDiffWithTargetRelease(
   }
   spinner4.succeed("Target artifact loaded");
 
-  const spinner5 = createSpinner(
-    "Computing differences...",
-    opts.logger.silent,
-  );
+  const spinner5 = opts.logger.createSpinner("Computing differences...");
   const differences: Difference[] = [];
   for (const [
     contractKey,

@@ -1,5 +1,5 @@
 import { StorageProvider } from "../storage-provider";
-import { CommandLogger, createSpinner, warn } from "@/ui";
+import { CommandLogger } from "@/ui";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import {
@@ -81,9 +81,8 @@ export async function push(
   },
 ): Promise<string> {
   // Step 1: Look for compilation artifact
-  const spinner1 = createSpinner(
+  const spinner1 = opts.logger.createSpinner(
     "Looking for compilation artifact...",
-    opts.logger.silent,
   );
   const candidateArtifactsResult = await toAsyncResult(
     lookForCandidateArtifacts(artifactPath, {
@@ -135,9 +134,8 @@ export async function push(
   spinner1.succeed(buildInfoPathToSuccessText(selectedBuildInfoPaths));
 
   // Step 2: Parse the compilation artifact, mapping it to the Ethoko format
-  const spinner2 = createSpinner(
+  const spinner2 = opts.logger.createSpinner(
     "Analyzing compilation artifact...",
-    opts.logger.silent,
   );
   const ethokoArtifactParsingResult = await toAsyncResult(
     mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
@@ -165,21 +163,18 @@ export async function push(
       ethokoArtifactParsingResult.value.inputArtifact.origin.type ===
         "forge-v1-default"
     ) {
-      warn(
+      opts.logger.warn(
         `The provided Forge compilation artifacts do not include the literal content of the sources. We recommend using the "--use-literal-content" option when generating the build info files with Forge to include the content in the artifact, which can help with later verification and debugging.`,
       );
     } else {
-      warn(
+      opts.logger.warn(
         `The provided compilation artifact does not include the literal content of the sources. This may make later verification and debugging more difficult. If possible, please provide artifacts that include the source content.`,
       );
     }
   }
 
   // Step 3: Check if tag exists
-  const spinner3 = createSpinner(
-    "Checking if tag exists...",
-    opts.logger.silent,
-  );
+  const spinner3 = opts.logger.createSpinner("Checking if tag exists...");
   if (!tag) {
     spinner3.succeed("No tag provided, skipping tag existence check");
   } else {
@@ -208,7 +203,7 @@ export async function push(
   }
 
   // Step 4: Upload artifact
-  const spinner4 = createSpinner("Uploading artifact...", opts.logger.silent);
+  const spinner4 = opts.logger.createSpinner("Uploading artifact...");
   const pushResult = await toAsyncResult(
     storageProvider.uploadArtifact(
       project,

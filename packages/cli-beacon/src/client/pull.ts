@@ -1,6 +1,6 @@
+import { CommandLogger } from "@/ui";
 import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-store";
 import { StorageProvider } from "../storage-provider";
-import { createSpinner } from "@/ui";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 
@@ -29,7 +29,7 @@ export type PullResult = {
  * @param opts Options for the pull command
  * @param opts.force Force the pull to skip checking existing pulled artifacts
  * @param opts.debug Enable debug mode
- * @param opts.silent Suppress CLI output (errors and warnings still shown)
+ * @param opts.logger The CommandLogger instance to use for logging and prompting the user during the pull process
  * @returns An object with the remote tags and IDs, pulled tags and IDs, and failed tags and IDs
  *
  */
@@ -38,12 +38,11 @@ export async function pull(
   search: { type: "tag"; tag: string } | { type: "id"; id: string } | null,
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
-  opts: { force: boolean; debug: boolean; silent?: boolean },
+  opts: { force: boolean; debug: boolean; logger: CommandLogger },
 ): Promise<PullResult> {
   // Step 1: Set up pulled artifact store
-  const spinner1 = createSpinner(
+  const spinner1 = opts.logger.createSpinner(
     "Setting up pulled artifact store...",
-    opts.silent,
   );
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(project),
@@ -58,9 +57,8 @@ export async function pull(
   spinner1.succeed("Pulled artifact store ready");
 
   // Step 2: Fetch remote artifacts
-  const spinner2 = createSpinner(
+  const spinner2 = opts.logger.createSpinner(
     "Fetching remote artifact list...",
-    opts.silent,
   );
   const remoteListingResult = await toAsyncResult(
     Promise.all([
@@ -108,9 +106,8 @@ export async function pull(
   }
 
   // Step 3: Check pulled artifact store
-  const spinner3 = createSpinner(
+  const spinner3 = opts.logger.createSpinner(
     "Checking pulled artifact store...",
-    opts.silent,
   );
   let filteredTagsToDownload: string[] = [];
   let filteredIdsToDownload: string[] = [];
@@ -157,7 +154,7 @@ export async function pull(
     filteredTagsToDownload.length === 0 &&
     filteredIdsToDownload.length === 0
   ) {
-    const spinner4 = createSpinner("Checking for updates...", opts.silent);
+    const spinner4 = opts.logger.createSpinner("Checking for updates...");
     spinner4.succeed("All artifacts are up to date");
     return {
       remoteTags,
@@ -171,9 +168,8 @@ export async function pull(
 
   const missingArtifactCount =
     filteredTagsToDownload.length + filteredIdsToDownload.length;
-  const spinner4 = createSpinner(
+  const spinner4 = opts.logger.createSpinner(
     `Downloading ${missingArtifactCount} missing artifact${missingArtifactCount > 1 ? "s" : ""}...`,
-    opts.silent,
   );
 
   const tagsPromises: Promise<{ tag: string; id: string }>[] =
