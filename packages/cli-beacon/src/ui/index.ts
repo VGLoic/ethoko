@@ -1,4 +1,3 @@
-import ora, { Ora } from "ora";
 import boxen from "boxen";
 import { styleText } from "node:util";
 import * as clackPrompts from "@clack/prompts";
@@ -14,15 +13,34 @@ export const LOG_COLORS = {
  * CLI UI utilities for enhanced terminal output
  */
 
-/**
- * Creates a simple spinner without step tracking
- */
-export function createSpinner(message: string, silent = false): Ora {
-  return ora({
-    text: message,
-    stream: process.stderr,
-    isSilent: silent,
-  }).start();
+export function createSpinner(message: string, silent = false): Spinner {
+  if (silent) {
+    return {
+      succeed: () => {},
+      warn: () => {},
+      fail: () => {},
+      stop: () => {},
+    };
+  }
+  const spinner = clackPrompts.spinner({ output: process.stderr });
+  spinner.start(message);
+  return {
+    succeed: (msg: string) => spinner.stop(msg),
+    warn: (msg: string) => spinner.error(msg),
+    fail: (msg: string) => spinner.cancel(msg),
+    stop: () => spinner.clear(),
+  };
+}
+
+interface Spinner {
+  // Displays a success message and stops the spinner
+  succeed: (message: string) => void;
+  // Displays a warning message and stops the spinner
+  warn: (message: string) => void;
+  // Displays an error message and stops the spinner
+  fail: (message: string) => void;
+  // Stops the spinner without displaying a message, can be used with {succeed, warn, fail} afterwards to display a message
+  stop: () => void;
 }
 
 /**
@@ -88,8 +106,6 @@ export function info(message: string, silent = false): void {
   if (silent) return;
   console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
 }
-
-export type { Ora };
 
 export const prompts = {
   select: clackPrompts.select,

@@ -59,7 +59,6 @@
     "@smithy/types": "^3.3.0",
     "boxen": "^8.0.1",
     "commander": "^12.1.0",
-    "ora": "^9.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
