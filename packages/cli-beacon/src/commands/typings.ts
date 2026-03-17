@@ -1,8 +1,6 @@
-import { styleText } from "node:util";
-
 import { Command } from "commander";
 import { z } from "zod";
-import { boxHeader, error as cliError, LOG_COLORS } from "@/ui/index.js";
+import { CommandLogger } from "@/ui/index.js";
 import {
   CliError,
   generateArtifactsSummariesAndTypings,
@@ -24,9 +22,11 @@ export function registerTypingsCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (options) => {
+      const logger = new CommandLogger(options.silent);
+
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
-        cliError(
+        logger.error(
           configResult.error instanceof Error
             ? configResult.error.message
             : String(configResult.error),
@@ -41,21 +41,18 @@ export function registerTypingsCommand(
           debug: z
             .boolean('The "debug" option must be a boolean')
             .default(config.debug),
-          silent: z
-            .boolean('The "silent" option must be a boolean')
-            .default(false),
         })
         .safeParse(options);
 
       if (!parsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(parsingResult.error)}`,
         );
         process.exitCode = 1;
         return;
       }
 
-      boxHeader("Generating typings", parsingResult.data.silent);
+      logger.intro("Generating typings");
 
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
@@ -66,24 +63,17 @@ export function registerTypingsCommand(
         pulledArtifactStore,
         {
           debug: parsingResult.data.debug,
-          silent: parsingResult.data.silent,
+          silent: logger.silent,
         },
       )
         .then(() => {
-          if (!parsingResult.data.silent) {
-            console.error(
-              styleText(
-                LOG_COLORS.success,
-                `\n✔ Typings generated at ${config.typingsPath}`,
-              ),
-            );
-          }
+          logger.success(`Typings generated at ${config.typingsPath}`);
         })
         .catch((err) => {
           if (err instanceof CliError) {
-            cliError(err.message);
+            logger.error(err.message);
           } else {
-            cliError(
+            logger.error(
               "An unexpected error occurred, please fill an issue with the error details if the problem persists",
             );
             console.error(err);

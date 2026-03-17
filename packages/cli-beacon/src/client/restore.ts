@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createSpinner } from "@/ui";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store";
 import { StorageProvider } from "@/storage-provider";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
+import { CommandLogger } from "@/ui";
 
 export type RestoreResult = {
   project: string;
@@ -22,9 +22,9 @@ export async function restore(
   outputPath: string,
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
-  opts: { force: boolean; debug: boolean; silent?: boolean },
+  opts: { force: boolean; debug: boolean; logger: CommandLogger },
 ): Promise<RestoreResult> {
-  const spinner1 = createSpinner("Identifying artifact...", opts.silent);
+  const spinner1 = opts.logger.createSpinner("Identifying artifact...");
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifact.project),
     { debug: opts.debug },
@@ -73,7 +73,7 @@ export async function restore(
   }
   spinner1.succeed("Artifact identified");
 
-  const spinner2 = createSpinner("Checking output directory...", opts.silent);
+  const spinner2 = opts.logger.createSpinner("Checking output directory...");
   const resolvedOutputPath = path.resolve(outputPath);
   const outputStatResult = await toAsyncResult(fs.stat(resolvedOutputPath), {
     debug: opts.debug,
@@ -140,7 +140,7 @@ export async function restore(
   }
   spinner2.succeed("Output directory ready");
 
-  const spinner3 = createSpinner("Listing original content...", opts.silent);
+  const spinner3 = opts.logger.createSpinner("Listing original content...");
   const originalContentResult = await toAsyncResult(
     storageProvider.listOriginalContent(artifact.project, artifactId),
     { debug: opts.debug },
@@ -160,9 +160,8 @@ export async function restore(
   }
   spinner3.succeed(`Found ${originalContentPaths.length} files`);
 
-  const spinner4 = createSpinner(
+  const spinner4 = opts.logger.createSpinner(
     `Downloading ${originalContentPaths.length} file${originalContentPaths.length > 1 ? "s" : ""}...`,
-    opts.silent,
   );
   const downloadResults = await Promise.all(
     originalContentPaths.map(async (relativePath) => {

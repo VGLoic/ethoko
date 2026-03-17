@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-
-import { createSpinner } from "../ui";
+import { CommandLogger } from "../ui";
 import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-store";
 import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";
@@ -135,7 +134,7 @@ export type Difference = {
  * @param pulledArtifactStore The store used to persist pulled artifacts
  * @param opts Options for the diff command
  * @param opts.debug Enable debug mode for more verbose logging
- * @param opts.silent Suppress CLI output (errors and warnings still shown)
+ * @param opts.logger The CommandLogger instance to use for logging and prompting the user during the diff process
  * @param opts.isCI Whether running in CI environment (disables interactive prompts)
  * @returns The array of differences between the fresh compilation artifact and the target artifact
  */
@@ -146,13 +145,12 @@ export async function generateDiffWithTargetRelease(
     search: { type: "tag"; tag: string } | { type: "id"; id: string };
   },
   pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean; silent?: boolean; isCI?: boolean },
+  opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
 ): Promise<Difference[]> {
   // Step 1: Check if target artifact exists locally
 
-  const spinner1 = createSpinner(
+  const spinner1 = opts.logger.createSpinner(
     "Checking artifact existence locally...",
-    opts.silent,
   );
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifact.project),
@@ -203,9 +201,8 @@ export async function generateDiffWithTargetRelease(
   spinner1.succeed("Artifact found locally");
 
   // Step 2: Look for compilation artifact
-  const spinner2 = createSpinner(
+  const spinner2 = opts.logger.createSpinner(
     "Looking for compilation artifact...",
-    opts.silent,
   );
   const candidateArtifactsResult = await toAsyncResult(
     lookForCandidateArtifacts(artifactPath, {
@@ -238,6 +235,7 @@ export async function generateDiffWithTargetRelease(
     }
     const userSelectionResult = await toAsyncResult(
       promptUserSelection(
+        opts.logger,
         `Multiple JSON files found in "${candidateArtifactsResult.value.finalFolderPath}" (${candidateArtifactsResult.value.ignoredFilesCount} ignored). Please select which build info file to use:`,
         candidateArtifactsResult.value.candidateBuildInfoOptions,
         30_000,
@@ -254,9 +252,8 @@ export async function generateDiffWithTargetRelease(
   spinner2.succeed(buildInfoPathToSuccessText(selectedBuildInfoPaths));
 
   // Step 3: Parse the compilation artifact, mapping it to the Ethoko format
-  const spinner3 = createSpinner(
+  const spinner3 = opts.logger.createSpinner(
     "Analyzing compilation artifact...",
-    opts.silent,
   );
   const ethokoArtifactParsingResult = await toAsyncResult(
     mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
@@ -285,7 +282,7 @@ export async function generateDiffWithTargetRelease(
   }
   spinner3.succeed("Fresh artifact loaded");
 
-  const spinner4 = createSpinner("Reading target artifact...", opts.silent);
+  const spinner4 = opts.logger.createSpinner("Reading target artifact...");
   let artifactId: string;
   if (artifact.search.type === "id") {
     artifactId = artifact.search.id;
@@ -355,7 +352,7 @@ export async function generateDiffWithTargetRelease(
   }
   spinner4.succeed("Target artifact loaded");
 
-  const spinner5 = createSpinner("Computing differences...", opts.silent);
+  const spinner5 = opts.logger.createSpinner("Computing differences...");
   const differences: Difference[] = [];
   for (const [
     contractKey,

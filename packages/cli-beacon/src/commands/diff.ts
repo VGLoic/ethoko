@@ -1,13 +1,7 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  boxHeader,
-  boxSummary,
-  error as cliError,
-  LOG_COLORS,
-  success,
-} from "@/ui/index.js";
+import { CommandLogger, LOG_COLORS } from "@/ui/index.js";
 import {
   CliError,
   Difference,
@@ -36,9 +30,11 @@ export function registerDiffCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (projectArg, options) => {
+      const logger = new CommandLogger(options.silent);
+
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
-        cliError(
+        logger.error(
           configResult.error instanceof Error
             ? configResult.error.message
             : String(configResult.error),
@@ -60,7 +56,7 @@ export function registerDiffCommand(
         },
       ).safeParse(projectArg);
       if (!artifactKeyParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
         );
         process.exitCode = 1;
@@ -70,12 +66,19 @@ export function registerDiffCommand(
         artifactKeyParsingResult.data.project,
       );
       if (!projectConfig) {
-        cliError(
+        logger.error(
           `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
         );
         process.exitCode = 1;
         return;
       }
+      logger.intro(
+        `Comparing with artifact "${artifactKeyParsingResult.data.project}:${
+          artifactKeyParsingResult.data.search.type === "id"
+            ? artifactKeyParsingResult.data.search.id
+            : artifactKeyParsingResult.data.search.tag
+        }"`,
+      );
 
       const paramParsingResult = z
         .object({
@@ -89,13 +92,10 @@ export function registerDiffCommand(
           debug: z
             .boolean('The "debug" option must be a boolean')
             .default(config.debug),
-          silent: z
-            .boolean('The "silent" option must be a boolean')
-            .default(false),
         })
         .safeParse(options);
       if (!paramParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(paramParsingResult.error)}`,
         );
         process.exitCode = 1;
@@ -106,17 +106,12 @@ export function registerDiffCommand(
         paramParsingResult.data.artifactPath || config.compilationOutputPath;
 
       if (!finalArtifactPath) {
-        cliError(
+        logger.error(
           "Artifact path is required. Provide --artifact-path or set compilationOutputPath in ethoko.config.json",
         );
         process.exitCode = 1;
         return;
       }
-
-      boxHeader(
-        `Comparing with artifact "${projectConfig.name}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
-        paramParsingResult.data.silent,
-      );
 
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
@@ -132,17 +127,17 @@ export function registerDiffCommand(
         {
           debug: paramParsingResult.data.debug,
           isCI: process.env.CI === "true" || process.env.CI === "1",
-          silent: paramParsingResult.data.silent,
+          logger,
         },
       )
-        .then((result) =>
-          displayDifferences(result, paramParsingResult.data.silent),
-        )
+        .then((result) => {
+          displayDifferences(logger, result);
+        })
         .catch((err) => {
           if (err instanceof CliError) {
-            cliError(err.message);
+            logger.error(err.message);
           } else {
-            cliError(
+            logger.error(
               "An unexpected error occurred, please fill an issue with the error details if the problem persists",
             );
             console.error(err);
@@ -153,15 +148,11 @@ export function registerDiffCommand(
 }
 
 export function displayDifferences(
+  logger: CommandLogger,
   differences: Difference[],
-  silent = false,
 ): void {
   if (differences.length === 0) {
-    if (!silent) {
-      console.error("");
-      success("No differences found");
-      console.error("");
-    }
+    logger.success("No differences found");
     return;
   }
 
@@ -200,5 +191,6 @@ export function displayDifferences(
     });
   }
 
-  boxSummary("Differences Found", summaryLines, silent);
+  logger.note("Differences Found", summaryLines.join("\n"));
+  logger.outro(undefined);
 }

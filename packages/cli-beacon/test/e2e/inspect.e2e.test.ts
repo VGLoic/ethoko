@@ -7,10 +7,12 @@ import {
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
+import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Inspect E2E Tests (%s)",
   ([, storageProviderFactory]) => {
+    const logger = new CommandLogger(true);
     storageProviderTest.scoped({ storageProviderFactory });
 
     storageProviderTest.for(ARTIFACTS_STRATEGIES)(
@@ -29,7 +31,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: true,
-            silent: true,
+            logger,
           },
         );
 
@@ -41,14 +43,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
         const inspectResult = await inspectArtifact(
           { project, search: { type: "tag", tag } },
           pulledArtifactStore,
-          { debug: false, silent: true },
+          { debug: false },
         );
 
         expect(inspectResult.project).toBe(project);
@@ -82,7 +84,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -94,14 +96,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
         const inspectResult = await inspectArtifact(
           { project, search: { type: "id", id: artifactId } },
           pulledArtifactStore,
-          { debug: false, silent: true },
+          { debug: false },
         );
 
         expect(inspectResult.project).toBe(project);
@@ -133,7 +135,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             pulledArtifactStore,
             {
               debug: false,
-              silent: true,
             },
           ),
         ).rejects.toThrow();

@@ -1,12 +1,7 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  boxHeader,
-  error as cliError,
-  LOG_COLORS,
-  boxSummary,
-} from "@/ui/index.js";
+import { LOG_COLORS, CommandLogger } from "@/ui/index.js";
 import { CliError, inspectArtifact, InspectResult } from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
@@ -31,9 +26,11 @@ export function registerInspectCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (projectArg, options) => {
+      const logger = new CommandLogger(options.silent);
+
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
-        cliError(
+        logger.error(
           configResult.error instanceof Error
             ? configResult.error.message
             : String(configResult.error),
@@ -55,7 +52,7 @@ export function registerInspectCommand(
         },
       ).safeParse(projectArg);
       if (!artifactKeyParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
         );
         process.exitCode = 1;
@@ -65,7 +62,7 @@ export function registerInspectCommand(
         artifactKeyParsingResult.data.project,
       );
       if (!projectConfig) {
-        cliError(
+        logger.error(
           `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
         );
         process.exitCode = 1;
@@ -78,23 +75,21 @@ export function registerInspectCommand(
           debug: z
             .boolean('The "debug" option must be a boolean')
             .default(config.debug),
-          silent: z
-            .boolean('The "silent" option must be a boolean')
-            .default(false),
         })
         .safeParse(options);
       if (!optsParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
         );
         process.exitCode = 1;
         return;
       }
 
-      boxHeader(
-        `Inspecting artifact "${projectConfig.name}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
-        optsParsingResult.data.silent,
-      );
+      if (!optsParsingResult.data.json) {
+        logger.intro(
+          `Inspecting artifact "${projectConfig.name}:${artifactKeyParsingResult.data.search.type === "tag" ? artifactKeyParsingResult.data.search.tag : artifactKeyParsingResult.data.search.id}"`,
+        );
+      }
 
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
@@ -108,21 +103,20 @@ export function registerInspectCommand(
         pulledArtifactStore,
         {
           debug: optsParsingResult.data.debug,
-          silent: optsParsingResult.data.silent,
         },
       )
         .then((result) => {
-          if (optsParsingResult.data.json) {
-            displayInspectResultJson(result, optsParsingResult.data.silent);
+          if (optsParsingResult.data.json && !logger.silent) {
+            console.log(JSON.stringify(result, null, 2));
           } else {
-            displayInspectResult(result, optsParsingResult.data.silent);
+            displayInspectResult(logger, result);
           }
         })
         .catch((err) => {
           if (err instanceof CliError) {
-            cliError(err.message);
+            logger.error(err.message);
           } else {
-            cliError(
+            logger.error(
               "An unexpected error occurred, please fill an issue with the error details if the problem persists",
             );
             console.error(err);
@@ -132,11 +126,10 @@ export function registerInspectCommand(
     });
 }
 
-function displayInspectResult(result: InspectResult, silent = false): void {
-  if (silent) {
-    return;
-  }
-
+function displayInspectResult(
+  logger: CommandLogger,
+  result: InspectResult,
+): void {
   const summaryLines: string[] = [];
   const artifactLabel = result.tag
     ? `${result.project}:${result.tag}`
@@ -190,13 +183,8 @@ function displayInspectResult(result: InspectResult, silent = false): void {
       );
     }
   }
-
-  boxSummary("Inspect Artifact", summaryLines, silent);
-}
-
-function displayInspectResultJson(result: InspectResult, silent = false): void {
-  if (silent) return;
-  console.error(JSON.stringify(result, null, 2));
+  logger.note(summaryLines.join("\n"), "Artifact");
+  logger.outro();
 }
 
 function countContracts(result: InspectResult): number {

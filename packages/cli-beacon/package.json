@@ -53,19 +53,18 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.624.0",
     "@aws-sdk/client-sts": "^3.624.0",
+    "@clack/prompts": "^1.1.0",
     "@ethersproject/keccak256": "^5.7.0",
     "@ethersproject/strings": "^5.7.0",
     "@smithy/types": "^3.3.0",
-    "boxen": "5.1.2",
     "commander": "^12.1.0",
-    "ora": "5.4.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@ethoko/eslint-config": "workspace:*",
     "@ethoko/typescript-config": "workspace:*",
-    "@types/node": "^22.1.0",
     "@types/bun": "^1.2.22",
+    "@types/node": "^22.1.0",
     "bun": "^1.2.22",
     "eslint": "^9.39.1",
     "tsup": "^8.2.4",

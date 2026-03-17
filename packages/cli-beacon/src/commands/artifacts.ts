@@ -1,7 +1,7 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import { boxHeader, error as cliError, LOG_COLORS, warn } from "@/ui/index.js";
+import { CommandLogger, LOG_COLORS } from "@/ui/index.js";
 import {
   CliError,
   ListArtifactsResult,
@@ -25,9 +25,11 @@ export function registerArtifactsCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (options) => {
+      const logger = new CommandLogger(options.silent);
+
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
-        cliError(
+        logger.error(
           configResult.error instanceof Error
             ? configResult.error.message
             : String(configResult.error),
@@ -50,14 +52,16 @@ export function registerArtifactsCommand(
         .safeParse(options);
 
       if (!parsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(parsingResult.error)}`,
         );
         process.exitCode = 1;
         return;
       }
 
-      boxHeader("Listing artifacts", parsingResult.data.silent);
+      if (!parsingResult.data.json) {
+        logger.intro("Listing artifacts");
+      }
 
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
@@ -65,20 +69,19 @@ export function registerArtifactsCommand(
 
       await listPulledArtifacts(pulledArtifactStore, {
         debug: parsingResult.data.debug,
-        silent: parsingResult.data.silent,
       })
         .then((result) => {
-          if (parsingResult.data.json) {
-            displayListArtifactsResultsJson(result, parsingResult.data.silent);
+          if (parsingResult.data.json && !logger.silent) {
+            console.log(JSON.stringify(result, null, 2));
           } else {
-            displayListArtifactsResults(result, parsingResult.data.silent);
+            displayListArtifactsResults(logger, result);
           }
         })
         .catch((err) => {
           if (err instanceof CliError) {
-            cliError(err.message);
+            logger.error(err.message);
           } else {
-            cliError(
+            logger.error(
               "An unexpected error occurred, please fill an issue with the error details if the problem persists",
             );
             console.error(err);
@@ -88,24 +91,14 @@ export function registerArtifactsCommand(
     });
 }
 
-function displayListArtifactsResultsJson(
-  data: ListArtifactsResult,
-  silent = false,
-): void {
-  if (silent) return;
-  console.log(JSON.stringify(data, null, 2));
-}
-
 function displayListArtifactsResults(
+  logger: CommandLogger,
   data: ListArtifactsResult,
-  silent = false,
 ): void {
   if (data.length === 0) {
-    warn("No artifacts found");
+    logger.warn("No artifacts found");
     return;
   }
-
-  if (silent) return;
 
   const structuredData = data.map((item) => ({
     Project: item.project,
@@ -114,13 +107,19 @@ function displayListArtifactsResults(
     "Pull date": deriveTimeAgo(item.lastModifiedAt),
   }));
 
-  colorTableHeaders(structuredData, ["Project", "Tag", "ID", "Pull date"]);
+  colorTableHeaders(logger, structuredData, [
+    "Project",
+    "Tag",
+    "ID",
+    "Pull date",
+  ]);
 }
 
 /**
  * Creates a colored table header row with fixed column widths
  */
 function colorTableHeaders(
+  logger: CommandLogger,
   data: Record<string, unknown>[],
   headers: string[],
 ): void {
@@ -153,15 +152,14 @@ function colorTableHeaders(
   const headerRow = headers
     .map((h) => styleText(["bold", LOG_COLORS.log], pad(h, columnWidths[h]!)))
     .join(" │ ");
-  console.error(`\n ${headerRow}`);
 
   // Create separator row
   const separatorRow = headers
     .map((h) => "─".repeat(columnWidths[h]!))
     .join("─┼─");
-  console.error(` ${separatorRow}`);
 
   // Print data rows with fixed widths
+  const displayedRows = [];
   for (const row of data) {
     const values = headers.map((h) => {
       const value = row[h];
@@ -185,9 +183,13 @@ function colorTableHeaders(
       }
       return paddedValue;
     });
-    console.error(` ${values.join(" │ ")}`);
+    displayedRows.push(` ${values.join(" │ ")}`);
   }
-  console.error();
+
+  logger.message(
+    `\n ${headerRow}\n ${separatorRow}\n${displayedRows.join("\n")}`,
+  );
+  logger.outro(undefined);
 }
 
 function deriveTimeAgo(time: string): string {

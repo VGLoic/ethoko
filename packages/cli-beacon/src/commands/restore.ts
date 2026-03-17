@@ -1,13 +1,7 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import {
-  boxHeader,
-  error as cliError,
-  LOG_COLORS,
-  boxSummary,
-  success,
-} from "@/ui/index.js";
+import { LOG_COLORS, CommandLogger } from "@/ui/index.js";
 import { CliError, restore, type RestoreResult } from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
@@ -34,9 +28,10 @@ export function registerRestoreCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (projectArg, options) => {
+      const logger = new CommandLogger(options.silent);
       const configResult = await toAsyncResult(getConfig());
       if (!configResult.success) {
-        cliError(
+        logger.error(
           configResult.error instanceof Error
             ? configResult.error.message
             : String(configResult.error),
@@ -58,7 +53,7 @@ export function registerRestoreCommand(
         },
       ).safeParse(projectArg);
       if (!artifactKeyParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
         );
         process.exitCode = 1;
@@ -68,12 +63,16 @@ export function registerRestoreCommand(
         artifactKeyParsingResult.data.project,
       );
       if (!projectConfig) {
-        cliError(
+        logger.error(
           `Project "${artifactKeyParsingResult.data.project}" not found in configuration`,
         );
         process.exitCode = 1;
         return;
       }
+
+      logger.intro(
+        `Restoring artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
+      );
 
       const optsParsingResult = z
         .object({
@@ -89,23 +88,15 @@ export function registerRestoreCommand(
           debug: z
             .boolean('The "debug" option must be a boolean')
             .default(config.debug),
-          silent: z
-            .boolean('The "silent" option must be a boolean')
-            .default(false),
         })
         .safeParse(options);
       if (!optsParsingResult.success) {
-        cliError(
+        logger.error(
           `Invalid command arguments:\n${z.prettifyError(optsParsingResult.error)}`,
         );
         process.exitCode = 1;
         return;
       }
-
-      boxHeader(
-        `Restoring artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.search.type === "id" ? artifactKeyParsingResult.data.search.id : artifactKeyParsingResult.data.search.tag}"`,
-        optsParsingResult.data.silent,
-      );
 
       const storageProvider = createStorageProvider(
         projectConfig.storage,
@@ -127,17 +118,15 @@ export function registerRestoreCommand(
         {
           force: optsParsingResult.data.force,
           debug: optsParsingResult.data.debug,
-          silent: optsParsingResult.data.silent,
+          logger,
         },
       )
-        .then((result: RestoreResult) =>
-          displayRestoreResult(result, optsParsingResult.data.silent),
-        )
+        .then((result: RestoreResult) => displayRestoreResult(logger, result))
         .catch((err: unknown) => {
           if (err instanceof CliError) {
-            cliError(err.message);
+            logger.error(err.message);
           } else {
-            cliError(
+            logger.error(
               "An unexpected error occurred, please fill an issue with the error details if the problem persists",
             );
             if (err instanceof Error) {
@@ -149,19 +138,18 @@ export function registerRestoreCommand(
     });
 }
 
-function displayRestoreResult(result: RestoreResult, silent = false): void {
-  if (silent) return;
-
-  console.error("");
-  success(
-    `Restored ${result.filesRestored.length} file${result.filesRestored.length > 1 ? "s" : ""} to ${result.outputPath}`,
-    silent,
-  );
-
+function displayRestoreResult(
+  logger: CommandLogger,
+  result: RestoreResult,
+): void {
   const summaryLines = result.filesRestored.map((file) =>
     styleText(LOG_COLORS.log, `  • ${file}`),
   );
   if (summaryLines.length > 0) {
-    boxSummary("Restored Files", summaryLines, silent);
+    logger.note(summaryLines.join("\n"), "Restored Files");
   }
+
+  logger.success(
+    `Restored ${result.filesRestored.length} file${result.filesRestored.length > 1 ? "s" : ""} to ${result.outputPath}`,
+  );
 }

@@ -22,12 +22,11 @@ export type ArtifactItem = {
  * @param pulledArtifactStore The pulled artifact store used to retrieve pulled artifacts
  * @param opts Options for the listing
  * @param opts.debug Enable debug mode
- * @param opts.silent Suppress CLI output (errors and warnings still shown)
  * @returns The list of artifacts in the pulled artifact store with their project, tag, ID, and last modified date
  */
 export async function listPulledArtifacts(
   pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean; silent?: boolean },
+  opts: { debug: boolean },
 ): Promise<ListArtifactsResult> {
   const ensureResult = await toAsyncResult(pulledArtifactStore.ensureSetup(), {
     debug: opts.debug,

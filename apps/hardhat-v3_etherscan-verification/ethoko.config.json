@@ -5,7 +5,7 @@
       "name": "verified-counter",
       "storage": {
         "type": "filesystem",
-        "path": "./ethoko-storage"
+        "path": "ethoko-storage"
       }
     }
   ]

@@ -8,10 +8,12 @@ import {
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
+import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Export E2E Tests (%s)",
   ([, storageProviderFactory]) => {
+    const logger = new CommandLogger(true);
     storageProviderTest.scoped({ storageProviderFactory });
 
     storageProviderTest.for(ARTIFACTS_STRATEGIES)(
@@ -30,7 +32,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -42,7 +44,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -54,7 +56,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           pulledArtifactStore,
           {
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -98,7 +100,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -110,7 +112,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -122,7 +124,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           pulledArtifactStore,
           {
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -165,7 +167,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             pulledArtifactStore,
             {
               debug: false,
-              silent: true,
+              logger,
             },
           ),
         ).rejects.toThrow();
@@ -190,7 +192,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -202,7 +204,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -213,7 +215,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             pulledArtifactStore,
             {
               debug: false,
-              silent: true,
+              logger,
             },
           ),
         ).rejects.toThrow();

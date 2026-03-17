@@ -1,6 +1,5 @@
-import ora, { Ora } from "ora";
-import boxen from "boxen";
 import { styleText } from "node:util";
+import * as clackPrompts from "@clack/prompts";
 
 export const LOG_COLORS = {
   log: "cyan",
@@ -13,79 +12,139 @@ export const LOG_COLORS = {
  * CLI UI utilities for enhanced terminal output
  */
 
-/**
- * Creates a simple spinner without step tracking
- */
-export function createSpinner(message: string, silent = false): Ora {
-  return ora({
-    text: message,
-    stream: process.stderr,
-    isSilent: silent,
-  }).start();
+interface Spinner {
+  // Displays a success message and stops the spinner
+  succeed: (message: string) => void;
+  // Displays a warning message and stops the spinner
+  warn: (message: string) => void;
+  // Displays an error message and stops the spinner
+  fail: (message: string) => void;
+  // Stops the spinner without displaying a message, can be used with {succeed, warn, fail} afterwards to display a message
+  stop: () => void;
 }
 
-/**
- * Creates a boxed header message
- */
-export function boxHeader(message: string, silent = false): void {
-  if (silent) return;
-  const boxed = boxen(message, {
-    padding: 0,
-    margin: { top: 1, bottom: 0, left: 0, right: 0 },
-    borderStyle: "round",
-    borderColor: "cyan",
-  });
-  console.error(boxed);
-}
+export class CommandLogger {
+  public silent: boolean;
+  private active: boolean = false;
 
-/**
- * Creates a boxed summary with multiple lines
- */
-export function boxSummary(
-  title: string,
-  lines: string[],
-  silent = false,
-): void {
-  if (silent) return;
-  const boldTitle = styleText("bold", title);
-  const content = `${boldTitle}\n\n${lines.join("\n")}`;
-  const boxed = boxen(content, {
-    padding: 1,
-    margin: { top: 1, bottom: 1, left: 0, right: 0 },
-    borderStyle: "round",
-    borderColor: "cyan",
-  });
-  console.error(boxed);
-}
+  public prompts = {
+    select: clackPrompts.select,
+    isCancel: clackPrompts.isCancel,
+    cancel: clackPrompts.cancel,
+    confirm: clackPrompts.confirm,
+    text: clackPrompts.text,
+    password: clackPrompts.password,
+  };
 
-/**
- * Enhanced success message
- */
-export function success(message: string, silent = false): void {
-  if (silent) return;
-  console.error(styleText(LOG_COLORS.success, `✔ ${message}`));
-}
+  constructor(silent = false) {
+    this.silent = silent;
+  }
 
-/**
- * Enhanced error message
- */
-export function error(message: string): void {
-  console.error(styleText(LOG_COLORS.error, `✖ ${message}`));
-}
+  public createSpinner(message: string): Spinner {
+    if (this.silent) {
+      return {
+        succeed: () => {},
+        warn: () => {},
+        fail: () => {},
+        stop: () => {},
+      };
+    }
+    const spinner = clackPrompts.spinner({ output: process.stderr });
+    spinner.start(message);
+    return {
+      succeed: (msg: string) => spinner.stop(msg),
+      warn: (msg: string) => spinner.error(msg),
+      fail: (msg: string) => spinner.cancel(msg),
+      stop: () => spinner.clear(),
+    };
+  }
 
-/**
- * Enhanced warning message
- */
-export function warn(message: string): void {
-  console.error(styleText(LOG_COLORS.warn, `⚠ ${message}`));
-}
+  public intro(message: string): CommandLogger {
+    if (!this.silent) {
+      clackPrompts.intro(message, { output: process.stderr });
+    }
+    this.active = true;
+    return this;
+  }
 
-/**
- * Enhanced info message
- */
-export function info(message: string, silent = false): void {
-  if (silent) return;
-  console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
-}
+  public outro(message?: string): CommandLogger {
+    if (!this.silent) {
+      clackPrompts.outro(message, { output: process.stderr });
+    }
+    return this;
+  }
 
-export type { Ora };
+  public error(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.error, `✖ ${message}`));
+      } else {
+        clackPrompts.log.error(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public info(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
+      } else {
+        clackPrompts.log.message(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public warn(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.warn, `⚠ ${message}`));
+      } else {
+        clackPrompts.log.warn(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public success(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.success, `✔ ${message}`));
+      } else {
+        clackPrompts.log.success(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public message(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.log, `ℹ ${message}`));
+      } else {
+        clackPrompts.log.message(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public cancel(message: string): CommandLogger {
+    if (!this.silent) {
+      if (!this.active) {
+        console.error(styleText(LOG_COLORS.error, `✖ ${message}`));
+      } else {
+        clackPrompts.cancel(message, { output: process.stderr });
+      }
+    }
+    return this;
+  }
+
+  public note(content: string, title?: string): CommandLogger {
+    if (this.silent) return this;
+    clackPrompts.note(content, title, {
+      output: process.stderr,
+    });
+    return this;
+  }
+}

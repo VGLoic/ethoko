@@ -49,22 +49,29 @@ Ethoko CLI can be configured through an `ethoko.config.json` file at the root of
 
 ```json
 {
-  "projects": [{
-    "name": "<my-project>",
-    "storage": {
-      "type": "aws",
-      "awsBucket": "<my-ethoko-bucket>",
-      "awsRegion": "<my-aws-region>"
+  "projects": [
+    {
+      "name": "my-project",
+      "storage": {
+        "type": "aws",
+        "awsRegion": "us-east-1",
+        "awsBucketName": "my-artifacts-bucket",
+        "awsProfile": "my-profile"
+      }
     }
-  }],
-  "compilationOutputPath": "out"
+  ],
+  "compilationOutputPath": "./out",
 }
 ```
 
 Each project can be configured with its own storage backend, Ethoko supports two types of storage backends for now:
-
 - `aws`: store the compilation artifacts in an AWS S3 bucket. The bucket must be created beforehand, and the AWS credentials must be configured locally for Ethoko to be able to access it.
 - `filesystem`: store the compilation artifacts locally in the directory.
+
+For a quick setup, it is recommended to use the init command:
+```bash
+ethoko init
+```
 
 Check out the full [configuration reference in the docs](docs/external/CONFIGURATION.md).
 
@@ -209,7 +216,7 @@ ethoko diff my-project:2026-02-02 --artifact-path ./path/to/artifacts
 
 ### Using the exported artifacts in scripts
 
-The exported artifacts can be used as any JSON files in scripts in for various purposes, e.g. deployment, verification, etc... 
+The exported artifacts can be used as any JSON files in scripts in for various purposes, e.g. deployment, verification, etc...
 
 Below is an example of a deployment script with the [hardhat-deploy](https://github.com/wighawag/hardhat-deploy) plugin for deploying a released smart contract.
 

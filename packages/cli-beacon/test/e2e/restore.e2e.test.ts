@@ -11,10 +11,12 @@ import {
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { deriveAllPathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
+import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Restore E2E Tests (%s)",
   ([, storageProviderFactory]) => {
+    const logger = new CommandLogger(true);
     storageProviderTest.scoped({ storageProviderFactory });
 
     let tempOutputDir: string;
@@ -50,7 +52,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -62,7 +64,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -72,7 +74,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             outputPath,
             storageProvider,
             pulledArtifactStore,
-            { force: false, debug: false, silent: true },
+            { force: false, debug: false, logger },
           );
 
           expect(result.filesRestored.length).toBeGreaterThan(0);
@@ -103,7 +105,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -115,7 +117,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -129,7 +131,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             relativeOutputPath,
             storageProvider,
             pulledArtifactStore,
-            { force: false, debug: false, silent: true },
+            { force: false, debug: false, logger },
           );
 
           expect(result.filesRestored.length).toBeGreaterThan(0);
@@ -160,7 +162,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -172,7 +174,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -186,7 +188,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               storageProvider,
               pulledArtifactStore,
-              { force: false, debug: false, silent: true },
+              { force: false, debug: false, logger },
             ),
           ).rejects.toThrow(/not empty|overwrite/);
         },
@@ -212,7 +214,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -224,7 +226,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           );
 
@@ -237,7 +239,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             outputPath,
             storageProvider,
             pulledArtifactStore,
-            { force: true, debug: false, silent: true },
+            { force: true, debug: false, logger },
           );
 
           expect(result.filesRestored.length).toBeGreaterThan(0);
@@ -260,7 +262,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               storageProvider,
               pulledArtifactStore,
-              { force: false, debug: false, silent: true },
+              { force: false, debug: false, logger },
             ),
           ).rejects.toThrow();
         },
@@ -280,7 +282,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               storageProvider,
               pulledArtifactStore,
-              { force: false, debug: false, silent: true },
+              { force: false, debug: false, logger },
             ),
           ).rejects.toThrow();
         },
@@ -298,7 +300,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await push(artifactFixture.folderPath, project, tag, storageProvider, {
           force: false,
           debug: false,
-          silent: true,
+          logger,
         });
 
         await pull(
@@ -309,7 +311,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -319,7 +321,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           outputPath,
           storageProvider,
           pulledArtifactStore,
-          { force: false, debug: false, silent: true },
+          { force: false, debug: false, logger },
         );
 
         expect(result.project).toBe(project);
@@ -354,7 +356,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -366,7 +368,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -376,7 +378,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           outputPath,
           storageProvider,
           pulledArtifactStore,
-          { force: false, debug: false, silent: true },
+          { force: false, debug: false, logger },
         );
 
         expect(result.project).toBe(project);

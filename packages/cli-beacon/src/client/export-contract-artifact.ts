@@ -1,8 +1,8 @@
+import { CommandLogger } from "@/ui";
 import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-store";
 import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";
 import { ContractMetadataSchema } from "@/solc-artifacts/v0.8.33/contract-metadata-json";
-import { warn } from "@/ui";
 import z from "zod";
 
 type ContractBytecode = {
@@ -59,7 +59,7 @@ export async function exportContractArtifact(
   },
   shortOrFullyQualifiedContractName: string,
   pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean; silent?: boolean },
+  opts: { debug: boolean; logger: CommandLogger },
 ): Promise<ExportContractArtifactResult> {
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifact.project),
@@ -198,7 +198,7 @@ export async function exportContractArtifact(
       const inputSource = inputArtifact.input.sources[sourcePath];
       if (!inputSource || !("content" in inputSource) || !inputSource.content) {
         if (opts.debug) {
-          warn(
+          opts.logger.warn(
             `Source ${sourcePath} is missing content in the contract metadata and could not be found in the artifact input sources for artifact ${deriveDisplayArtifactName(artifact.project, artifact.search)}. This source will have empty content in the exported artifact.`,
           );
         }

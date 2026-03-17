@@ -193,11 +193,11 @@ class S3BucketProvider implements StorageProvider {}
 type CompilerOutputContract = z.infer<typeof ZCompilerOutputContract>;
 ```
 
-**Zod Schemas:** Prefix with `Z`
+**Zod Schemas:** Suffix with `Schema`
 
 ```typescript
-const ZBuildInfo = z.object({...});
-const ZAbi = z.array(...);
+const BuildInfoSchema = z.object({...});
+const AbiSchema = z.array(...);
 ```
 
 **Constants:** SCREAMING_SNAKE_CASE for log colors and configuration:
@@ -224,12 +224,12 @@ export type EthokoCliUserConfig = {
 **Prefer Zod schemas for runtime validation:**
 
 ```typescript
-const EthokoCliConfig = z.object({
+const EthokoCliConfigSchema = z.object({
   project: z.string().min(1),
   pulledArtifactsPath: z.string().default(".ethoko"),
 });
 
-const result = EthokoHardhatConfig.safeParse(userInput);
+const result = EthokoCliConfigSchema.safeParse(userInput);
 if (!result.success) {
   // Handle validation error
 }
@@ -318,9 +318,9 @@ await pull(
   .then((result) => displayPullResults(optsParsingResult.data.project, result))
   .catch((err) => {
     if (err instanceof CliError) {
-      cliError(err.message);
+      logger.error(err.message);
     } else {
-      cliError(
+      logger.error(
         "An unexpected error occurred, please fill an issue with the error details if the problem persists",
       );
       console.error(err);
@@ -331,16 +331,24 @@ await pull(
 
 ### Console Output
 
-Use `LOG_COLORS` and `styleText` for all console output:
+Use the instance of `CommandLogger` (packages/cli-beacon/src/ui/index.ts) passed to command handlers for consistent logging.
 
 ```typescript
-console.error(styleText(LOG_COLORS.success, "\nOperation successful"));
-console.error(styleText(LOG_COLORS.error, "❌ Operation failed"));
-console.error(styleText(LOG_COLORS.warn, "⚠️ Warning message"));
-console.error(styleText(LOG_COLORS.log, "Info message"));
+logger.success("Operation successful");
+logger.error("Operation failed");
+logger.warn("Warning message");
+logger.info("Info message");
 ```
 
-Note: Use `console.error()` for task output (not `console.log()`) to ensure proper streaming in Hardhat tasks.
+Note: Use `process.stderr` for task output (not `process.stdout`) to ensure proper streaming in Hardhat tasks.
+
+Without access to a logger instance, use `console.error` with `LOG_COLORS` for colored output:
+
+```typescript
+console.error(
+  styleText(LOG_COLORS.error, "Error message"),
+);
+```
 
 ## File Organization
 
@@ -355,7 +363,7 @@ packages/cli-beacon/
 │   ├── solc-artifacts/                # Solc artifact definitions
 │   ├── storage-provider/              # Storage provider interfaces and implementations
 │   ├── supported-origins/             # Supported origins for artifacts with mapping logic (e.g., Hardhat, Foundry)
-│   ├── ui/                            # CLI UI primitives (spinners, loggers, etc.)
+│   ├── ui/                            # CLI UI command logger (spinners, loggers, etc.) and colours
 │   └── utils/                         # Utility functions and helpers
 ├── templates-builder/                 # Template for generated typescript typings (through `typings` command)
 ├── test/                              # End to end tests for `client` methods (Vitest)

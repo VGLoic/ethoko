@@ -1,5 +1,5 @@
 import { StorageProvider } from "../storage-provider";
-import { createSpinner, warn } from "@/ui";
+import { CommandLogger } from "@/ui";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import {
@@ -64,7 +64,7 @@ const FORMAT_TO_ERROR_MESSAGE: Record<
  * @param opts Options for the push command
  * @param opts.force Force the push of the artifact even if the tag already exists in the storage
  * @param opts.debug Enable debug mode
- * @param opts.silent Suppress CLI output (errors and warnings still shown)
+ * @param opts.logger The CommandLogger instance to use for logging and prompting the user during the push process
  * @param opts.isCI Whether running in CI environment (disables interactive prompts)
  * @returns The generated artifact ID
  */
@@ -73,12 +73,16 @@ export async function push(
   project: string,
   tag: string | undefined,
   storageProvider: StorageProvider,
-  opts: { force: boolean; debug: boolean; silent?: boolean; isCI?: boolean },
+  opts: {
+    force: boolean;
+    debug: boolean;
+    logger: CommandLogger;
+    isCI?: boolean;
+  },
 ): Promise<string> {
   // Step 1: Look for compilation artifact
-  const spinner1 = createSpinner(
+  const spinner1 = opts.logger.createSpinner(
     "Looking for compilation artifact...",
-    opts.silent,
   );
   const candidateArtifactsResult = await toAsyncResult(
     lookForCandidateArtifacts(artifactPath, {
@@ -112,6 +116,7 @@ export async function push(
     spinner1.stop();
     const userSelectionResult = await toAsyncResult(
       promptUserSelection(
+        opts.logger,
         `Multiple JSON files found in "${candidateArtifactsResult.value.finalFolderPath}" (${candidateArtifactsResult.value.ignoredFilesCount} ignored). Please select which build info file to use:`,
         candidateArtifactsResult.value.candidateBuildInfoOptions,
         30_000,
@@ -129,9 +134,8 @@ export async function push(
   spinner1.succeed(buildInfoPathToSuccessText(selectedBuildInfoPaths));
 
   // Step 2: Parse the compilation artifact, mapping it to the Ethoko format
-  const spinner2 = createSpinner(
+  const spinner2 = opts.logger.createSpinner(
     "Analyzing compilation artifact...",
-    opts.silent,
   );
   const ethokoArtifactParsingResult = await toAsyncResult(
     mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
@@ -159,18 +163,18 @@ export async function push(
       ethokoArtifactParsingResult.value.inputArtifact.origin.type ===
         "forge-v1-default"
     ) {
-      warn(
+      opts.logger.warn(
         `The provided Forge compilation artifacts do not include the literal content of the sources. We recommend using the "--use-literal-content" option when generating the build info files with Forge to include the content in the artifact, which can help with later verification and debugging.`,
       );
     } else {
-      warn(
+      opts.logger.warn(
         `The provided compilation artifact does not include the literal content of the sources. This may make later verification and debugging more difficult. If possible, please provide artifacts that include the source content.`,
       );
     }
   }
 
   // Step 3: Check if tag exists
-  const spinner3 = createSpinner("Checking if tag exists...", opts.silent);
+  const spinner3 = opts.logger.createSpinner("Checking if tag exists...");
   if (!tag) {
     spinner3.succeed("No tag provided, skipping tag existence check");
   } else {
@@ -199,7 +203,7 @@ export async function push(
   }
 
   // Step 4: Upload artifact
-  const spinner4 = createSpinner("Uploading artifact...", opts.silent);
+  const spinner4 = opts.logger.createSpinner("Uploading artifact...");
   const pushResult = await toAsyncResult(
     storageProvider.uploadArtifact(
       project,

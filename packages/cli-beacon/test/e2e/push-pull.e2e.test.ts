@@ -9,10 +9,12 @@ import {
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { deriveAllPathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
+import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Push-Pull E2E Tests (%s)",
   ([, storageProviderFactory]) => {
+    const logger = new CommandLogger(true);
     storageProviderTest.scoped({ storageProviderFactory });
 
     storageProviderTest.for(ARTIFACTS_STRATEGIES)(
@@ -30,7 +32,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -51,7 +53,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -62,7 +64,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           pulledArtifactStore,
           {
             debug: false,
-            silent: true,
           },
         );
         expect(
@@ -115,7 +116,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -135,7 +136,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -146,7 +147,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           pulledArtifactStore,
           {
             debug: false,
-            silent: true,
           },
         );
         expect(
@@ -176,12 +176,12 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await push(artifactFixture.folderPath, project, tag1, storageProvider, {
           force: false,
           debug: false,
-          silent: true,
+          logger,
         });
         await push(artifactFixture.folderPath, project, tag2, storageProvider, {
           force: true,
           debug: false,
-          silent: true,
+          logger,
         });
 
         const pullResult = await pull(
@@ -189,7 +189,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           null,
           storageProvider,
           pulledArtifactStore,
-          { force: false, debug: false, silent: true },
+          { force: false, debug: false, logger },
         );
 
         expect(pullResult.pulledTags).toHaveLength(2);
@@ -200,7 +200,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           pulledArtifactStore,
           {
             debug: false,
-            silent: true,
           },
         );
         const pulledTags = listArtifactsResult
@@ -231,7 +230,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -239,7 +238,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           push(artifactFixture.folderPath, project, tag, storageProvider, {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           }),
         ).rejects.toThrow(/already exists/);
 
@@ -251,7 +250,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: true,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -275,7 +274,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await push(artifactFixture.folderPath, project, tag, storageProvider, {
           force: false,
           debug: false,
-          silent: true,
+          logger,
         });
         await pull(
           project,
@@ -285,7 +284,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
 
@@ -297,7 +296,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: false,
             debug: false,
-            silent: true,
+            logger,
           },
         );
         expect(result1.pulledTags).toHaveLength(0);
@@ -310,7 +309,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           {
             force: true,
             debug: false,
-            silent: true,
+            logger,
           },
         );
         expect(result2.pulledTags).toContain(tag);
@@ -333,7 +332,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             {
               force: false,
               debug: false,
-              silent: true,
+              logger,
             },
           ),
         ).rejects.toThrow();

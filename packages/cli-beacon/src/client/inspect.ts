@@ -43,7 +43,7 @@ export async function inspectArtifact(
     search: { type: "tag"; tag: string } | { type: "id"; id: string };
   },
   pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean; silent?: boolean },
+  opts: { debug: boolean },
 ): Promise<InspectResult> {
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifact.project),
