@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import { CommandLogger } from "@/ui";
 import { CliError } from "@/client/error";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 /**
  * Register the CLI init command.
@@ -32,9 +33,9 @@ export function registerInitCommand(program: Command): void {
 }
 
 type ConfigData = {
-  pulledArtifactsPath: string;
-  typingsPath: string;
-  compilationOutputPath?: string;
+  pulledArtifactsPath: AbsolutePath;
+  typingsPath: AbsolutePath;
+  compilationOutputPath?: AbsolutePath;
   projects: Array<ProjectConfig>;
   debug: boolean;
 };
@@ -70,17 +71,17 @@ async function runInit(
 ): Promise<void> {
   logger.intro("Welcome to Ethoko CLI Configuration");
 
-  const configPath = path.resolve(process.cwd(), opts.config);
+  const configPath = AbsolutePath.from(opts.config);
 
   // Check if config already exists
   const configExists = await fs
-    .stat(configPath)
+    .stat(configPath.resolvedPath)
     .then(() => true)
     .catch(() => false);
 
   if (configExists && !opts.force) {
     const overwrite = await logger.prompts.confirm({
-      message: `Configuration file already exists at ${configPath}. Overwrite?`,
+      message: `Configuration file already exists at ${configPath.resolvedPath}. Overwrite?`,
       initialValue: false,
     });
 
@@ -108,17 +109,17 @@ async function runInit(
   // Additional paths
 
   const compilationOutputOptions = await deriveCompilationOutputPathsOptions();
-  let compilationOutputPath: string | undefined = undefined;
+  let compilationOutputPath: RelativePath | undefined = undefined;
   if (compilationOutputOptions.length > 0) {
     const compilationOutputSelection = await logger.prompts.select({
       message: "Select the path where your compilation output are stored:",
       options: [
         ...compilationOutputOptions.map((option) => ({
           value: option.path,
-          label: `${option.path} (${option.label})`,
+          label: `${option.path.relativePath} (${option.label})`,
         })),
         {
-          value: "other",
+          value: RelativePath.unsafeFrom("other"),
           label: "Other",
           hint: "Specify another path",
         },
@@ -128,7 +129,7 @@ async function runInit(
       logger.cancel("Configuration cancelled");
       return;
     }
-    if (compilationOutputSelection !== "other") {
+    if (compilationOutputSelection.relativePath !== "other") {
       compilationOutputPath = compilationOutputSelection;
     }
   }
@@ -136,6 +137,18 @@ async function runInit(
     const compilationOutputResult = await logger.prompts.text({
       message:
         "Input the path where your compilation output are stored (e.g. `./out` for Forge, `./artifacts` for Hardhat, press Enter to skip):",
+      validate: (value) => {
+        if (value && value.trim().length > 0) {
+          try {
+            RelativePath.unsafeFrom(value.trim());
+            return undefined;
+          } catch {
+            return "Invalid relative path";
+          }
+        } else {
+          return undefined; // Allow empty value
+        }
+      },
     });
 
     if (logger.prompts.isCancel(compilationOutputResult)) {
@@ -144,7 +157,7 @@ async function runInit(
     }
     compilationOutputPath =
       compilationOutputResult.trim().length > 0
-        ? compilationOutputResult.trim()
+        ? RelativePath.unsafeFrom(compilationOutputResult.trim())
         : undefined;
   }
 
@@ -156,7 +169,12 @@ async function runInit(
       if (!value || value.trim().length === 0) {
         return "Pulled artifacts path cannot be empty";
       }
-      return undefined;
+      try {
+        AbsolutePath.from(value.trim());
+        return undefined;
+      } catch {
+        return "Invalid path, must be a valid absolute or relative path";
+      }
     },
   });
 
@@ -173,7 +191,12 @@ async function runInit(
       if (!value || value.trim().length === 0) {
         return "Typings path cannot be empty";
       }
-      return undefined;
+      try {
+        AbsolutePath.from(value.trim());
+        return undefined;
+      } catch {
+        return "Invalid path, must be a valid absolute or relative path";
+      }
     },
   });
 
@@ -184,9 +207,11 @@ async function runInit(
 
   // Build config object
   const configData: ConfigData = {
-    pulledArtifactsPath,
-    typingsPath,
-    compilationOutputPath,
+    pulledArtifactsPath: AbsolutePath.from(pulledArtifactsPath),
+    typingsPath: AbsolutePath.from(typingsPath),
+    compilationOutputPath: compilationOutputPath
+      ? AbsolutePath.from(compilationOutputPath.relativePath)
+      : undefined,
     projects: [projectConfigResult.project],
     debug: false,
   };
@@ -255,13 +280,13 @@ async function runInit(
   // Write config file
   try {
     await fs.writeFile(
-      configPath,
+      configPath.resolvedPath,
       JSON.stringify(configData, null, 2) + "\n",
       "utf-8",
     );
   } catch (error) {
     throw new CliError(
-      `Failed to write configuration file to ${configPath}. ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to write configuration file to ${configPath.resolvedPath}. ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -600,7 +625,7 @@ async function promptAwsS3Config(
  * @returns The list of suggested compilation output paths with labels for user selection
  */
 async function deriveCompilationOutputPathsOptions(): Promise<
-  { path: string; label: string }[]
+  { path: RelativePath; label: string }[]
 > {
   // Existence of
   // - hardhat.config.{js,ts}
@@ -614,7 +639,7 @@ async function deriveCompilationOutputPathsOptions(): Promise<
   // - out/ directory
   // -> suggest ./out because likely a Foundry project
 
-  const options: { path: string; label: string }[] = [];
+  const options: { path: RelativePath; label: string }[] = [];
 
   const hardhatConfigExists = await fs
     .stat(path.resolve(process.cwd(), "hardhat.config.js"))
@@ -657,7 +682,10 @@ async function deriveCompilationOutputPathsOptions(): Promise<
     hardhatDependencyExists ||
     artifactsDirExists
   ) {
-    options.push({ path: "./artifacts", label: "Hardhat default output" });
+    options.push({
+      path: RelativePath.unsafeFrom("./artifacts"),
+      label: "Hardhat default output",
+    });
   }
 
   const foundryConfigExists = await fs
@@ -676,7 +704,10 @@ async function deriveCompilationOutputPathsOptions(): Promise<
     .catch(() => false);
 
   if (foundryConfigExists || libDirExists || outDirExists) {
-    options.push({ path: "./out", label: "Foundry default output" });
+    options.push({
+      path: RelativePath.unsafeFrom("./out"),
+      label: "Foundry default output",
+    });
   }
 
   return options;

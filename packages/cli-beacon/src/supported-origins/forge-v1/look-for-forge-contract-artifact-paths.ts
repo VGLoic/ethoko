@@ -3,13 +3,14 @@ import { toAsyncResult } from "@/utils/result";
 import { ForgeCompilerContractOutputSchema } from "@/supported-origins/forge-v1/schemas";
 import z from "zod";
 import { lookForContractArtifactPath } from "@/supported-origins/utils/look-for-contract-artifact-path";
+import { AbsolutePath } from "@/utils/path";
 
 export async function* lookForForgeContractArtifactPath(
-  rootArtifactsFolderPath: string,
+  rootArtifactsFolderPath: AbsolutePath,
   buildInfoContractPaths: Map<string, string>,
   debug: boolean,
 ): AsyncIterable<{
-  localArtifactPath: string; // Relative path in artifacts output
+  artifactPath: AbsolutePath;
   fullyQualifiedName: {
     path: string;
     name: string;
@@ -20,16 +21,18 @@ export async function* lookForForgeContractArtifactPath(
     rootArtifactsFolderPath,
   )) {
     const contractContentResult = await toAsyncResult(
-      fs.readFile(contractArtifactPath, "utf-8").then((content) => {
-        const rawParsing = JSON.parse(content);
-        return ForgeCompilerContractOutputSchema.parse(rawParsing);
-      }),
+      fs
+        .readFile(contractArtifactPath.resolvedPath, "utf-8")
+        .then((content) => {
+          const rawParsing = JSON.parse(content);
+          return ForgeCompilerContractOutputSchema.parse(rawParsing);
+        }),
       { debug },
     );
     if (!contractContentResult.success) {
       if (debug) {
         console.error(
-          `Failed to parse contract artifact at path "${contractArtifactPath}". Skipping it. Error: ${contractContentResult.error}`,
+          `Failed to parse contract artifact at path "${contractArtifactPath.resolvedPath}". Skipping it. Error: ${contractContentResult.error}`,
         );
       }
       continue;
@@ -41,7 +44,7 @@ export async function* lookForForgeContractArtifactPath(
     let contractName: string;
     // @dev we retrieve the name and path from the `compilationTarget` field
     // An exception is made for `console2.sol` helper "contract" because the format is different, I don't know why
-    if (contractArtifactPath.endsWith("console2.json")) {
+    if (contractArtifactPath.resolvedPath.endsWith("console2.json")) {
       contractPath = "lib/forge-std/src/console2.sol";
       contractName = "console2";
     } else {
@@ -52,7 +55,7 @@ export async function* lookForForgeContractArtifactPath(
       if (!targetEntry || compilationTargetEntries.length > 1) {
         if (debug) {
           console.error(
-            `No compilation target found or too many targets for contract "${contractArtifactPath}". Skipping it.`,
+            `No compilation target found or too many targets for contract "${contractArtifactPath.resolvedPath}". Skipping it.`,
           );
         }
         continue;
@@ -67,7 +70,7 @@ export async function* lookForForgeContractArtifactPath(
     if (expectedContractPath != contractPath) {
       if (debug) {
         console.error(
-          `Found an artifact belonging to another compilation for contract "${contractArtifactPath}". Skipping it.`,
+          `Found an artifact belonging to another compilation for contract "${contractArtifactPath.resolvedPath}". Skipping it.`,
         );
       }
       continue;
@@ -77,7 +80,7 @@ export async function* lookForForgeContractArtifactPath(
         name: contractName,
         path: contractPath,
       },
-      localArtifactPath: contractArtifactPath,
+      artifactPath: contractArtifactPath,
       contract,
     };
   }

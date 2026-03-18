@@ -12,6 +12,7 @@ import {
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { deriveAllAbsolutePathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 import { CommandLogger } from "@/ui";
+import { AbsolutePath } from "@/utils/path";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Restore E2E Tests (%s)",
@@ -19,15 +20,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     const logger = new CommandLogger(true);
     storageProviderTest.scoped({ storageProviderFactory });
 
-    let tempOutputDir: string;
+    let tempOutputDir: AbsolutePath;
 
     beforeEach(async () => {
-      tempOutputDir = await fs.mkdtemp(
+      const tempOutputDirName = await fs.mkdtemp(
         path.join(os.tmpdir(), TEST_CONSTANTS.PATHS.TEMP_DIR_PREFIX),
       );
+      tempOutputDir = AbsolutePath.from(tempOutputDirName);
 
       return async () => {
-        await fs.rm(tempOutputDir, { recursive: true, force: true });
+        await fs.rm(tempOutputDir.resolvedPath, {
+          recursive: true,
+          force: true,
+        });
       };
     });
 
@@ -68,7 +73,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             },
           );
 
-          const outputPath = path.join(tempOutputDir, "absolute-path-test");
+          const outputPath = tempOutputDir.join("absolute-path-test");
           const result = await restore(
             { project, search: { type: "tag", tag } },
             outputPath,
@@ -80,64 +85,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           expect(result.filesRestored.length).toBeGreaterThan(0);
           expect(result.outputPath).toBe(outputPath);
 
-          const stat = await fs.stat(outputPath);
-          expect(stat.isDirectory()).toBe(true);
-        },
-      );
-
-      storageProviderTest(
-        "restore to relative path",
-        async ({ storageProvider, pulledArtifactStore }) => {
-          const project = createTestProjectName(
-            TEST_CONSTANTS.PROJECTS.DEFAULT,
-          );
-          const tag = TEST_CONSTANTS.TAGS.V1;
-          const artifactFixture =
-            TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
-
-          await pulledArtifactStore.ensureProjectSetup(project);
-
-          await push(
-            artifactFixture.folderPath,
-            project,
-            tag,
-            storageProvider,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
-          );
-
-          await pull(
-            project,
-            { type: "tag", tag },
-            storageProvider,
-            pulledArtifactStore,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
-          );
-
-          const relativeOutputPath = path.join(
-            path.relative(process.cwd(), tempOutputDir),
-            "relative-path-test",
-          );
-          const outputPath = path.resolve(relativeOutputPath);
-          const result = await restore(
-            { project, search: { type: "tag", tag } },
-            relativeOutputPath,
-            storageProvider,
-            pulledArtifactStore,
-            { force: false, debug: false, logger },
-          );
-
-          expect(result.filesRestored.length).toBeGreaterThan(0);
-          expect(result.outputPath).toBe(outputPath);
-
-          const stat = await fs.stat(outputPath);
+          const stat = await fs.stat(outputPath.resolvedPath);
           expect(stat.isDirectory()).toBe(true);
         },
       );
@@ -178,9 +126,12 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             },
           );
 
-          const outputPath = path.join(tempOutputDir, "existing-dir-test");
-          await fs.mkdir(outputPath, { recursive: true });
-          await fs.writeFile(path.join(outputPath, "dummy.txt"), "content");
+          const outputPath = tempOutputDir.join("existing-dir-test");
+          await fs.mkdir(outputPath.resolvedPath, { recursive: true });
+          await fs.writeFile(
+            outputPath.join("dummy.txt").resolvedPath,
+            "content",
+          );
 
           await expect(
             restore(
@@ -230,9 +181,12 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             },
           );
 
-          const outputPath = path.join(tempOutputDir, "force-overwrite-test");
-          await fs.mkdir(outputPath, { recursive: true });
-          await fs.writeFile(path.join(outputPath, "dummy.txt"), "content");
+          const outputPath = tempOutputDir.join("force-overwrite-test");
+          await fs.mkdir(outputPath.resolvedPath, { recursive: true });
+          await fs.writeFile(
+            outputPath.join("dummy.txt").resolvedPath,
+            "content",
+          );
 
           const result = await restore(
             { project, search: { type: "tag", tag } },
@@ -252,7 +206,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           const project = createTestProjectName(
             TEST_CONSTANTS.PROJECTS.DEFAULT,
           );
-          const outputPath = path.join(tempOutputDir, "not-pulled-test");
+          const outputPath = tempOutputDir.join("not-pulled-test");
 
           await pulledArtifactStore.ensureProjectSetup(project);
 
@@ -271,7 +225,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       storageProviderTest(
         "error: invalid project",
         async ({ storageProvider, pulledArtifactStore }) => {
-          const outputPath = path.join(tempOutputDir, "invalid-project-test");
+          const outputPath = tempOutputDir.join("invalid-project-test");
 
           await expect(
             restore(
@@ -315,7 +269,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           },
         );
 
-        const outputPath = path.join(tempOutputDir, `${tag}-tag-test`);
+        const outputPath = tempOutputDir.join(`${tag}-tag-test`);
         const result = await restore(
           { project, search: { type: "tag", tag } },
           outputPath,
@@ -329,14 +283,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const expectedOriginalAbsolutePaths =
           await deriveAllAbsolutePathsInDirectory(artifactFixture.folderPath);
         const expectedRelativePaths = expectedOriginalAbsolutePaths.map((p) =>
-          path.relative(artifactFixture.folderPath, p),
+          p.relativeTo(artifactFixture.folderPath),
         );
 
         expect(result.filesRestored.length).toBe(expectedRelativePaths.length);
 
         for (const expectedRelativePath of expectedRelativePaths) {
-          const fullPath = path.join(outputPath, expectedRelativePath);
-          const stat = await fs.stat(fullPath);
+          const fullPath = outputPath.join(expectedRelativePath);
+          const stat = await fs.stat(fullPath.resolvedPath);
           expect(stat.isFile()).toBe(true);
         }
       },
@@ -373,7 +327,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           },
         );
 
-        const outputPath = path.join(tempOutputDir, `${artifactId}-id-test`);
+        const outputPath = tempOutputDir.join(`${artifactId}-id-test`);
         const result = await restore(
           { project, search: { type: "id", id: artifactId } },
           outputPath,
@@ -388,14 +342,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const expectedOriginalAbsolutePaths =
           await deriveAllAbsolutePathsInDirectory(artifactFixture.folderPath);
         const expectedRelativePaths = expectedOriginalAbsolutePaths.map((p) =>
-          path.relative(artifactFixture.folderPath, p),
+          p.relativeTo(artifactFixture.folderPath),
         );
 
         expect(result.filesRestored.length).toBe(expectedRelativePaths.length);
 
         for (const expectedRelativePath of expectedRelativePaths) {
-          const fullPath = path.join(outputPath, expectedRelativePath);
-          const stat = await fs.stat(fullPath);
+          const fullPath = outputPath.join(expectedRelativePath);
+          const stat = await fs.stat(fullPath.resolvedPath);
           expect(stat.isFile()).toBe(true);
         }
       },

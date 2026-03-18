@@ -7,6 +7,7 @@ import {
   S3BucketProvider,
 } from "@/storage-provider";
 import { TEST_CONSTANTS } from "./test-constants";
+import { AbsolutePath } from "@/utils/path";
 
 export abstract class StorageProviderFactory<
   T extends StorageProvider = StorageProvider,
@@ -29,7 +30,7 @@ export class TestFilesystemStorageProviderFactory extends StorageProviderFactory
     );
 
     const storageProvider = new FilesystemStorageProvider({
-      path: tempDir,
+      path: AbsolutePath.from(tempDir),
       debug: this.debug,
     });
 

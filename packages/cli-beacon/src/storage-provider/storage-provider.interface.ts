@@ -3,6 +3,7 @@ import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
 } from "../ethoko-artifacts/v0";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 /**
  * Storage providers implement the persistence layer for Ethoko artifacts.
@@ -23,7 +24,7 @@ export interface StorageProvider {
   /** List available artifact IDs for a project. */
   listIds(project: string): Promise<string[]>;
   /** List paths under the original content folder for an artifact ID. */
-  listOriginalContent(project: string, id: string): Promise<string[]>;
+  listOriginalContent(project: string, id: string): Promise<RelativePath[]>;
   /** Check if a tag manifest exists for a project. */
   hasArtifactByTag(project: string, tag: string): Promise<boolean>;
   /** Check if an artifact ID exists for a project. */
@@ -34,7 +35,7 @@ export interface StorageProvider {
     inputArtifact: EthokoInputArtifact,
     contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContent: { rootPath: string; paths: string[] },
+    originalContent: { rootPath: AbsolutePath; paths: RelativePath[] },
   ): Promise<void>;
   /** Download input/output artifact streams by ID. */
   downloadArtifactById(
@@ -65,6 +66,6 @@ export interface StorageProvider {
   downloadOriginalContent(
     project: string,
     id: string,
-    relativePath: string,
+    relativePath: RelativePath,
   ): Promise<Stream>;
 }

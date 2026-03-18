@@ -9,6 +9,7 @@ import type { EthokoCliConfig } from "../config/config.js";
 import { createStorageProvider } from "./utils/storage-provider.js";
 import { toAsyncResult } from "@/utils/result.js";
 import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
+import { AbsolutePathSchema } from "@/utils/path.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -81,7 +82,8 @@ export function registerRestoreCommand(
             .min(
               1,
               'The "output" cannot be empty. Provide a valid output directory path.',
-            ),
+            )
+            .pipe(AbsolutePathSchema),
           force: z
             .boolean('The "force" option must be a boolean')
             .default(false),

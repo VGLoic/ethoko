@@ -1,6 +1,5 @@
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import path from "node:path";
 
 import { Command } from "commander";
 import { z } from "zod";
@@ -10,6 +9,7 @@ import {
   detectInstallMethod,
   type InstallMethod,
 } from "./utils/installation.js";
+import { AbsolutePath } from "@/utils/path.js";
 
 const UNINSTALL_INSTRUCTIONS: Record<Exclude<InstallMethod, "curl">, string> = {
   "npm-global": "npm uninstall -g @ethoko/cli",
@@ -24,12 +24,12 @@ const UNINSTALL_INSTRUCTIONS: Record<Exclude<InstallMethod, "curl">, string> = {
  */
 async function removePathFromProfile(
   logger: CommandLogger,
-  profilePath: string,
+  profilePath: AbsolutePath,
   opts: { debug: boolean },
 ): Promise<boolean> {
   let contents: string;
   try {
-    contents = await readFile(profilePath, "utf8");
+    contents = await readFile(profilePath.resolvedPath, "utf8");
   } catch (err) {
     if (opts.debug) {
       logger.info(`Skipped missing profile ${profilePath}`);
@@ -47,7 +47,7 @@ async function removePathFromProfile(
     return false;
   }
 
-  await writeFile(profilePath, updated, "utf8");
+  await writeFile(profilePath.resolvedPath, updated, "utf8");
   return true;
 }
 
@@ -56,11 +56,11 @@ async function removePathFromProfile(
  */
 async function removeInstallDirectory(
   logger: CommandLogger,
-  installDir: string,
+  installDir: AbsolutePath,
   opts: { debug: boolean },
 ): Promise<void> {
   try {
-    await stat(installDir);
+    await stat(installDir.resolvedPath);
   } catch (err) {
     if (opts.debug) {
       logger.info(`Install directory not found: ${installDir}`);
@@ -69,7 +69,7 @@ async function removeInstallDirectory(
     return;
   }
 
-  await rm(installDir, { recursive: true, force: true });
+  await rm(installDir.resolvedPath, { recursive: true, force: true });
 }
 
 /**
@@ -134,18 +134,18 @@ Proceed with uninstallation?`,
       }
 
       try {
-        const installDir = path.join(homedir(), ".ethoko");
+        const installDir = AbsolutePath.from(homedir(), ".ethoko");
         await removeInstallDirectory(logger, installDir, opts);
 
         const profiles = [
-          path.join(homedir(), ".bashrc"),
-          path.join(homedir(), ".zshrc"),
+          AbsolutePath.from(homedir(), ".bashrc"),
+          AbsolutePath.from(homedir(), ".zshrc"),
         ];
 
         for (const profile of profiles) {
           const removed = await removePathFromProfile(logger, profile, opts);
           if (opts.debug && removed) {
-            logger.info(`Removed PATH entry from ${profile}`);
+            logger.info(`Removed PATH entry from ${profile.resolvedPath}`);
           }
         }
 

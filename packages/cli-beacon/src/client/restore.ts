@@ -1,17 +1,17 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store";
 import { StorageProvider } from "@/storage-provider";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import { CommandLogger } from "@/ui";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 export type RestoreResult = {
   project: string;
   tag: string | null;
   id: string;
-  filesRestored: string[];
-  outputPath: string;
+  filesRestored: RelativePath[];
+  outputPath: AbsolutePath;
 };
 
 export async function restore(
@@ -19,7 +19,7 @@ export async function restore(
     project: string;
     search: { type: "tag"; tag: string } | { type: "id"; id: string };
   },
-  outputPath: string,
+  outputPath: AbsolutePath,
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { force: boolean; debug: boolean; logger: CommandLogger },
@@ -74,19 +74,21 @@ export async function restore(
   spinner1.succeed("Artifact identified");
 
   const spinner2 = opts.logger.createSpinner("Checking output directory...");
-  const resolvedOutputPath = path.resolve(outputPath);
-  const outputStatResult = await toAsyncResult(fs.stat(resolvedOutputPath), {
-    debug: opts.debug,
-  });
+  const outputStatResult = await toAsyncResult(
+    fs.stat(outputPath.resolvedPath),
+    {
+      debug: opts.debug,
+    },
+  );
   if (outputStatResult.success) {
     if (!outputStatResult.value.isDirectory()) {
       spinner2.fail("Output path is not a directory");
       throw new CliError(
-        `Output path "${resolvedOutputPath}" exists but is not a directory`,
+        `Output path "${outputPath}" exists but is not a directory`,
       );
     }
     const outputEntriesResult = await toAsyncResult(
-      fs.readdir(resolvedOutputPath),
+      fs.readdir(outputPath.resolvedPath),
       {
         debug: opts.debug,
       },
@@ -94,24 +96,24 @@ export async function restore(
     if (!outputEntriesResult.success) {
       spinner2.fail("Failed to read output directory");
       throw new CliError(
-        `Unable to read output directory "${resolvedOutputPath}". Run with debug mode for more info`,
+        `Unable to read output directory "${outputPath}". Run with debug mode for more info`,
       );
     }
     if (outputEntriesResult.value.length > 0 && !opts.force) {
       spinner2.fail("Output directory is not empty");
       throw new CliError(
-        `Output directory "${resolvedOutputPath}" is not empty. Use the --force flag to overwrite`,
+        `Output directory "${outputPath}" is not empty. Use the --force flag to overwrite`,
       );
     }
     if (outputEntriesResult.value.length > 0 && opts.force) {
       const removeResult = await toAsyncResult(
-        fs.rm(resolvedOutputPath, { recursive: true, force: true }),
+        fs.rm(outputPath.resolvedPath, { recursive: true, force: true }),
         { debug: opts.debug },
       );
       if (!removeResult.success) {
         spinner2.fail("Failed to clear output directory");
         throw new CliError(
-          `Unable to clear output directory "${resolvedOutputPath}". Run with debug mode for more info`,
+          `Unable to clear output directory "${outputPath}". Run with debug mode for more info`,
         );
       }
     }
@@ -125,17 +127,17 @@ export async function restore(
   ) {
     spinner2.fail("Failed to access output directory");
     throw new CliError(
-      `Unable to access output directory "${resolvedOutputPath}". Run with debug mode for more info`,
+      `Unable to access output directory "${outputPath}". Run with debug mode for more info`,
     );
   }
   const mkdirOutputResult = await toAsyncResult(
-    fs.mkdir(resolvedOutputPath, { recursive: true }),
+    fs.mkdir(outputPath.resolvedPath, { recursive: true }),
     { debug: opts.debug },
   );
   if (!mkdirOutputResult.success) {
     spinner2.fail("Failed to create output directory");
     throw new CliError(
-      `Unable to create output directory "${resolvedOutputPath}". Run with debug mode for more info`,
+      `Unable to create output directory "${outputPath}". Run with debug mode for more info`,
     );
   }
   spinner2.succeed("Output directory ready");
@@ -179,9 +181,9 @@ export async function restore(
         );
       }
 
-      const targetPath = path.join(resolvedOutputPath, relativePath);
+      const targetPath = outputPath.join(relativePath);
       const mkdirResult = await toAsyncResult(
-        fs.mkdir(path.dirname(targetPath), { recursive: true }),
+        fs.mkdir(targetPath.dirname().resolvedPath, { recursive: true }),
         { debug: opts.debug },
       );
       if (!mkdirResult.success) {
@@ -191,7 +193,7 @@ export async function restore(
       }
 
       const writeResult = await toAsyncResult(
-        fs.writeFile(targetPath, downloadResult.value),
+        fs.writeFile(targetPath.resolvedPath, downloadResult.value),
         { debug: opts.debug },
       );
       if (!writeResult.success) {
@@ -213,6 +215,6 @@ export async function restore(
     tag: artifact.search.type === "tag" ? artifact.search.tag : null,
     id: artifactId,
     filesRestored: downloadResults,
-    outputPath: resolvedOutputPath,
+    outputPath,
   };
 }

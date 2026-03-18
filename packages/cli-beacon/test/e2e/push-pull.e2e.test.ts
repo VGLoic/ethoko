@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-import path from "path";
 import { describe, expect } from "vitest";
 import { listPulledArtifacts, pull, push } from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
@@ -79,12 +78,12 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         );
 
         const expectedBuildInfoPaths = await deriveAllAbsolutePathsInDirectory(
-          path.join(artifactFixture.folderPath, "build-info"),
+          artifactFixture.folderPath.join("build-info"),
         );
         const expectedOriginalIds = await Promise.all(
           expectedBuildInfoPaths.map((path) =>
             fs
-              .readFile(path, "utf-8")
+              .readFile(path.resolvedPath, "utf-8")
               .then((c) => JSON.parse(c) as { id: string })
               .then((json) => json.id),
           ),

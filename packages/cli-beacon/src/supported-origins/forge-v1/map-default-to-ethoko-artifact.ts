@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-import path from "path";
 import { deriveEthokoArtifactId } from "@/ethoko-artifacts/derive-ethoko-artifact-id";
 import {
   EthokoContractOutputArtifact,
@@ -14,6 +13,7 @@ import {
 } from "@/solc-artifacts/v0.8.33/input-json";
 import { SolcContractSchema } from "@/solc-artifacts/v0.8.33/output-json";
 import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-artifact-paths";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 type SolcContractOutput = z.infer<typeof SolcContractSchema>;
 /**
@@ -40,20 +40,20 @@ type SolcContractOutput = z.infer<typeof SolcContractSchema>;
  * @param debug Whether to enable debug logging
  */
 export async function mapForgeV1DefaultArtifactToEthokoArtifact(
-  buildInfoPath: string,
+  buildInfoPath: AbsolutePath,
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContent: { rootPath: string; paths: string[] };
+  originalContent: { rootPath: AbsolutePath; paths: RelativePath[] };
 }> {
   const jsonContent = await fs
-    .readFile(buildInfoPath, "utf-8")
+    .readFile(buildInfoPath.resolvedPath, "utf-8")
     .then(JSON.parse)
     .catch((error) => {
       if (debug) {
         console.error(
-          `Failed to read or parse the build info file "${buildInfoPath}". Error: ${error}`,
+          `Failed to read or parse the build info file "${buildInfoPath.resolvedPath}". Error: ${error}`,
         );
       }
       throw error;
@@ -64,7 +64,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   if (!buildInfoParsingResult.success) {
     if (debug) {
       console.error(
-        `Failed to parse the build info file "${buildInfoPath}" as a Forge v1 default compiler output format. Error: ${buildInfoParsingResult.error}`,
+        `Failed to parse the build info file "${buildInfoPath.resolvedPath}" as a Forge v1 default compiler output format. Error: ${buildInfoParsingResult.error}`,
       );
     }
     throw buildInfoParsingResult.error;
@@ -79,11 +79,11 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
     throw new Error("Empty build info file");
   }
 
-  const buildInfoFolder = path.dirname(buildInfoPath);
-  const rootArtifactsFolder = path.dirname(buildInfoFolder);
+  const buildInfoFolder = buildInfoPath.dirname();
+  const rootArtifactsFolder = buildInfoFolder.dirname();
 
   // We keep track of the additional artifacts paths to return them at the end
-  const additionalArtifactsPaths: string[] = [];
+  const additionalArtifactsPaths: AbsolutePath[] = [];
 
   const rebuiltSourceIdToPath = new Map<string, string>();
   let solcLongVersion: string | undefined = undefined;
@@ -101,7 +101,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   > = {};
   for await (const {
     fullyQualifiedName,
-    localArtifactPath,
+    artifactPath,
     contract,
   } of lookForForgeContractArtifactPath(
     rootArtifactsFolder,
@@ -110,7 +110,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
   )) {
     // We register the visiter contract path with the ID
     rebuiltSourceIdToPath.set(contract.id.toString(), fullyQualifiedName.path);
-    additionalArtifactsPaths.push(localArtifactPath);
+    additionalArtifactsPaths.push(artifactPath);
 
     const contractMetadata = contract.metadata;
     const contractRawMetadata = contract.rawMetadata;
@@ -267,7 +267,7 @@ export async function mapForgeV1DefaultArtifactToEthokoArtifact(
       rootPath: rootArtifactsFolder,
       paths: additionalArtifactsPaths
         .concat(buildInfoPath)
-        .map((p) => path.relative(rootArtifactsFolder, p)),
+        .map((p) => p.relativeTo(rootArtifactsFolder)),
     },
   };
 }

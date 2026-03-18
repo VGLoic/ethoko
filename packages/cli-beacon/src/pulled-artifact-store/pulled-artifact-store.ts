@@ -10,6 +10,7 @@ import {
   TagManifestSchema,
 } from "../ethoko-artifacts/v0";
 import { Dirent } from "fs";
+import { AbsolutePath } from "@/utils/path";
 
 /**
  * Store implementation for pulled artifacts on the local filesystem.
@@ -22,9 +23,9 @@ import { Dirent } from "fs";
  * - {project}/tags/{tag}.json (manifest: { id })
  */
 export class PulledArtifactStore {
-  public readonly rootPath: string;
+  public readonly rootPath: AbsolutePath;
 
-  constructor(rootPath: string) {
+  constructor(rootPath: AbsolutePath) {
     this.rootPath = rootPath;
   }
 
@@ -35,7 +36,7 @@ export class PulledArtifactStore {
    * @returns True if the ID exists, false otherwise.
    */
   public async hasId(project: string, id: string): Promise<boolean> {
-    return this.exists(`${this.rootPath}/${project}/ids/${id}`);
+    return this.exists(this.rootPath.join(project, "ids", id));
   }
 
   /**
@@ -45,7 +46,7 @@ export class PulledArtifactStore {
    * @returns True if the tag exists, false otherwise.
    */
   public async hasTag(project: string, tag: string): Promise<boolean> {
-    return this.exists(`${this.rootPath}/${project}/tags/${tag}.json`);
+    return this.exists(this.tagPath(project, tag));
   }
 
   /**
@@ -53,7 +54,9 @@ export class PulledArtifactStore {
    * @returns The list of project names.
    */
   public async listProjects(): Promise<string[]> {
-    const entries = await fs.readdir(this.rootPath, { withFileTypes: true });
+    const entries = await fs.readdir(this.rootPath.resolvedPath, {
+      withFileTypes: true,
+    });
     return entries
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
@@ -70,7 +73,7 @@ export class PulledArtifactStore {
       lastModifiedAt: string;
     }[]
   > {
-    const entries = await fs.readdir(`${this.rootPath}/${project}/ids`, {
+    const entries = await fs.readdir(this.idsPath(project).resolvedPath, {
       withFileTypes: true,
     });
     const ids = entries
@@ -78,7 +81,7 @@ export class PulledArtifactStore {
       .map((entry) => entry.name);
     const statsPromises = ids.map((id) =>
       fs
-        .stat(`${this.rootPath}/${project}/ids/${id}`)
+        .stat(this.idPath(project, id).resolvedPath)
         .then((stat) => ({ id, stat })),
     );
     const allStats = await Promise.all(statsPromises);
@@ -100,7 +103,7 @@ export class PulledArtifactStore {
       lastModifiedAt: string;
     }[]
   > {
-    const entries = await fs.readdir(`${this.rootPath}/${project}/tags`, {
+    const entries = await fs.readdir(this.tagsPath(project).resolvedPath, {
       withFileTypes: true,
     });
     const tags = [];
@@ -111,7 +114,7 @@ export class PulledArtifactStore {
     }
     const statsPromises = tags.map((tag) =>
       fs
-        .stat(`${this.rootPath}/${project}/tags/${tag}.json`)
+        .stat(this.tagPath(project, tag).resolvedPath)
         .then((stat) => ({ tag, stat })),
     );
     const allStats = await Promise.all(statsPromises);
@@ -136,19 +139,16 @@ export class PulledArtifactStore {
       contractName: string;
     }[]
   > {
-    const jsonFilePaths: string[] = [];
+    const jsonFilePaths: AbsolutePath[] = [];
     await this.collectJsonFilePaths(
-      `${this.rootPath}/${project}/ids/${id}/outputs`,
+      this.outputsPath(project, id),
       jsonFilePaths,
     );
     const contractArtifacts: { sourceName: string; contractName: string }[] =
       [];
     for (const filePath of jsonFilePaths) {
-      const relativePath = path.relative(
-        `${this.rootPath}/${project}/ids/${id}/outputs`,
-        filePath,
-      );
-      const items = relativePath.split(path.sep);
+      const relativePath = filePath.relativeTo(this.outputsPath(project, id));
+      const items = relativePath.relativePath.split(path.sep);
       const contractNameWithExtension = items.pop();
       if (
         !contractNameWithExtension ||
@@ -186,22 +186,30 @@ export class PulledArtifactStore {
       }[];
     },
   ): Promise<void> {
-    const idDir = `${this.rootPath}/${project}/ids/${id}`;
-    await fs.mkdir(idDir, { recursive: true });
+    const idDir = this.idPath(project, id);
+    await fs.mkdir(idDir.resolvedPath, { recursive: true });
     const promises = [
-      fs.writeFile(`${idDir}/input.json`, artifacts.input),
+      fs.writeFile(
+        this.inputArtifactPath(project, id).resolvedPath,
+        artifacts.input,
+      ),
       ...artifacts.outputs.map(({ sourceName, contractName, stream }) => {
-        const contractPath = `${idDir}/outputs/${sourceName}/${contractName}.json`;
+        const contractPath = this.contractOutputPath(
+          project,
+          id,
+          sourceName,
+          contractName,
+        );
         return fs
-          .mkdir(path.dirname(contractPath), { recursive: true })
-          .then(() => fs.writeFile(contractPath, stream));
+          .mkdir(contractPath.dirname().resolvedPath, { recursive: true })
+          .then(() => fs.writeFile(contractPath.resolvedPath, stream));
       }),
     ];
     if (tag) {
       const manifest: TagManifest = { id };
       promises.push(
         fs.writeFile(
-          `${this.rootPath}/${project}/tags/${tag}.json`,
+          this.tagPath(project, tag).resolvedPath,
           JSON.stringify(manifest),
         ),
       );
@@ -213,9 +221,9 @@ export class PulledArtifactStore {
         settlement.status === "rejected",
     );
     if (firstRejection) {
-      await fs.rm(idDir, { recursive: true, force: true });
+      await fs.rm(idDir.resolvedPath, { recursive: true, force: true });
       if (tag) {
-        await fs.rm(`${this.rootPath}/${project}/tags/${tag}.json`, {
+        await fs.rm(this.tagPath(project, tag).resolvedPath, {
           force: true,
         });
       }
@@ -234,7 +242,7 @@ export class PulledArtifactStore {
     id: string,
   ): Promise<EthokoInputArtifact> {
     const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/ids/${id}/input.json`,
+      this.inputArtifactPath(project, id).resolvedPath,
       "utf-8",
     );
     const rawArtifact = JSON.parse(artifactContent);
@@ -256,7 +264,8 @@ export class PulledArtifactStore {
     contractName: string,
   ): Promise<EthokoContractOutputArtifact> {
     const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/ids/${id}/outputs/${sourceName}/${contractName}.json`,
+      this.contractOutputPath(project, id, sourceName, contractName)
+        .resolvedPath,
       "utf-8",
     );
     const rawArtifact = JSON.parse(artifactContent);
@@ -274,7 +283,7 @@ export class PulledArtifactStore {
     tag: string,
   ): Promise<string> {
     const artifactContent = await fs.readFile(
-      `${this.rootPath}/${project}/tags/${tag}.json`,
+      this.tagPath(project, tag).resolvedPath,
       "utf-8",
     );
     const rawArtifact = JSON.parse(artifactContent);
@@ -288,7 +297,7 @@ export class PulledArtifactStore {
   public async ensureSetup(): Promise<void> {
     const doesRootPathExist = await this.exists(this.rootPath);
     if (!doesRootPathExist) {
-      await fs.mkdir(this.rootPath, { recursive: true });
+      await fs.mkdir(this.rootPath.resolvedPath, { recursive: true });
     }
   }
 
@@ -299,35 +308,74 @@ export class PulledArtifactStore {
   public async ensureProjectSetup(project: string): Promise<void> {
     const pathsToEnsure = [
       this.rootPath,
-      `${this.rootPath}/${project}`,
-      `${this.rootPath}/${project}/ids`,
-      `${this.rootPath}/${project}/tags`,
+      this.projectPath(project),
+      this.idsPath(project),
+      this.tagsPath(project),
     ];
     for (const path of pathsToEnsure) {
       const doesPathExist = await this.exists(path);
       if (!doesPathExist) {
-        await fs.mkdir(path, { recursive: true });
+        await fs.mkdir(path.resolvedPath, { recursive: true });
       }
     }
   }
+  private projectPath(project: string): AbsolutePath {
+    return this.rootPath.join(project);
+  }
 
-  private exists(path: string): Promise<boolean> {
+  private idsPath(project: string): AbsolutePath {
+    return this.projectPath(project).join("ids");
+  }
+
+  private idPath(project: string, id: string): AbsolutePath {
+    return this.idsPath(project).join(id);
+  }
+
+  private inputArtifactPath(project: string, id: string): AbsolutePath {
+    return this.idPath(project, id).join("input.json");
+  }
+
+  private outputsPath(project: string, id: string): AbsolutePath {
+    return this.idPath(project, id).join("outputs");
+  }
+
+  private contractOutputPath(
+    project: string,
+    id: string,
+    sourceName: string,
+    contractName: string,
+  ): AbsolutePath {
+    return this.outputsPath(project, id).join(
+      sourceName,
+      `${contractName}.json`,
+    );
+  }
+
+  private tagsPath(project: string): AbsolutePath {
+    return this.projectPath(project).join("tags");
+  }
+
+  private tagPath(project: string, tag: string): AbsolutePath {
+    return this.tagsPath(project).join(`${tag}.json`);
+  }
+
+  private exists(path: AbsolutePath): Promise<boolean> {
     return fs
-      .stat(path)
+      .stat(path.resolvedPath)
       .then(() => true)
       .catch(() => false);
   }
 
   private async collectJsonFilePaths(
-    dirPath: string,
-    files: string[],
+    dirPath: AbsolutePath,
+    files: AbsolutePath[],
   ): Promise<void> {
-    const entries = await this.safeReadDir(dirPath);
+    const entries = await this.safeReadDir(dirPath.resolvedPath);
     if (entries.length === 0) {
       return;
     }
     for (const entry of entries) {
-      const entryPath = path.join(dirPath, entry.name);
+      const entryPath = dirPath.join(entry.name);
       if (entry.isDirectory()) {
         await this.collectJsonFilePaths(entryPath, files);
       } else if (entry.isFile() && entry.name.endsWith(".json")) {

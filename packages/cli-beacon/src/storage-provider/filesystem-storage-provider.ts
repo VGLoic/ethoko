@@ -11,9 +11,10 @@ import {
   TagManifestSchema,
 } from "../ethoko-artifacts/v0";
 import { StorageProvider } from "./storage-provider.interface";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 type FilesystemStorageProviderConfig = {
-  path: string;
+  path: AbsolutePath;
   debug?: boolean;
 };
 
@@ -26,7 +27,7 @@ type FilesystemStorageProviderConfig = {
  * - {project}/tags/{tag}.json (manifest: { id })
  */
 export class FilesystemStorageProvider implements StorageProvider {
-  private readonly storagePath: string;
+  private readonly storagePath: AbsolutePath;
   private readonly debug: boolean;
 
   constructor(config: FilesystemStorageProviderConfig) {
@@ -34,7 +35,7 @@ export class FilesystemStorageProvider implements StorageProvider {
     this.debug = config.debug ?? false;
   }
 
-  public getPath(): string {
+  public getStoragePath(): AbsolutePath {
     return this.storagePath;
   }
 
@@ -57,17 +58,15 @@ export class FilesystemStorageProvider implements StorageProvider {
   public async listOriginalContent(
     project: string,
     id: string,
-  ): Promise<string[]> {
+  ): Promise<RelativePath[]> {
     const originalContentRoot = this.originalContentRootPath(project, id);
     const rootExists = await this.exists(originalContentRoot);
     if (!rootExists) {
       return [];
     }
-    const files: string[] = [];
+    const files: AbsolutePath[] = [];
     await this.collectJsonFilePaths(originalContentRoot, files);
-    return files.map((filePath) =>
-      path.relative(originalContentRoot, filePath),
-    );
+    return files.map((filePath) => filePath.relativeTo(originalContentRoot));
   }
 
   private async listContractOutputArtifacts(
@@ -75,12 +74,12 @@ export class FilesystemStorageProvider implements StorageProvider {
     id: string,
   ): Promise<{ sourceName: string; contractName: string }[]> {
     const outputsPath = this.contractOutputsPath(project, id);
-    const filePaths: string[] = [];
+    const filePaths: AbsolutePath[] = [];
     await this.collectJsonFilePaths(outputsPath, filePaths);
     const outputArtifacts: { sourceName: string; contractName: string }[] = [];
     for (const filePath of filePaths) {
-      const relativePath = path.relative(outputsPath, filePath);
-      const pathParts = relativePath.split(path.sep);
+      const relativePath = filePath.relativeTo(outputsPath);
+      const pathParts = relativePath.relativePath.split(path.sep);
       const contractNameWithExt = pathParts.pop();
       if (!contractNameWithExt || !contractNameWithExt.endsWith(".json")) {
         continue;
@@ -108,11 +107,11 @@ export class FilesystemStorageProvider implements StorageProvider {
     inputArtifact: EthokoInputArtifact,
     outputContractArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContent: { rootPath: string; paths: string[] },
+    originalContent: { rootPath: AbsolutePath; paths: RelativePath[] },
   ): Promise<void> {
     await this.ensureProjectSetup(project);
 
-    await fs.mkdir(this.idDirPath(project, inputArtifact.id), {
+    await fs.mkdir(this.idDirPath(project, inputArtifact.id).resolvedPath, {
       recursive: true,
     });
     await Promise.all([
@@ -124,11 +123,13 @@ export class FilesystemStorageProvider implements StorageProvider {
           artifact.contract,
         );
         return fs
-          .mkdir(path.dirname(contractPath), { recursive: true })
-          .then(() => fs.writeFile(contractPath, JSON.stringify(artifact)));
+          .mkdir(contractPath.dirname().resolvedPath, { recursive: true })
+          .then(() =>
+            fs.writeFile(contractPath.resolvedPath, JSON.stringify(artifact)),
+          );
       }),
       fs.writeFile(
-        this.inputFilePath(project, inputArtifact.id),
+        this.inputFilePath(project, inputArtifact.id).resolvedPath,
         JSON.stringify(inputArtifact),
       ),
     ]);
@@ -136,7 +137,7 @@ export class FilesystemStorageProvider implements StorageProvider {
     if (tag) {
       const tagFilePath = this.tagFilePath(project, tag);
       const manifest: TagManifest = { id: inputArtifact.id };
-      await fs.writeFile(tagFilePath, JSON.stringify(manifest));
+      await fs.writeFile(tagFilePath.resolvedPath, JSON.stringify(manifest));
     }
 
     for (const originalContentPath of originalContent.paths) {
@@ -146,7 +147,7 @@ export class FilesystemStorageProvider implements StorageProvider {
         originalContentPath,
       );
       await this.copyOriginalContent(
-        path.join(originalContent.rootPath, originalContentPath),
+        originalContent.rootPath.join(originalContentPath),
         targetPath,
       );
     }
@@ -177,7 +178,7 @@ export class FilesystemStorageProvider implements StorageProvider {
       id,
     );
     return {
-      input: createReadStream(this.inputFilePath(project, id)),
+      input: createReadStream(this.inputFilePath(project, id).resolvedPath),
       contractOutputArtifacts: contractOutputArtifacts.map((artifact) => ({
         sourceName: artifact.sourceName,
         contractName: artifact.contractName,
@@ -187,7 +188,7 @@ export class FilesystemStorageProvider implements StorageProvider {
             id,
             artifact.sourceName,
             artifact.contractName,
-          ),
+          ).resolvedPath,
         ),
       })),
     };
@@ -206,7 +207,10 @@ export class FilesystemStorageProvider implements StorageProvider {
     }[];
   }> {
     const tagFilePath = this.tagFilePath(project, tag);
-    const manifestContent = await fs.readFile(tagFilePath, "utf-8");
+    const manifestContent = await fs.readFile(
+      tagFilePath.resolvedPath,
+      "utf-8",
+    );
     const manifest = TagManifestSchema.parse(JSON.parse(manifestContent));
     const streams = await this.downloadArtifactById(project, manifest.id);
     return {
@@ -218,50 +222,48 @@ export class FilesystemStorageProvider implements StorageProvider {
   public async downloadOriginalContent(
     project: string,
     id: string,
-    relativePath: string,
+    relativePath: RelativePath,
   ): Promise<Stream> {
-    const filePath = path.join(
-      this.originalContentRootPath(project, id),
+    const filePath = this.originalContentRootPath(project, id).join(
       relativePath,
     );
-    return createReadStream(filePath);
+    return createReadStream(filePath.resolvedPath);
   }
 
-  private idsPath(project: string): string {
-    return path.join(this.storagePath, project, "ids");
+  private idsPath(project: string): AbsolutePath {
+    return this.storagePath.join(project, "ids");
   }
 
-  private tagsPath(project: string): string {
-    return path.join(this.storagePath, project, "tags");
+  private tagsPath(project: string): AbsolutePath {
+    return this.storagePath.join(project, "tags");
   }
 
-  private originalContentRootPath(project: string, id: string): string {
-    return path.join(this.idDirPath(project, id), "original");
+  private originalContentRootPath(project: string, id: string): AbsolutePath {
+    return this.idDirPath(project, id).join("original");
   }
 
-  private idDirPath(project: string, id: string): string {
-    return path.join(this.idsPath(project), id);
+  private idDirPath(project: string, id: string): AbsolutePath {
+    return this.idsPath(project).join(id);
   }
 
-  private tagFilePath(project: string, tag: string): string {
-    return path.join(this.tagsPath(project), `${tag}.json`);
+  private tagFilePath(project: string, tag: string): AbsolutePath {
+    return this.tagsPath(project).join(`${tag}.json`);
   }
 
   private originalContentPath(
     project: string,
     id: string,
-    sourcePath: string,
-  ): string {
-    const sanitized = this.sanitizePath(sourcePath);
-    return path.join(this.idDirPath(project, id), "original", sanitized);
+    sourcePath: RelativePath,
+  ): AbsolutePath {
+    return this.idDirPath(project, id).join("original", sourcePath);
   }
 
-  private inputFilePath(project: string, id: string): string {
-    return path.join(this.idDirPath(project, id), "input.json");
+  private inputFilePath(project: string, id: string): AbsolutePath {
+    return this.idDirPath(project, id).join("input.json");
   }
 
-  private contractOutputsPath(project: string, id: string): string {
-    return path.join(this.idDirPath(project, id), "outputs");
+  private contractOutputsPath(project: string, id: string): AbsolutePath {
+    return this.idDirPath(project, id).join("outputs");
   }
 
   private contractOutputFilePath(
@@ -269,70 +271,59 @@ export class FilesystemStorageProvider implements StorageProvider {
     id: string,
     sourceName: string,
     contract: string,
-  ): string {
-    return path.join(
-      this.contractOutputsPath(project, id),
+  ): AbsolutePath {
+    return this.contractOutputsPath(project, id).join(
       sourceName,
       `${contract}.json`,
     );
   }
 
-  private sanitizePath(filePath: string): string {
-    if (filePath.startsWith("/")) {
-      return filePath.substring(1);
-    }
-    if (filePath.startsWith("./")) {
-      return filePath.substring(2);
-    }
-    return filePath;
-  }
-
   private async copyOriginalContent(
-    sourcePath: string,
-    targetPath: string,
+    sourcePath: AbsolutePath,
+    targetPath: AbsolutePath,
   ): Promise<void> {
-    await fs.mkdir(path.dirname(targetPath), { recursive: true });
-    await fs.copyFile(sourcePath, targetPath);
+    await fs.mkdir(targetPath.dirname().resolvedPath, { recursive: true });
+    await fs.copyFile(sourcePath.resolvedPath, targetPath.resolvedPath);
   }
 
   private async ensureProjectSetup(project: string): Promise<void> {
     const pathsToEnsure = [
       this.storagePath,
-      path.join(this.storagePath, project),
+      this.storagePath.join(project),
       this.idsPath(project),
       this.tagsPath(project),
     ];
 
     for (const pathToEnsure of pathsToEnsure) {
-      await fs.mkdir(pathToEnsure, { recursive: true });
+      await fs.mkdir(pathToEnsure.resolvedPath, { recursive: true });
     }
   }
 
-  private async safeReadDir(dirPath: string): Promise<Dirent[]> {
+  private async safeReadDir(dirPath: AbsolutePath): Promise<Dirent[]> {
     try {
-      return await fs.readdir(dirPath, { withFileTypes: true });
+      return await fs.readdir(dirPath.resolvedPath, { withFileTypes: true });
     } catch {
       return [];
     }
   }
 
-  private async exists(filePath: string): Promise<boolean> {
+  private async exists(filePath: AbsolutePath): Promise<boolean> {
     return fs
-      .stat(filePath)
+      .stat(filePath.resolvedPath)
       .then(() => true)
       .catch(() => false);
   }
 
   private async collectJsonFilePaths(
-    dirPath: string,
-    files: string[],
+    dirPath: AbsolutePath,
+    files: AbsolutePath[],
   ): Promise<void> {
     const entries = await this.safeReadDir(dirPath);
     if (entries.length === 0) {
       return;
     }
     for (const entry of entries) {
-      const entryPath = path.join(dirPath, entry.name);
+      const entryPath = dirPath.join(entry.name);
       if (entry.isDirectory()) {
         await this.collectJsonFilePaths(entryPath, files);
       } else if (entry.isFile() && entry.name.endsWith(".json")) {

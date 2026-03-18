@@ -10,6 +10,7 @@ import {
   mapOriginalArtifactToEthokoArtifact,
   OriginalBuildInfoPaths,
 } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import { AbsolutePath } from "@/utils/path";
 
 function buildInfoPathToSuccessText(paths: OriginalBuildInfoPaths): string {
   if (paths.format === "hardhat-v3") {
@@ -69,7 +70,7 @@ const FORMAT_TO_ERROR_MESSAGE: Record<
  * @returns The generated artifact ID
  */
 export async function push(
-  artifactPath: string,
+  artifactPath: AbsolutePath,
   project: string,
   tag: string | undefined,
   storageProvider: StorageProvider,

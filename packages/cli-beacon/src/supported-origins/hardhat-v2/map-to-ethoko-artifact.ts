@@ -5,26 +5,26 @@ import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
 } from "@/ethoko-artifacts/v0";
-import path from "path";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 export async function mapHardhatV2ArtifactToEthokoArtifact(
-  buildInfoPath: string,
+  buildInfoPath: AbsolutePath,
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
   originalContent: {
-    rootPath: string;
-    paths: string[];
+    rootPath: AbsolutePath;
+    paths: RelativePath[];
   };
 }> {
   const jsonContent = await fs
-    .readFile(buildInfoPath, "utf-8")
+    .readFile(buildInfoPath.resolvedPath, "utf-8")
     .then(JSON.parse)
     .catch((error) => {
       if (debug) {
         console.error(
-          `Failed to read or parse the build info file "${buildInfoPath}". Error: ${error}`,
+          `Failed to read or parse the build info file "${buildInfoPath.resolvedPath}". Error: ${error}`,
         );
       }
       throw error;
@@ -34,7 +34,7 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
   if (!parsingResult.success) {
     if (debug) {
       console.error(
-        `Failed to parse the build info file "${buildInfoPath}" as a Hardhat v2 compiler output format. Error: ${parsingResult.error}`,
+        `Failed to parse the build info file "${buildInfoPath.resolvedPath}" as a Hardhat v2 compiler output format. Error: ${parsingResult.error}`,
       );
     }
     throw parsingResult.error;
@@ -72,15 +72,15 @@ export async function mapHardhatV2ArtifactToEthokoArtifact(
     }
   }
 
-  const buildInfoDirPath = path.dirname(buildInfoPath);
-  const rootPath = path.dirname(buildInfoDirPath);
+  const buildInfoDirPath = buildInfoPath.dirname();
+  const rootPath = buildInfoDirPath.dirname();
 
   return {
     inputArtifact,
     outputContractArtifacts,
     originalContent: {
       rootPath,
-      paths: [path.relative(rootPath, buildInfoPath)],
+      paths: [buildInfoPath.relativeTo(rootPath)],
     },
   };
 }

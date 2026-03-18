@@ -18,7 +18,7 @@ import {
 } from "../ethoko-artifacts/v0";
 import { StorageProvider } from "./storage-provider.interface";
 import fs from "fs/promises";
-import path from "path";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 type S3BucketProviderConfig = {
   bucketName: string;
@@ -235,7 +235,7 @@ export class S3BucketProvider implements StorageProvider {
   public async listOriginalContent(
     project: string,
     id: string,
-  ): Promise<string[]> {
+  ): Promise<RelativePath[]> {
     const client = await this.getClient();
     const prefix = `${this.rootPath}/${project}/ids/${id}/original/`;
     const paths: string[] = [];
@@ -264,7 +264,7 @@ export class S3BucketProvider implements StorageProvider {
         : undefined;
     } while (continuationToken);
 
-    return paths;
+    return paths.map((relativePath) => RelativePath.unsafeFrom(relativePath));
   }
 
   public async listTags(project: string): Promise<string[]> {
@@ -324,7 +324,7 @@ export class S3BucketProvider implements StorageProvider {
     inputArtifact: EthokoInputArtifact,
     contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContent: { rootPath: string; paths: string[] },
+    originalContent: { rootPath: AbsolutePath; paths: RelativePath[] },
   ): Promise<void> {
     const client = await this.getClient();
     const inputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/input.json`;
@@ -363,7 +363,7 @@ export class S3BucketProvider implements StorageProvider {
     // These files are stored under `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/` prefix, so they don't interfere with the main artifact JSON file and can be easily retrieved when downloading the artifact
     for (const originalContentPath of originalContent.paths) {
       const content = await fs.readFile(
-        path.join(originalContent.rootPath, originalContentPath),
+        originalContent.rootPath.join(originalContentPath).resolvedPath,
       );
       const putCommand = new PutObjectCommand({
         Bucket: this.config.bucketName,
@@ -455,12 +455,12 @@ export class S3BucketProvider implements StorageProvider {
   public async downloadOriginalContent(
     project: string,
     id: string,
-    relativePath: string,
+    relativePath: RelativePath,
   ): Promise<Stream> {
     const client = await this.getClient();
     const getObjectCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}/original/${relativePath}`,
+      Key: `${this.rootPath}/${project}/ids/${id}/original/${relativePath.relativePath}`,
     });
     const getObjectResult = await client.send(getObjectCommand);
     if (!getObjectResult.Body) {

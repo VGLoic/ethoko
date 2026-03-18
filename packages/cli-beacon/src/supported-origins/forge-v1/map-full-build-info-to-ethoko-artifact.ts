@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-import path from "path";
 import { deriveEthokoArtifactId } from "@/ethoko-artifacts/derive-ethoko-artifact-id";
 import {
   EthokoContractOutputArtifact,
@@ -7,6 +6,7 @@ import {
 } from "@/ethoko-artifacts/v0";
 import { ForgeCompilerOutputWithBuildInfoOptionSchema } from "./schemas";
 import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-artifact-paths";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 /**
  * The full Forge build info format splits the contract output into multiple files in the same way as Forge default
@@ -28,20 +28,20 @@ import { lookForForgeContractArtifactPath } from "./look-for-forge-contract-arti
  * @param debug Whether to enable debug logging
  */
 export async function mapForgeV1FullBuildInfoToEthokoArtifact(
-  buildInfoPath: string,
+  buildInfoPath: AbsolutePath,
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContent: { rootPath: string; paths: string[] };
+  originalContent: { rootPath: AbsolutePath; paths: RelativePath[] };
 }> {
   const jsonContent = await fs
-    .readFile(buildInfoPath, "utf-8")
+    .readFile(buildInfoPath.resolvedPath, "utf-8")
     .then(JSON.parse)
     .catch((error) => {
       if (debug) {
         console.error(
-          `Failed to read or parse the build info file "${buildInfoPath}". Error: ${error}`,
+          `Failed to read or parse the build info file "${buildInfoPath.resolvedPath}". Error: ${error}`,
         );
       }
       throw error;
@@ -52,7 +52,7 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
   if (!buildInfoParsingResult.success) {
     if (debug) {
       console.error(
-        `Failed to parse the build info file "${buildInfoPath}" as a Forge v1 full build info compiler output format. Error: ${buildInfoParsingResult.error}`,
+        `Failed to parse the build info file "${buildInfoPath.resolvedPath}" as a Forge v1 full build info compiler output format. Error: ${buildInfoParsingResult.error}`,
       );
     }
     throw buildInfoParsingResult.error;
@@ -67,7 +67,7 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
   ).catch((error) => {
     if (debug) {
       console.error(
-        `Failed to retrieve the contract artifacts paths related to the build info file "${buildInfoPath}". Error: ${error}`,
+        `Failed to retrieve the contract artifacts paths related to the build info file "${buildInfoPath.resolvedPath}". Error: ${error}`,
       );
     }
     throw error;
@@ -105,8 +105,8 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
     }
   }
 
-  const buildInfoDirPath = path.dirname(buildInfoPath);
-  const rootArtifactsFolder = path.dirname(buildInfoDirPath);
+  const buildInfoDirPath = buildInfoPath.dirname();
+  const rootArtifactsFolder = buildInfoDirPath.dirname();
 
   return {
     inputArtifact,
@@ -115,29 +115,29 @@ export async function mapForgeV1FullBuildInfoToEthokoArtifact(
       rootPath: rootArtifactsFolder,
       paths: contractArtifactsPaths
         .concat(buildInfoPath)
-        .map((p) => path.relative(rootArtifactsFolder, p)),
+        .map((p) => p.relativeTo(rootArtifactsFolder)),
     },
   };
 }
 
 async function retrieveForgeContractArtifactsPaths(
-  buildInfoPath: string,
+  buildInfoPath: AbsolutePath,
   sourceIdToPath: Record<string, string>,
   debug: boolean,
-): Promise<string[]> {
+): Promise<AbsolutePath[]> {
   const expectedSourceIdToPath = new Map(Object.entries(sourceIdToPath));
 
-  const buildInfoFolder = path.dirname(buildInfoPath);
-  const rootArtifactsFolder = path.dirname(buildInfoFolder);
+  const buildInfoFolder = buildInfoPath.dirname();
+  const rootArtifactsFolder = buildInfoFolder.dirname();
 
   // We keep track of the additional artifacts paths to return them at the end
-  const additionalArtifactsPaths: string[] = [];
+  const additionalArtifactsPaths: AbsolutePath[] = [];
 
   const rebuiltSourceIdToPath = new Map<string, string>();
 
   for await (const {
     fullyQualifiedName,
-    localArtifactPath,
+    artifactPath,
     contract,
   } of lookForForgeContractArtifactPath(
     rootArtifactsFolder,
@@ -146,7 +146,7 @@ async function retrieveForgeContractArtifactsPaths(
   )) {
     // We register the visiter contract path with the ID
     rebuiltSourceIdToPath.set(contract.id.toString(), fullyQualifiedName.path);
-    additionalArtifactsPaths.push(localArtifactPath);
+    additionalArtifactsPaths.push(artifactPath);
   }
 
   // We verify that all contract paths have been visited
