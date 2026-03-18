@@ -12,6 +12,7 @@ import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-sto
 import type { EthokoCliConfig } from "../config/config.js";
 import { toAsyncResult } from "@/utils/result.js";
 import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
+import { AbsolutePathSchema } from "@/utils/path.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -91,6 +92,7 @@ export function registerExportCommand(
               1,
               'If provided, the "output" cannot be empty. Provide a valid file path.',
             )
+            .pipe(AbsolutePathSchema)
             .optional(),
           debug: z
             .boolean('The "debug" option must be a boolean')
@@ -132,22 +134,17 @@ export function registerExportCommand(
             const artifactJson = JSON.stringify(result, null, 2);
 
             try {
-              await fs.access(optsParsingResult.data.output);
+              await fs.access(optsParsingResult.data.output.resolvedPath);
               logger.warn(
-                `File ${optsParsingResult.data.output} already exists, overwriting...`,
+                `File ${optsParsingResult.data.output.resolvedPath} already exists, overwriting...`,
               );
             } catch {
-              const dir = optsParsingResult.data.output
-                .split("/")
-                .slice(0, -1)
-                .join("/");
-              if (dir.length > 0) {
-                await fs.mkdir(dir, { recursive: true });
-              }
+              const dir = optsParsingResult.data.output.dirname();
+              await fs.mkdir(dir.resolvedPath, { recursive: true });
             }
 
             await fs.writeFile(
-              optsParsingResult.data.output,
+              optsParsingResult.data.output.resolvedPath,
               `${artifactJson}\n`,
             );
 
@@ -156,7 +153,7 @@ export function registerExportCommand(
               ? `${result.project}:${result.tag}`
               : `${result.project}:${result.id}`;
             logger.success(
-              `Exported contract artifact for ${contractIdentifier} from ${artifactLabel} to ${optsParsingResult.data.output}`,
+              `Exported contract artifact for ${contractIdentifier} from ${artifactLabel} to ${optsParsingResult.data.output.resolvedPath}`,
             );
             return;
           }

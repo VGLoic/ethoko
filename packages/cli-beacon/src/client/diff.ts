@@ -12,6 +12,7 @@ import {
   mapOriginalArtifactToEthokoArtifact,
   OriginalBuildInfoPaths,
 } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import { AbsolutePath } from "@/utils/path";
 
 function buildInfoPathToSuccessText(paths: OriginalBuildInfoPaths): string {
   if (paths.format === "hardhat-v3") {
@@ -139,7 +140,7 @@ export type Difference = {
  * @returns The array of differences between the fresh compilation artifact and the target artifact
  */
 export async function generateDiffWithTargetRelease(
-  artifactPath: string,
+  artifactPath: AbsolutePath,
   artifact: {
     project: string;
     search: { type: "tag"; tag: string } | { type: "id"; id: string };

@@ -1,4 +1,3 @@
-import path from "path";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
@@ -9,6 +8,7 @@ import {
   readOutputArtifact,
   retrieveHardhatv3ContractArtifactsPaths,
 } from "./helpers";
+import { AbsolutePath, RelativePath } from "@/utils/path";
 
 /**
  * Hardhat v3 non isolated build will emit a single pair of input/output artifacts
@@ -21,14 +21,17 @@ import {
  */
 export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
   pair: {
-    input: string;
-    output: string;
+    input: AbsolutePath;
+    output: AbsolutePath;
   },
   debug: boolean,
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContentPaths: string[];
+  originalContent: {
+    rootPath: AbsolutePath;
+    paths: RelativePath[];
+  };
 }> {
   const inputArtifact = await readInputArtifact(pair.input);
   const outputArtifact = await readOutputArtifact(pair.output);
@@ -57,8 +60,11 @@ export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
     }
   }
 
+  const buildInfoDirPath = pair.input.dirname();
+  const rootPath = buildInfoDirPath.dirname();
+
   const contractArtifactsPaths = await retrieveHardhatv3ContractArtifactsPaths(
-    path.dirname(pair.input),
+    buildInfoDirPath,
     [inputArtifact.id],
     userSourceNameMap,
     debug,
@@ -79,8 +85,11 @@ export async function mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
       input: solcInput,
     },
     outputContractArtifacts,
-    originalContentPaths: [pair.input, pair.output].concat(
-      contractArtifactsPaths,
-    ),
+    originalContent: {
+      rootPath,
+      paths: [pair.input, pair.output]
+        .concat(contractArtifactsPaths)
+        .map((p) => p.relativeTo(rootPath)),
+    },
   };
 }

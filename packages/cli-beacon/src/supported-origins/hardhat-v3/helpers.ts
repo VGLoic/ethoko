@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-import path from "path";
 import {
   HardhatV3CompilerContractOutputSchema,
   HardhatV3CompilerInputPieceSchema,
@@ -8,32 +7,33 @@ import {
 import z from "zod";
 import { lookForContractArtifactPath } from "@/supported-origins/utils/look-for-contract-artifact-path";
 import { toAsyncResult } from "@/utils/result";
+import { AbsolutePath } from "@/utils/path";
 
 export function readInputArtifact(
-  path: string,
+  path: AbsolutePath,
 ): Promise<z.infer<typeof HardhatV3CompilerInputPieceSchema>> {
   return fs
-    .readFile(path, "utf-8")
+    .readFile(path.resolvedPath, "utf-8")
     .then((c) => JSON.parse(c))
     .then(HardhatV3CompilerInputPieceSchema.parse);
 }
 
 export function readOutputArtifact(
-  path: string,
+  path: AbsolutePath,
 ): Promise<z.infer<typeof HardhatV3CompilerOutputPieceSchema>> {
   return fs
-    .readFile(path, "utf-8")
+    .readFile(path.resolvedPath, "utf-8")
     .then((c) => JSON.parse(c))
     .then(HardhatV3CompilerOutputPieceSchema.parse);
 }
 
 export async function retrieveHardhatv3ContractArtifactsPaths(
-  buildInfoDirectoryPath: string,
+  buildInfoDirectoryPath: AbsolutePath,
   buildInfoIds: string[],
   userSourceNameMap: Record<string, string>,
   debug: boolean,
-): Promise<string[]> {
-  const rootArtifactsFolder = path.dirname(buildInfoDirectoryPath);
+): Promise<AbsolutePath[]> {
+  const rootArtifactsFolder = buildInfoDirectoryPath.dirname();
 
   const buildInfoIdsSet = new Set(buildInfoIds);
 
@@ -46,16 +46,18 @@ export async function retrieveHardhatv3ContractArtifactsPaths(
     rootArtifactsFolder,
   )) {
     const contractContentResult = await toAsyncResult(
-      fs.readFile(contractArtifactPath, "utf-8").then((content) => {
-        const rawParsing = JSON.parse(content);
-        return HardhatV3CompilerContractOutputSchema.parse(rawParsing);
-      }),
+      fs
+        .readFile(contractArtifactPath.resolvedPath, "utf-8")
+        .then((content) => {
+          const rawParsing = JSON.parse(content);
+          return HardhatV3CompilerContractOutputSchema.parse(rawParsing);
+        }),
       { debug },
     );
     if (!contractContentResult.success) {
       if (debug) {
         console.warn(
-          `Failed to parse contract artifact at path "${contractArtifactPath}". Skipping it. Error: ${contractContentResult.error}`,
+          `Failed to parse contract artifact at path "${contractArtifactPath.resolvedPath}". Skipping it. Error: ${contractContentResult.error}`,
         );
       }
       continue;
@@ -64,7 +66,7 @@ export async function retrieveHardhatv3ContractArtifactsPaths(
     if (!buildInfoIdsSet.has(contract.buildInfoId)) {
       if (debug) {
         console.warn(
-          `Found compilation artifact at path "${contractArtifactPath}" but does not have the same build info ID than the input/output. Skipping it.`,
+          `Found compilation artifact at path "${contractArtifactPath.resolvedPath}" but does not have the same build info ID than the input/output. Skipping it.`,
         );
       }
       continue;
@@ -72,7 +74,7 @@ export async function retrieveHardhatv3ContractArtifactsPaths(
     if (!expectedUserSourceNameMap.has(contract.sourceName)) {
       if (debug) {
         console.warn(
-          `Found compilation artifact at path "${contractArtifactPath}" but does not belong to the expected user source name map. Skipping it.`,
+          `Found compilation artifact at path "${contractArtifactPath.resolvedPath}" but does not belong to the expected user source name map. Skipping it.`,
         );
       }
       continue;

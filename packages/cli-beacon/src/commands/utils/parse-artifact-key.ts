@@ -64,6 +64,13 @@ function parseArtifactKey(key: string):
         error: `Invalid artifact key "${key}": tag cannot be empty`,
       };
     }
+    const tagValidation = validateTag(tag);
+    if (!tagValidation.success) {
+      return {
+        success: false,
+        error: `Invalid artifact key "${key}": ${tagValidation.error}`,
+      };
+    }
     return {
       success: true,
       key: { project, artifact: { type: "tag", tag } },
@@ -109,4 +116,25 @@ function parseArtifactKey(key: string):
     success: true,
     key: { project, artifact: null },
   };
+}
+
+function validateTag(
+  value: string,
+): { success: true } | { success: false; error: string } {
+  if (!value.trim()) {
+    return {
+      success: false,
+      error: "Tag cannot be empty",
+    };
+  }
+  const FORBIDDEN_CHARACTERS = [":", "@", "/", "\\", " "];
+  for (const char of FORBIDDEN_CHARACTERS) {
+    if (value.includes(char)) {
+      return {
+        success: false,
+        error: `Tag cannot contain '${char}' character`,
+      };
+    }
+  }
+  return { success: true };
 }

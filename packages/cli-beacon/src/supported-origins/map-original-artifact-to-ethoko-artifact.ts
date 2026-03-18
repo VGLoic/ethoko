@@ -1,3 +1,4 @@
+import { AbsolutePath, RelativePath } from "@/utils/path";
 import {
   EthokoInputArtifact,
   EthokoContractOutputArtifact,
@@ -6,6 +7,7 @@ import { mapForgeV1DefaultArtifactToEthokoArtifact } from "./forge-v1/map-defaul
 import { mapForgeV1FullBuildInfoToEthokoArtifact } from "./forge-v1/map-full-build-info-to-ethoko-artifact";
 import { mapHardhatV2ArtifactToEthokoArtifact } from "./hardhat-v2/map-to-ethoko-artifact";
 import { mapHardhatV3ArtifactsToEthokoArtifact } from "./hardhat-v3/map-isolated-build-to-ethoko-artifact";
+import { mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact } from "./hardhat-v3/map-non-isolated-build-to-ethoko-artifact";
 
 export type OriginalBuildInfoPaths =
   | {
@@ -13,20 +15,20 @@ export type OriginalBuildInfoPaths =
         | "forge-v1-default"
         | "forge-v1-with-build-info-option"
         | "hardhat-v2";
-      buildInfoPath: string;
+      buildInfoPath: AbsolutePath;
     }
   | {
       format: "hardhat-v3-non-isolated-build";
       buildInfoPaths: {
-        input: string;
-        output: string;
+        input: AbsolutePath;
+        output: AbsolutePath;
       };
     }
   | {
       format: "hardhat-v3";
       buildInfoPaths: {
-        input: string;
-        output: string;
+        input: AbsolutePath;
+        output: AbsolutePath;
       }[];
     };
 /**
@@ -42,12 +44,18 @@ export function mapOriginalArtifactToEthokoArtifact(
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
-  originalContentPaths: string[];
+  originalContent: {
+    rootPath: AbsolutePath;
+    paths: RelativePath[];
+  };
 }> {
   if (paths.format === "hardhat-v3") {
     return mapHardhatV3ArtifactsToEthokoArtifact(paths.buildInfoPaths, debug);
   } else if (paths.format === "hardhat-v3-non-isolated-build") {
-    return mapHardhatV3ArtifactsToEthokoArtifact([paths.buildInfoPaths], debug);
+    return mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact(
+      paths.buildInfoPaths,
+      debug,
+    );
   } else if (paths.format === "hardhat-v2") {
     return mapHardhatV2ArtifactToEthokoArtifact(paths.buildInfoPath, debug);
   } else if (paths.format === "forge-v1-with-build-info-option") {

@@ -1,3 +1,4 @@
+import { AbsolutePath, AbsolutePathSchema } from "@/utils/path";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -206,7 +207,7 @@ const FilesystemStorageSchema = z.object({
       'The "path" field can not be an empty string when "type" is "filesystem". Provide a valid path or set it to "." to use the current directory or leave it empty to default to "./.ethoko-storage"',
     )
     .default("./.ethoko-storage")
-    .transform((p) => path.resolve(p)),
+    .pipe(AbsolutePathSchema),
 });
 
 const ProjectConfigSchema = z.object({
@@ -229,7 +230,7 @@ const EthokoConfigSchema = z
         "'pulledArtifactsPath' cannot be an empty string. Provide a valid path or set it to '.' to use the current directory or leave it empty to default to './.ethoko'",
       )
       .default(".ethoko")
-      .transform((p) => path.resolve(p)),
+      .pipe(AbsolutePathSchema),
     typingsPath: z
       .string('"typingsPath" field must be a string or left empty')
       .min(
@@ -237,14 +238,14 @@ const EthokoConfigSchema = z
         "'typingsPath' cannot be an empty string. Provide a valid path or set it to '.' to use the current directory or leave it empty to default to './.ethoko-typings'",
       )
       .default(".ethoko-typings")
-      .transform((p) => path.resolve(p)),
+      .pipe(AbsolutePathSchema),
     compilationOutputPath: z
       .string('"compilationOutputPath" field must be a string or left empty')
       .min(
         1,
         "'compilationOutputPath' cannot be an empty string. Provide a valid path or set it to '.' to use the current directory or leave it empty",
       )
-      .transform((p) => path.resolve(p))
+      .pipe(AbsolutePathSchema)
       .optional(),
     projects: z
       .array(
@@ -259,17 +260,15 @@ const EthokoConfigSchema = z
   .refine(
     (data) => {
       // Typings path and pulled artifacts path must not be a parent/child relationship
-      const resolvedTypingsPath = path.resolve(data.typingsPath);
-      const resolvedPulledArtifactsPath = path.resolve(
-        data.pulledArtifactsPath,
-      );
       return (
-        path.resolve(data.typingsPath) !==
-          path.resolve(data.pulledArtifactsPath) &&
-        !resolvedTypingsPath.startsWith(
-          resolvedPulledArtifactsPath + path.sep,
+        data.typingsPath.resolvedPath !==
+          data.pulledArtifactsPath.resolvedPath &&
+        !data.typingsPath.resolvedPath.startsWith(
+          data.pulledArtifactsPath.resolvedPath + path.sep,
         ) &&
-        !resolvedPulledArtifactsPath.startsWith(resolvedTypingsPath + path.sep)
+        !data.pulledArtifactsPath.resolvedPath.startsWith(
+          data.typingsPath.resolvedPath + path.sep,
+        )
       );
     },
     {
@@ -280,17 +279,16 @@ const EthokoConfigSchema = z
   .refine(
     (data) => {
       // In case of storage type "filesystem", the storage path must not be a child of typings path or pulled artifacts path
-      const filesystemProjectPaths = [];
+      const filesystemProjectPaths: string[] = [];
       for (const project of data.projects) {
         if (project.storage.type === "filesystem") {
-          filesystemProjectPaths.push(path.resolve(project.storage.path));
+          filesystemProjectPaths.push(project.storage.path.resolvedPath);
         }
       }
       if (filesystemProjectPaths.length > 0) {
-        const resolvedTypingsPath = path.resolve(data.typingsPath);
-        const resolvedPulledArtifactsPath = path.resolve(
-          data.pulledArtifactsPath,
-        );
+        const resolvedTypingsPath = data.typingsPath.resolvedPath;
+        const resolvedPulledArtifactsPath =
+          data.pulledArtifactsPath.resolvedPath;
         return filesystemProjectPaths.every((resolvedStoragePath) => {
           return (
             resolvedTypingsPath !== resolvedStoragePath &&
@@ -314,14 +312,17 @@ type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type EthokoStorageConfig = ProjectConfig["storage"];
 
 export class EthokoCliConfig {
-  public pulledArtifactsPath: string;
-  public typingsPath: string;
-  public compilationOutputPath?: string;
+  public pulledArtifactsPath: AbsolutePath;
+  public typingsPath: AbsolutePath;
+  public compilationOutputPath?: AbsolutePath;
   public debug: boolean;
-  public configPath: string;
+  public configPath: AbsolutePath;
   public projects: ProjectConfig[];
 
-  constructor(config: z.infer<typeof EthokoConfigSchema>, configPath: string) {
+  constructor(
+    config: z.infer<typeof EthokoConfigSchema>,
+    configPath: AbsolutePath,
+  ) {
     this.pulledArtifactsPath = config.pulledArtifactsPath;
     this.typingsPath = config.typingsPath;
     this.compilationOutputPath = config.compilationOutputPath;
@@ -339,8 +340,8 @@ export async function loadConfig(
   configPath?: string,
 ): Promise<EthokoCliConfig> {
   const resolvedPath = configPath
-    ? path.resolve(process.cwd(), configPath)
-    : await findConfigPath(process.cwd());
+    ? AbsolutePath.from(configPath)
+    : await findConfigPath(AbsolutePath.from(process.cwd()));
 
   if (!resolvedPath) {
     throw new Error(`Ethoko config not found. Searched from ${process.cwd()} to the filesystem root.
@@ -364,7 +365,7 @@ Example ethoko.config.json:
 
   let configRaw: string;
   try {
-    configRaw = await fs.readFile(resolvedPath, "utf-8");
+    configRaw = await fs.readFile(resolvedPath.resolvedPath, "utf-8");
   } catch {
     throw new Error(
       `Failed to read ethoko.config.json at ${resolvedPath}. Please ensure the file exists and is readable.`,
@@ -391,12 +392,14 @@ Example ethoko.config.json:
   return new EthokoCliConfig(parsingResult.data, resolvedPath);
 }
 
-async function findConfigPath(startDir: string): Promise<string | null> {
+async function findConfigPath(
+  startDir: AbsolutePath,
+): Promise<AbsolutePath | null> {
   let currentDir = startDir;
   while (true) {
-    const candidate = path.join(currentDir, "ethoko.config.json");
+    const candidate = currentDir.join("ethoko.config.json");
     const exists = await fs
-      .stat(candidate)
+      .stat(candidate.resolvedPath)
       .then(() => true)
       .catch(() => false);
     if (exists) {
@@ -406,10 +409,10 @@ async function findConfigPath(startDir: string): Promise<string | null> {
     if (isRootPath(currentDir)) {
       return null;
     }
-    currentDir = path.dirname(currentDir);
+    currentDir = currentDir.dirname();
   }
 }
 
-function isRootPath(currentPath: string): boolean {
-  return path.dirname(currentPath) === currentPath;
+function isRootPath(currentPath: AbsolutePath): boolean {
+  return currentPath.dirname().resolvedPath === currentPath.resolvedPath;
 }

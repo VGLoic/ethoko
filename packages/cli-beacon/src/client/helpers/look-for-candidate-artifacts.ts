@@ -1,5 +1,4 @@
 import fs from "fs/promises";
-import path from "path";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
 import {
@@ -8,6 +7,7 @@ import {
 } from "@/supported-origins/infer-original-artifact-format";
 import { OriginalBuildInfoPaths } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
 import { CommandLogger } from "@/ui";
+import { AbsolutePath } from "@/utils/path";
 
 type CandidateBuildInfoOption = {
   display: string;
@@ -51,35 +51,37 @@ type CandidateBuildInfoOption = {
  * @throws A CliError
  */
 export async function lookForCandidateArtifacts(
-  inputPath: string,
+  inputPath: AbsolutePath,
   opts: { debug: boolean },
 ): Promise<{
   candidateBuildInfoOptions: CandidateBuildInfoOption[];
   ignoredFilesCount: number;
-  finalFolderPath: string;
+  finalFolderPath: AbsolutePath;
 }> {
   const { debug } = opts;
-  const statResult = await toAsyncResult(fs.stat(inputPath), { debug });
+  const statResult = await toAsyncResult(fs.stat(inputPath.resolvedPath), {
+    debug,
+  });
   if (!statResult.success) {
     throw new CliError(
-      `The provided path "${inputPath}" does not exist or is not accessible. Please provide a valid path to a compilation artifact (build info) or a directory containing it.`,
+      `The provided path "${inputPath.resolvedPath}" does not exist or is not accessible. Please provide a valid path to a compilation artifact (build info) or a directory containing it.`,
     );
   }
 
   // The provided path is a file, we check if it is a valid JSON file and if it is in a supported format
   if (statResult.value.isFile()) {
-    if (!inputPath.endsWith(".json")) {
+    if (!inputPath.resolvedPath.endsWith(".json")) {
       throw new CliError(
-        `The provided path "${inputPath}" is a file but does not have a .json extension. Please provide a valid path to a JSON compilation artifact (build info).`,
+        `The provided path "${inputPath.resolvedPath}" is a file but does not have a .json extension. Please provide a valid path to a JSON compilation artifact (build info).`,
       );
     }
     const contentResult = await toAsyncResult(
-      fs.readFile(inputPath, "utf-8").then((v) => JSON.parse(v)),
+      fs.readFile(inputPath.resolvedPath, "utf-8").then((v) => JSON.parse(v)),
       { debug },
     );
     if (!contentResult.success) {
       throw new CliError(
-        `The provided file "${inputPath}" could not be read or is not a valid JSON file. Please check the file and try again. Run with debug mode for more info.`,
+        `The provided file "${inputPath.resolvedPath}" could not be read or is not a valid JSON file. Please check the file and try again. Run with debug mode for more info.`,
       );
     }
 
@@ -94,11 +96,13 @@ export async function lookForCandidateArtifacts(
       format.artifact.format === "hardhat-v3-input-no-isolated-build"
     ) {
       // We verify that the corresponding output file exists
-      const matchingOutputPath = inputPath.replace(".json", ".output.json");
+      const matchingOutputPath = AbsolutePath.from(
+        inputPath.resolvedPath.replace(".json", ".output.json"),
+      );
       const outputCheckResult = await toAsyncResult(
         fs
-          .stat(matchingOutputPath)
-          .then(() => fs.readFile(matchingOutputPath, "utf-8"))
+          .stat(matchingOutputPath.resolvedPath)
+          .then(() => fs.readFile(matchingOutputPath.resolvedPath, "utf-8"))
           .then(JSON.parse)
           .then((json) => {
             const inferredFormat = inferOriginalArtifactFormat(json);
@@ -119,7 +123,7 @@ export async function lookForCandidateArtifacts(
         );
       }
       return {
-        finalFolderPath: path.dirname(inputPath),
+        finalFolderPath: inputPath.dirname(),
         ignoredFilesCount: 0,
         candidateBuildInfoOptions: [
           {
@@ -136,11 +140,13 @@ export async function lookForCandidateArtifacts(
     }
     if (format.artifact.format === "hardhat-v3-output") {
       // We verify that the corresponding input file exists
-      const matchingInputPath = inputPath.replace(".output.json", ".json");
+      const matchingInputPath = AbsolutePath.from(
+        inputPath.resolvedPath.replace(".output.json", ".json"),
+      );
       const inputCheckResult = await toAsyncResult(
         fs
-          .stat(matchingInputPath)
-          .then(() => fs.readFile(matchingInputPath, "utf-8"))
+          .stat(matchingInputPath.resolvedPath)
+          .then(() => fs.readFile(matchingInputPath.resolvedPath, "utf-8"))
           .then(JSON.parse)
           .then((json) => {
             const inferredFormat = inferOriginalArtifactFormat(json);
@@ -164,7 +170,7 @@ export async function lookForCandidateArtifacts(
         );
       }
       return {
-        finalFolderPath: path.dirname(inputPath),
+        finalFolderPath: inputPath.dirname(),
         ignoredFilesCount: 0,
         candidateBuildInfoOptions: [
           {
@@ -179,7 +185,7 @@ export async function lookForCandidateArtifacts(
     }
 
     return {
-      finalFolderPath: path.dirname(inputPath),
+      finalFolderPath: inputPath.dirname(),
       ignoredFilesCount: 0,
       candidateBuildInfoOptions: [
         {
@@ -203,7 +209,7 @@ export async function lookForCandidateArtifacts(
   // - if there is a `build-info` directory, we look for JSON files in it and consider it as the main candidate,
   // - if there is no `build-info` directory, we look for JSON files directly in the provided directory
   const entriesResult = await toAsyncResult(
-    fs.readdir(inputPath, { withFileTypes: true }),
+    fs.readdir(inputPath.resolvedPath, { withFileTypes: true }),
     {
       debug,
     },
@@ -221,9 +227,9 @@ export async function lookForCandidateArtifacts(
     (entry) => entry.isDirectory() && entry.name === "build-info",
   );
   if (buildInfoDirEntry) {
-    const buildInfoDirPath = `${inputPath}/build-info`;
+    const buildInfoDirPath = inputPath.join("build-info");
     const buildInfoEntriesResult = await toAsyncResult(
-      fs.readdir(buildInfoDirPath, { withFileTypes: true }),
+      fs.readdir(buildInfoDirPath.resolvedPath, { withFileTypes: true }),
       { debug },
     );
     if (!buildInfoEntriesResult.success) {
@@ -245,8 +251,8 @@ export async function lookForCandidateArtifacts(
     | { ignored: true; name: string }
   )[] = await Promise.all(
     jsonFiles.map(async (file) => {
-      const filePath = `${finalFolderPath}/${file.name}`;
-      const statsResult = await toAsyncResult(fs.stat(filePath), {
+      const filePath = finalFolderPath.join(file.name);
+      const statsResult = await toAsyncResult(fs.stat(filePath.resolvedPath), {
         debug,
       });
       if (!statsResult.success) {
@@ -263,7 +269,7 @@ export async function lookForCandidateArtifacts(
 
       const inferrenceResult = await toAsyncResult(
         fs
-          .readFile(filePath, "utf-8")
+          .readFile(filePath.resolvedPath, "utf-8")
           .then((v) => JSON.parse(v))
           .then(inferOriginalArtifactFormat),
         { debug },
@@ -325,7 +331,7 @@ export async function lookForCandidateArtifacts(
 
 type FileSummary = {
   name: string;
-  filePath: string;
+  filePath: AbsolutePath;
   mtime: Date;
   size: number;
   artifact: InferredArtifact;
@@ -334,11 +340,11 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
   const options: CandidateBuildInfoOption[] = [];
   const hardhatV3Pairs: {
     input: {
-      path: string;
+      path: AbsolutePath;
       size: number;
     };
     output: {
-      path: string;
+      path: AbsolutePath;
       size: number;
     };
     solcLongVersion: string;

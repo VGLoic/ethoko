@@ -8,7 +8,7 @@ import {
   storageProviderTest,
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
-import { deriveAllPathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
+import { deriveAllAbsolutePathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 import { CommandLogger } from "@/ui";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
@@ -77,13 +77,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           artifactId,
         );
 
-        const expectedBuildInfoPaths = await deriveAllPathsInDirectory(
-          `${artifactFixture.folderPath}/build-info`,
+        const expectedBuildInfoPaths = await deriveAllAbsolutePathsInDirectory(
+          artifactFixture.folderPath.join("build-info"),
         );
         const expectedOriginalIds = await Promise.all(
           expectedBuildInfoPaths.map((path) =>
             fs
-              .readFile(path, "utf-8")
+              .readFile(path.resolvedPath, "utf-8")
               .then((c) => JSON.parse(c) as { id: string })
               .then((json) => json.id),
           ),

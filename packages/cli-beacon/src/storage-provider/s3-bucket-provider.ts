@@ -18,6 +18,8 @@ import {
 } from "../ethoko-artifacts/v0";
 import { StorageProvider } from "./storage-provider.interface";
 import fs from "fs/promises";
+import { AbsolutePath, RelativePath } from "@/utils/path";
+import path from "path";
 
 type S3BucketProviderConfig = {
   bucketName: string;
@@ -234,7 +236,7 @@ export class S3BucketProvider implements StorageProvider {
   public async listOriginalContent(
     project: string,
     id: string,
-  ): Promise<string[]> {
+  ): Promise<RelativePath[]> {
     const client = await this.getClient();
     const prefix = `${this.rootPath}/${project}/ids/${id}/original/`;
     const paths: string[] = [];
@@ -263,7 +265,7 @@ export class S3BucketProvider implements StorageProvider {
         : undefined;
     } while (continuationToken);
 
-    return paths;
+    return paths.map((relativePath) => this.fromS3Path(relativePath));
   }
 
   public async listTags(project: string): Promise<string[]> {
@@ -323,7 +325,7 @@ export class S3BucketProvider implements StorageProvider {
     inputArtifact: EthokoInputArtifact,
     contractOutputArtifacts: EthokoContractOutputArtifact[],
     tag: string | undefined,
-    originalContentPaths: string[],
+    originalContent: { rootPath: AbsolutePath; paths: RelativePath[] },
   ): Promise<void> {
     const client = await this.getClient();
     const inputKey = `${this.rootPath}/${project}/ids/${inputArtifact.id}/input.json`;
@@ -360,19 +362,13 @@ export class S3BucketProvider implements StorageProvider {
 
     // Upload original content files as well, using the artifact ID as reference
     // These files are stored under `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/` prefix, so they don't interfere with the main artifact JSON file and can be easily retrieved when downloading the artifact
-    for (const originalContentPath of originalContentPaths) {
-      const content = await fs.readFile(originalContentPath);
-      let sanitizedPath = originalContentPath;
-      // We remove any leading `/` or `./` from the path to avoid creating unnecessary folders in the storage and to ensure the key is valid
-      if (sanitizedPath.startsWith("/")) {
-        sanitizedPath = sanitizedPath.substring(1);
-      }
-      if (sanitizedPath.startsWith("./")) {
-        sanitizedPath = sanitizedPath.substring(2);
-      }
+    for (const originalContentPath of originalContent.paths) {
+      const content = await fs.readFile(
+        originalContent.rootPath.join(originalContentPath).resolvedPath,
+      );
       const putCommand = new PutObjectCommand({
         Bucket: this.config.bucketName,
-        Key: `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/${sanitizedPath}`,
+        Key: `${this.rootPath}/${project}/ids/${inputArtifact.id}/original/${this.toS3Path(originalContentPath)}`,
         Body: content,
       });
       await client.send(putCommand);
@@ -460,12 +456,12 @@ export class S3BucketProvider implements StorageProvider {
   public async downloadOriginalContent(
     project: string,
     id: string,
-    relativePath: string,
+    relativePath: RelativePath,
   ): Promise<Stream> {
     const client = await this.getClient();
     const getObjectCommand = new GetObjectCommand({
       Bucket: this.config.bucketName,
-      Key: `${this.rootPath}/${project}/ids/${id}/original/${relativePath}`,
+      Key: `${this.rootPath}/${project}/ids/${id}/original/${this.toS3Path(relativePath)}`,
     });
     const getObjectResult = await client.send(getObjectCommand);
     if (!getObjectResult.Body) {
@@ -541,5 +537,20 @@ export class S3BucketProvider implements StorageProvider {
     } while (continuationToken);
 
     return paths;
+  }
+
+  /**
+   * Converts a RelativePath to an S3-compatible key segment.
+   * S3 keys always use forward slashes, regardless of platform.
+   */
+  private toS3Path(relativePath: RelativePath): string {
+    return relativePath.relativePath.replace(/\\/g, "/");
+  }
+  /**
+   * Converts an S3 key segment to a RelativePath.
+   * Normalizes forward slashes to the platform's separator.
+   */
+  private fromS3Path(s3Path: string): RelativePath {
+    return RelativePath.unsafeFrom(s3Path.replace(/\//g, path.sep));
   }
 }

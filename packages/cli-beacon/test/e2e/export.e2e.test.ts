@@ -76,7 +76,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
         expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = (await fs
-          .readFile(artifactFixture.abiPath, "utf-8")
+          .readFile(artifactFixture.abiPath.resolvedPath, "utf-8")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .then(JSON.parse)) as any[];
         expect(exportResult.abi.sort(sortAbiItem)).toEqual(
@@ -144,7 +144,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(exportResult.deployedLinkReferences).toEqual(expect.any(Object));
         expect(exportResult.evm).toEqual(expect.any(Object));
         const expectedAbi = (await fs
-          .readFile(artifactFixture.abiPath, "utf-8")
+          .readFile(artifactFixture.abiPath.resolvedPath, "utf-8")
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .then(JSON.parse)) as any[];
         expect(exportResult.abi.sort(sortAbiItem)).toEqual(

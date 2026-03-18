@@ -1,4 +1,4 @@
-import path from "path";
+import { AbsolutePath } from "@/utils/path";
 
 export const TEST_CONSTANTS = {
   LOCALSTACK: {
@@ -23,7 +23,7 @@ export const TEST_CONSTANTS = {
     COUNTER: {
       TARGETS: {
         HARDHAT_V2: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter_hardhat-v2",
           ),
@@ -32,13 +32,13 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter.abi.json",
           ),
         },
         HARDHAT_V3: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter_hardhat-v3",
           ),
@@ -49,13 +49,13 @@ export const TEST_CONSTANTS = {
             path: "project/contracts/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter.abi.json",
           ),
         },
         FOUNDRY_DEFAULT: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter_foundry-default",
           ),
@@ -64,13 +64,13 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter.abi.json",
           ),
         },
         FOUNDRY_BUILD_INFO: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter_foundry-build-info",
           ),
@@ -79,7 +79,7 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/counter.abi.json",
           ),
@@ -94,7 +94,7 @@ export const TEST_CONSTANTS = {
     MIX: {
       TARGETS: {
         HARDHAT_V2: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix_hardhat-v2",
           ),
@@ -110,13 +110,13 @@ export const TEST_CONSTANTS = {
             path: "src/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix.counter.abi.json",
           ),
         },
         HARDHAT_V3_ISOLATED_BUILD: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix_hardhat-v3-isolated-build",
           ),
@@ -132,13 +132,13 @@ export const TEST_CONSTANTS = {
             path: "project/contracts/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix.counter.abi.json",
           ),
         },
         HARDHAT_V3_NON_ISOLATED_BUILD: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix_hardhat-v3-non-isolated-build",
           ),
@@ -154,13 +154,13 @@ export const TEST_CONSTANTS = {
             path: "project/contracts/Counter.sol",
             name: "Counter",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix.counter.abi.json",
           ),
         },
         FOUNDRY_DEFAULT: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix_foundry-default",
           ),
@@ -176,13 +176,13 @@ export const TEST_CONSTANTS = {
             name: "Counter",
             path: "src/Counter.sol",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix.counter.abi.json",
           ),
         },
         FOUNDRY_BUILD_INFO: {
-          folderPath: path.resolve(
+          folderPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix_foundry-build-info",
           ),
@@ -198,7 +198,7 @@ export const TEST_CONSTANTS = {
             name: "Counter",
             path: "src/Counter.sol",
           },
-          abiPath: path.resolve(
+          abiPath: AbsolutePath.from(
             process.cwd(),
             "test/fixtures/mix.counter.abi.json",
           ),
@@ -208,6 +208,6 @@ export const TEST_CONSTANTS = {
   },
   PATHS: {
     TEMP_DIR_PREFIX: "ethoko-test-",
-    FIXTURES: path.resolve(process.cwd(), "test/fixtures"),
+    FIXTURES: AbsolutePath.from(process.cwd(), "test/fixtures"),
   },
 } as const;

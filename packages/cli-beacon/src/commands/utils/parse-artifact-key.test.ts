@@ -41,6 +41,9 @@ describe("ArtifactKeySchema", () => {
     "my:project:latest", // Too many colons
     "my@project@12345", // Too many at symbols
     "my-project:latest@12345", // Both delimiters
+    "my-project:my-tag/invalid", // Invalid characters in tag
+    "my-project:my-tag\\invalid", // Invalid characters in tag
+    "my-project:my-tag invalid", // Invalid characters in tag
   ];
 
   INVALID_KEYS.forEach((key) => {
