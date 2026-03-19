@@ -1,4 +1,4 @@
-import { AbsolutePathSchema } from "@/utils/path";
+import { AbsolutePath, RelativePathSchema } from "@/utils/path";
 import { z } from "zod";
 
 const AwsStorageSchema = z
@@ -196,25 +196,39 @@ const AwsStorageSchema = z
     };
   });
 
-const FilesystemStorageSchema = z.object({
-  type: z.literal("filesystem"),
-  path: z
-    .string('The "path" field must be a string when "type" is "filesystem"')
-    .min(
-      1,
-      'The "path" field can not be an empty string when "type" is "filesystem". Provide a valid path or set it to "." to use the current directory or leave it empty to default to "./.ethoko-storage"',
-    )
-    .default("./.ethoko-storage")
-    .pipe(AbsolutePathSchema),
-});
+function generateFilesystemStorageSchema(basePath: AbsolutePath) {
+  return z.object({
+    type: z.literal("filesystem"),
+    path: z
+      .string('The "path" field must be a string when "type" is "filesystem"')
+      .min(
+        1,
+        'The "path" field can not be an empty string when "type" is "filesystem". Provide a valid path or set it to "." to use the current directory or leave it empty to default to "./.ethoko-storage"',
+      )
+      .default("./.ethoko-storage")
+      .transform((pathStr) => {
+        // If the path is relative, resolve it against the base path.
+        // Else, return the path as is
+        const relativePathResult = RelativePathSchema.safeParse(pathStr);
+        if (!relativePathResult.success) {
+          return AbsolutePath.from(pathStr);
+        }
+        return basePath.join(relativePathResult.data);
+      }),
+  });
+}
 
-export const ProjectConfigSchema = z.object({
-  name: z
-    .string('"name" field must be a string')
-    .min(1, '"name" field must be a non-empty string'),
-  storage: z.discriminatedUnion(
-    "type",
-    [AwsStorageSchema, FilesystemStorageSchema],
-    '"storage" field must be a valid storage configuration object. Start with specifying the "type" field as either "aws" or "filesystem" and provide the corresponding configuration fields.',
-  ),
-});
+export function generateProjectConfigSchema(
+  basePathResolver: () => AbsolutePath,
+) {
+  return z.object({
+    name: z
+      .string('"name" field must be a string')
+      .min(1, '"name" field must be a non-empty string'),
+    storage: z.discriminatedUnion(
+      "type",
+      [AwsStorageSchema, generateFilesystemStorageSchema(basePathResolver())],
+      '"storage" field must be a valid storage configuration object. Start with specifying the "type" field as either "aws" or "filesystem" and provide the corresponding configuration fields.',
+    ),
+  });
+}

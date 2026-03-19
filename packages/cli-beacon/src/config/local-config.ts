@@ -1,7 +1,7 @@
 import { AbsolutePath, AbsolutePathSchema } from "@/utils/path";
 import fs from "node:fs/promises";
 import { z } from "zod";
-import { ProjectConfigSchema } from "./projects";
+import { generateProjectConfigSchema } from "./projects";
 import { toAsyncResult, toResult } from "@/utils/result";
 
 const EthokoLocalConfigSchema = z
@@ -32,7 +32,7 @@ const EthokoLocalConfigSchema = z
       .optional(),
     projects: z
       .array(
-        ProjectConfigSchema,
+        generateProjectConfigSchema(() => AbsolutePath.from(process.cwd())),
         '"projects" field must be an array of project configurations',
       )
       .default([])

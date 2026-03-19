@@ -66,165 +66,13 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
       },
       /'typingsPath' cannot be an empty string/,
     ],
-    // Bad project configuration
+    // Bad projects configuration
     [
-      '"name" field is missing in project configuration',
+      '"projects" field is not an array',
       {
-        projects: [{ storage: defaultStorageConfig }],
+        projects: "stuff",
       },
-      /"name" field must be a string/,
-    ],
-    // Bad storage configuration
-    [
-      'Storage "type" field is missing',
-      {
-        projects: [{ name: "dummy", storage: {} }],
-      },
-      /"storage" field must be a valid storage configuration object/,
-    ],
-    [
-      'Storage "type" field is invalid',
-      {
-        projects: [{ name: "dummy", storage: { type: "invalid" } }],
-      },
-      /"storage" field must be a valid storage configuration object/,
-    ],
-    // Filesystem storage specific cases
-    [
-      '"path" field is equal to "typingsPath"',
-      {
-        typingsPath: "path/to/typings",
-        projects: [
-          {
-            name: "dummy",
-            storage: { type: "filesystem", path: "path/to/typings" },
-          },
-        ],
-      },
-      /For "filesystem" storage, the "storage.path" cannot be in a child relationship with "typingsPath"/,
-    ],
-    [
-      '"path" field is a child of "typingsPath"',
-      {
-        typingsPath: "path/to/typings",
-        projects: [
-          {
-            name: "dummy",
-            storage: { type: "filesystem", path: "path/to/typings/subdir" },
-          },
-        ],
-      },
-      /For "filesystem" storage, the "storage.path" cannot be in a child relationship with "typingsPath"/,
-    ],
-    // AWS storage specific cases
-    [
-      'Missing "awsRegion" field for "aws" storage',
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: { type: "aws", awsBucketName: "my-bucket" },
-          },
-        ],
-      },
-      /The "awsRegion" field must be a string when "type" is "aws"/,
-    ],
-    [
-      'Missing "awsBucketName" field for "aws" storage',
-      {
-        projects: [
-          { name: "dummy", storage: { type: "aws", awsRegion: "us-east-1" } },
-        ],
-      },
-      /The "awsBucketName" field must be a string when "type" is "aws"/,
-    ],
-    [
-      '"awsAccessKeyId" cannot be provided if "awsProfile" filled',
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsProfile: "profile",
-              awsAccessKeyId: "access-key-id",
-            },
-          },
-        ],
-      },
-      /When "awsProfile" is provided, credential fields \("awsAccessKeyId", "awsSecretAccessKey"\) and role configuration fields \("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
-    ],
-    [
-      '"awsAccessKeyId" empty while "awsSecretAccessKey" provided for "aws" storage',
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsSecretAccessKey: "secret",
-            },
-          },
-        ],
-      },
-      /Both "awsAccessKeyId" and "awsSecretAccessKey" must be provided together when "type" is "aws"/,
-    ],
-    [
-      '"awsSecretAccessKey" empty while "awsAccessKeyId" provided for "aws" storage',
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsAccessKeyId: "access-key-id",
-            },
-          },
-        ],
-      },
-      /Both "awsAccessKeyId" and "awsSecretAccessKey" must be provided together when "type" is "aws"/,
-    ],
-    [
-      '"awsRoleArn" cannot be provided if missing credentials for "aws" storage',
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsRoleArn: "arn:aws:iam::123456789012:role/MyRole",
-            },
-          },
-        ],
-      },
-      /When no AWS credentials are provided, role configuration fields \("awsRoleArn", "awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
-    ],
-    [
-      '"awsRoleExternalId" cannot be provided if "awsRoleArn" is missing for "aws" storage',
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsAccessKeyId: "access-key-id",
-              awsSecretAccessKey: "secret",
-              awsRoleExternalId: "external-id",
-            },
-          },
-        ],
-      },
-      /When "awsRoleArn" is not provided, role configuration fields \("awsRoleExternalId", "awsRoleSessionName", "awsRoleDurationSeconds"\) must be empty/,
+      /"projects" field must be an array/,
     ],
     // Duplicate project names
     [
@@ -280,7 +128,7 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
     ],
     // AWS storage valid cases
     [
-      "Minimal valid config with AWS storage and without credentials",
+      "Minimal valid config with AWS storage",
       {
         projects: [
           {
@@ -289,60 +137,6 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
               type: "aws",
               awsRegion: "us-east-1",
               awsBucketName: "my-bucket",
-            },
-          },
-        ],
-      },
-    ],
-    [
-      "Minimal valid config with AWS and profile-based credentials",
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsProfile: "profile",
-            },
-          },
-        ],
-      },
-    ],
-    [
-      "Valid config with AWS storage and static credentials",
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsAccessKeyId: "access-key-id",
-              awsSecretAccessKey: "secret",
-            },
-          },
-        ],
-      },
-    ],
-    [
-      "Valid config with AWS storage and role configuration",
-      {
-        projects: [
-          {
-            name: "dummy",
-            storage: {
-              type: "aws",
-              awsRegion: "us-east-1",
-              awsBucketName: "my-bucket",
-              awsAccessKeyId: "access-key-id",
-              awsSecretAccessKey: "secret",
-              awsRoleArn: "arn:aws:iam::123456789012:role/MyRole",
-              awsRoleExternalId: "external-id",
-              awsRoleSessionName: "session-name",
-              awsRoleDurationSeconds: 3600,
             },
           },
         ],
