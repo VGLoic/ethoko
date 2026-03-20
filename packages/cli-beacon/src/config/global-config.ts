@@ -5,11 +5,11 @@ import { AbsolutePath, generateAbsolutePathSchema } from "@/utils/path";
 import { toAsyncResult, toResult } from "@/utils/result";
 import { generateProjectConfigSchema } from "./projects";
 
-function getEthokoGlobalPath(): AbsolutePath {
+export function getEthokoGlobalPath(): AbsolutePath {
   return new AbsolutePath(os.homedir(), ".ethoko");
 }
 
-function getEthokoGlobalConfigPath(): AbsolutePath {
+export function getEthokoGlobalConfigPath(): AbsolutePath {
   return getEthokoGlobalPath().join("config.json");
 }
 
@@ -73,6 +73,7 @@ const GlobalEthokoConfigSchema = z
     }
   });
 
+export type GlobalEthokoConfigInput = z.input<typeof GlobalEthokoConfigSchema>;
 export type GlobalEthokoConfig = z.infer<typeof GlobalEthokoConfigSchema> & {
   configPath: AbsolutePath | undefined;
 };

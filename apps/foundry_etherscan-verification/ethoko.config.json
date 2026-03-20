@@ -1,5 +1,4 @@
 {
-  "compilationOutputPath": "out",
   "projects": [
     {
       "name": "verified-forge-counter",
@@ -8,5 +7,6 @@
         "path": ".ethoko-storage"
       }
     }
-  ]
+  ],
+  "compilationOutputPath": "out"
 }

@@ -4,6 +4,14 @@ import path from "path";
 import { CommandLogger } from "@/ui";
 import { CliError } from "@/client/error";
 import { AbsolutePath, RelativePath } from "@/utils/path";
+import { EthokoCliConfig, loadConfig } from "@/config";
+import {
+  getEthokoGlobalConfigPath,
+  getEthokoGlobalPath,
+  GlobalEthokoConfigInput,
+} from "@/config/global-config";
+import { LocalEthokoConfigInput } from "@/config/local-config";
+import { toAsyncResult } from "@/utils/result";
 
 /**
  * Register the CLI init command.
@@ -13,7 +21,6 @@ export function registerInitCommand(program: Command): void {
     .command("init")
     .description("Initialize Ethoko configuration interactively")
     .option("--config <path>", "Custom config file path", "ethoko.config.json")
-    .option("--force", "Overwrite existing config without prompting")
     .action(async (opts) => {
       const logger = new CommandLogger();
       try {
@@ -32,282 +39,356 @@ export function registerInitCommand(program: Command): void {
     });
 }
 
-type ConfigData = {
-  pulledArtifactsPath: AbsolutePath;
-  typingsPath: AbsolutePath;
-  compilationOutputPath?: AbsolutePath;
-  projects: Array<ProjectConfig>;
-  debug: boolean;
-};
+type ProjectConfigInput = NonNullable<
+  LocalEthokoConfigInput["projects"]
+>[number];
 
-type ProjectConfig = {
-  name: string;
-  storage: StorageConfig;
-};
-type StorageConfig =
-  | {
-      type: "aws";
-      awsRegion: string;
-      awsBucketName: string;
-      awsProfile?: string;
-      awsAccessKeyId?: string;
-      awsSecretAccessKey?: string;
-      awsRoleArn?: string;
-      awsRoleExternalId?: string;
-      awsRoleSessionName?: string;
-      awsRoleDurationSeconds?: number;
-    }
-  | {
-      type: "filesystem";
-      path: string;
-    };
-
+/**
+ * Run the interactive initialization process to create or update the global and local Ethoko configuration files.
+ *
+ * Flow is as follows:
+ * 1. Welcome message and intro
+ * 2. Load global and local config if they exist
+ * 3. Look at projects
+ *  3.A. If no project exists, ask if user wants to add a first project
+ *    3.A.A. If yes, use `promptProject` to ask for project name, storage configuration (AWS S3 or filesystem),
+ *           and scope (global saved to ~/.ethoko/config.json, or local saved to ./ethoko.config.json)
+ *    3.A.B. If no, go to step 4
+ *  3.B. If projects exist, show summary of existing projects and ask if user wants to add a new project
+ *   3.B.A. If yes, use `promptProject` to configure the new project and add it to the list
+ *   3.B.B. If no, go to step 4
+ * 4. Check if Hardhat or Foundry project based on common files
+ *  4.A. If detected, suggest default compilation output path (./artifacts for Hardhat, ./out for Foundry) and ask user to confirm or input another path, go to step 5
+ *  4.B. If not detected, go to step 5
+ * 5. Check if .git directory exists,
+ *  5.A. If it exists and `.gitignore` exists, add the typings path to .gitignore if not already present. If the pulled artifacts path is local (relative path), add it to .gitignore if not already present. Inform the user about the changes made to .gitignore.
+ *  5.B. If it exists and `.gitignore` does not exist, create a .gitignore file with the typings path and, if applicable, the pulled artifacts path. Inform the user about the creation of .gitignore.
+ *  5.C. If it does not exist, skip .gitignore handling and inform the user that they should manually ignore the typings path and pulled artifacts path if they are local.
+ * 6. Show summary of the changed configuration and inform user where the config files are located, next steps, and how to edit the config file to add more projects or customize further.
+ */
 async function runInit(
   logger: CommandLogger,
   opts: {
     config: string;
-    force?: boolean;
   },
 ): Promise<void> {
-  logger.intro("Welcome to Ethoko CLI Configuration");
+  logger.intro("Welcome to Ethoko CLI Configuration!");
 
-  const configPath = new AbsolutePath(opts.config);
-
-  // Check if config already exists
-  const configExists = await fs
-    .stat(configPath.resolvedPath)
-    .then(() => true)
-    .catch(() => false);
-
-  if (configExists && !opts.force) {
-    const overwrite = await logger.prompts.confirm({
-      message: `Configuration file already exists at ${configPath.resolvedPath}. Overwrite?`,
-      initialValue: false,
-    });
-
-    if (logger.prompts.isCancel(overwrite)) {
-      logger.cancel("Configuration cancelled");
-      return;
-    }
-
-    if (!overwrite) {
-      logger.cancel("Configuration cancelled");
-      return;
-    }
-  }
-
-  const projectConfigResult = await promptFirstProject(logger);
-  if (projectConfigResult.cancelled) {
-    logger.cancel("Operation cancelled during project configuration");
-    return;
-  }
-
-  logger.note(
-    `Project "${projectConfigResult.project.name}" configured successfully!\nLet's finish with the last details!`,
-  );
-
-  // Additional paths
-
-  const compilationOutputOptions = await deriveCompilationOutputPathsOptions();
-  let compilationOutputPath: RelativePath | undefined = undefined;
-  if (compilationOutputOptions.length > 0) {
-    const compilationOutputSelection = await logger.prompts.select({
-      message: "Select the path where your compilation output are stored:",
-      options: [
-        ...compilationOutputOptions.map((option) => ({
-          value: option.path,
-          label: `${option.path.relativePath} (${option.label})`,
-        })),
-        {
-          value: RelativePath.unsafeFrom("other"),
-          label: "Other",
-          hint: "Specify another path",
-        },
-      ],
-    });
-    if (logger.prompts.isCancel(compilationOutputSelection)) {
-      logger.cancel("Configuration cancelled");
-      return;
-    }
-    if (compilationOutputSelection.relativePath !== "other") {
-      compilationOutputPath = compilationOutputSelection;
-    }
-  }
-  if (!compilationOutputPath) {
-    const compilationOutputResult = await logger.prompts.text({
-      message:
-        "Input the path where your compilation output are stored (e.g. `./out` for Forge, `./artifacts` for Hardhat, press Enter to skip):",
-      validate: (value) => {
-        if (value && value.trim().length > 0) {
-          try {
-            RelativePath.unsafeFrom(value.trim());
-            return undefined;
-          } catch {
-            return "Invalid relative path";
-          }
-        } else {
-          return undefined; // Allow empty value
-        }
-      },
-    });
-
-    if (logger.prompts.isCancel(compilationOutputResult)) {
-      logger.cancel("Configuration cancelled");
-      return;
-    }
-    compilationOutputPath =
-      compilationOutputResult.trim().length > 0
-        ? RelativePath.unsafeFrom(compilationOutputResult.trim())
-        : undefined;
-  }
-
-  const pulledArtifactsPath = await logger.prompts.text({
-    message:
-      "Choose a path for the pulled artifacts store (default is .ethoko):",
-    initialValue: ".ethoko",
-    validate: (value) => {
-      if (!value || value.trim().length === 0) {
-        return "Pulled artifacts path cannot be empty";
-      }
-      try {
-        new AbsolutePath(value.trim());
-        return undefined;
-      } catch {
-        return "Invalid path, must be a valid absolute or relative path";
-      }
-    },
-  });
-
-  if (logger.prompts.isCancel(pulledArtifactsPath)) {
-    logger.cancel("Configuration cancelled");
-    return;
-  }
-
-  const typingsPath = await logger.prompts.text({
-    message:
-      "Choose a path for the generated TypeScript typings (default is .ethoko-typings):",
-    initialValue: ".ethoko-typings",
-    validate: (value) => {
-      if (!value || value.trim().length === 0) {
-        return "Typings path cannot be empty";
-      }
-      try {
-        new AbsolutePath(value.trim());
-        return undefined;
-      } catch {
-        return "Invalid path, must be a valid absolute or relative path";
-      }
-    },
-  });
-
-  if (logger.prompts.isCancel(typingsPath)) {
-    logger.cancel("Configuration cancelled");
-    return;
-  }
-
-  // Build config object
-  const configData: ConfigData = {
-    pulledArtifactsPath: new AbsolutePath(pulledArtifactsPath),
-    typingsPath: new AbsolutePath(typingsPath),
-    compilationOutputPath: compilationOutputPath
-      ? new AbsolutePath(compilationOutputPath.relativePath)
-      : undefined,
-    projects: [projectConfigResult.project],
-    debug: false,
-  };
-
-  // Show summary
-  const summaryLines: string[] = [
-    `Project: ${projectConfigResult.project.name}`,
-    ` Storage type: ${projectConfigResult.project.storage.type === "aws" ? "AWS S3" : "Filesystem"}`,
+  const introLines = [
+    "This interactive setup will guide you through configuring your Ethoko projects and settings.",
+    "If the script is not enough, we encourage you to edit the configuration files directly for full customization.",
   ];
+  logger.note(introLines.join("\n"));
 
-  if (projectConfigResult.project.storage.type === "aws") {
-    summaryLines.push(
-      ` AWS region: ${projectConfigResult.project.storage.awsRegion}`,
-    );
-    summaryLines.push(
-      ` S3 bucket: ${projectConfigResult.project.storage.awsBucketName}`,
-    );
-    if (projectConfigResult.project.storage.awsProfile) {
-      summaryLines.push(
-        ` AWS profile: ${projectConfigResult.project.storage.awsProfile}`,
-      );
-    } else if (projectConfigResult.project.storage.awsAccessKeyId) {
-      summaryLines.push(
-        ` AWS access Key ID: ${projectConfigResult.project.storage.awsAccessKeyId}`,
-      );
-      summaryLines.push(` AWS Secret Access Key: ****`);
-      if (projectConfigResult.project.storage.awsRoleArn) {
-        summaryLines.push(
-          ` AWS role ARN: ${projectConfigResult.project.storage.awsRoleArn}`,
-        );
+  // Step 1: Load existing configs
+  const config = await loadConfig({ localConfigPath: opts.config });
+
+  // Step 2: Projects
+  if (config.projects.length === 0) {
+    const wants = await logger.prompts.confirm({
+      message:
+        "No projects have been configured yet. Do you want to add your first project?",
+      initialValue: true,
+    });
+    if (logger.prompts.isCancel(wants)) {
+      logger.cancel("Configuration cancelled");
+      return;
+    }
+    if (wants) {
+      const result = await handleProject(logger, config);
+      if (result.cancelled) {
+        logger.cancel("Operation cancelled during project configuration");
+        return;
       }
-    } else {
-      summaryLines.push(` Authentication: environment (default)`);
     }
   } else {
-    summaryLines.push(
-      ` Storage path: ${projectConfigResult.project.storage.path}`,
+    const lines = config.projects.map(
+      (p) =>
+        ` • ${p.name} (${p.storage.type}) [${config.globalProjectNames.has(p.name) ? "global" : "local"}]`,
     );
+    logger.note(lines.join("\n"), "Existing projects");
+    const wants = await logger.prompts.confirm({
+      message: "Do you want to add another project?",
+      initialValue: true,
+    });
+    if (logger.prompts.isCancel(wants)) {
+      logger.cancel("Configuration cancelled");
+      return;
+    }
+    if (wants) {
+      const result = await handleProject(logger, config);
+      if (result.cancelled) {
+        logger.cancel("Operation cancelled during project configuration");
+        return;
+      }
+    }
   }
 
-  summaryLines.push("");
-  summaryLines.push("Artifact paths:");
-  summaryLines.push(` Pulled artifacts path: ${pulledArtifactsPath}`);
-  summaryLines.push(` Typings path: ${typingsPath}`);
-  if (compilationOutputPath) {
-    summaryLines.push(` Compilation output path: ${compilationOutputPath}`);
-  }
-
-  logger.note(summaryLines.join("\n"), "Configuration summary");
-
-  const proceed = await logger.prompts.confirm({
-    message: "Save this configuration?",
-    initialValue: true,
-  });
-
-  if (logger.prompts.isCancel(proceed)) {
-    logger.cancel("Configuration cancelled");
-    return;
-  }
-
-  if (!proceed) {
-    logger.cancel("Configuration cancelled");
-    return;
-  }
-
-  // Write config file
-  try {
-    await fs.writeFile(
-      configPath.resolvedPath,
-      JSON.stringify(configData, null, 2) + "\n",
-      "utf-8",
-    );
-  } catch (error) {
-    throw new CliError(
-      `Failed to write configuration file to ${configPath.resolvedPath}. ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  logger.outro(
-    `Configuration saved to ${opts.config}\n\nEdit this file to add more projects or customize your configuration further.\nRun "ethoko pull ${projectConfigResult.project.name}" to pull artifacts for your project.`,
+  // Step 3: Compilation output path
+  const compilationOutputPathResult = await handleCompilationOutputPath(
+    logger,
+    config,
   );
+  if (compilationOutputPathResult.cancelled) {
+    logger.cancel(
+      "Operation cancelled during compilation output path configuration",
+    );
+    return;
+  }
+
+  // Step 4: .gitignore handling
+  await handleGitignore(
+    logger,
+    new AbsolutePath(process.cwd()),
+    config.typingsPath,
+    config.pulledArtifactsPath,
+  );
+
+  const outroLines: string[] = [
+    "For further customization, edit the configuration files directly:",
+    ` - Global config: ${config.globalConfigPath?.resolvedPath ?? getEthokoGlobalConfigPath().resolvedPath}`,
+    ` - Local config: ${config.localConfigPath?.resolvedPath ?? new AbsolutePath(process.cwd(), "ethoko.config.json").resolvedPath}`,
+    "You can use this init script again anytime to add more projects or update your configuration.",
+  ];
+  logger.note(outroLines.join("\n"));
+  logger.outro("Configuration completed");
 }
 
 /**
- * Prompt the user to configure their first project, including storage type and related settings.
- * Handles both AWS S3 and filesystem storage options with appropriate follow-up questions.
- * @returns An object containing the configured project or a cancellation flag if the user cancels at any point.
+ * Prompt the user to set up a new project configuration then update the correct config file
+ * @returns The new project configuration and its scope, or a cancellation flag if the user cancels at any point
  */
-async function promptFirstProject(
+async function handleProject(
   logger: CommandLogger,
-): Promise<{ cancelled: false; project: ProjectConfig } | { cancelled: true }> {
+  config: EthokoCliConfig,
+): Promise<
+  | {
+      cancelled: false;
+      scope: "global" | "local";
+      project: ProjectConfigInput;
+    }
+  | { cancelled: true }
+> {
+  const promptResult = await promptProject(logger, config);
+  if (promptResult.cancelled) {
+    return { cancelled: true };
+  }
+
+  if (promptResult.scope === "global") {
+    if (config.globalConfigPath) {
+      // If global config already exists, we update its content with the new project
+      const existingGlobalConfigContentResult = await toAsyncResult(
+        fs
+          .readFile(config.globalConfigPath.resolvedPath, "utf-8")
+          .then(JSON.parse),
+      );
+      if (!existingGlobalConfigContentResult.success) {
+        throw new CliError(
+          `Global config file at ${config.globalConfigPath.resolvedPath} can not be read or is not a valid JSON. Please fix it before adding a new project.`,
+        );
+      }
+      const updatedContent = {
+        ...existingGlobalConfigContentResult.value,
+        projects: [
+          ...(existingGlobalConfigContentResult.value.projects ?? []),
+          promptResult.project,
+        ],
+      };
+      const updateConfigResult = await toAsyncResult(
+        fs.writeFile(
+          config.globalConfigPath.resolvedPath,
+          JSON.stringify(updatedContent, null, 2) + "\n",
+          "utf-8",
+        ),
+      );
+      if (!updateConfigResult.success) {
+        throw new CliError(
+          "Failed to update global config file with the new project. Please verify permissions or contact us if the problem persists.",
+        );
+      }
+    } else {
+      // If global config doesn't exist, we create it with the new project
+      const ensureDirResult = await toAsyncResult(
+        fs.mkdir(getEthokoGlobalPath().resolvedPath, { recursive: true }),
+      );
+      if (!ensureDirResult.success) {
+        throw new CliError(
+          `Failed to create directory for global config at ${getEthokoGlobalPath().resolvedPath}. Please verify permissions or contact us if the problem persists.`,
+        );
+      }
+      const config: GlobalEthokoConfigInput = {
+        projects: [promptResult.project],
+      };
+      const writeConfigResult = await toAsyncResult(
+        fs.writeFile(
+          getEthokoGlobalConfigPath().resolvedPath,
+          JSON.stringify(config, null, 2) + "\n",
+          "utf-8",
+        ),
+      );
+      if (!writeConfigResult.success) {
+        throw new CliError(
+          `Failed to write global config file at ${getEthokoGlobalConfigPath().resolvedPath}. Please verify permissions or contact us if the problem persists.`,
+        );
+      }
+    }
+  } else {
+    if (config.localConfigPath) {
+      // If local config already exists, we update its content with the new project
+      const existingLocalConfigContentResult = await toAsyncResult(
+        fs
+          .readFile(config.localConfigPath.resolvedPath, "utf-8")
+          .then(JSON.parse),
+      );
+      if (!existingLocalConfigContentResult.success) {
+        throw new CliError(
+          `Local config file at ${config.localConfigPath.resolvedPath} can not be read or is not a valid JSON. Please fix it before adding a new project.`,
+        );
+      }
+      const existingLocalConfigContent =
+        existingLocalConfigContentResult.value as LocalEthokoConfigInput;
+      const updatedLocalConfigContent: LocalEthokoConfigInput =
+        existingLocalConfigContent;
+      updatedLocalConfigContent.projects = updatedLocalConfigContent.projects
+        ? [...updatedLocalConfigContent.projects, promptResult.project]
+        : [promptResult.project];
+      const updateLocalConfigResult = await toAsyncResult(
+        fs.writeFile(
+          config.localConfigPath.resolvedPath,
+          JSON.stringify(updatedLocalConfigContent, null, 2) + "\n",
+          "utf-8",
+        ),
+      );
+      if (!updateLocalConfigResult.success) {
+        throw new CliError(
+          "Failed to update local config file with the new project. Please verify permissions or contact us if the problem persists.",
+        );
+      }
+    } else {
+      // If local config doesn't exist, we will create it in the next step with the new project and compilation output path if applicable
+      const localConfigFilePath = new AbsolutePath(
+        process.cwd(),
+        "ethoko.config.json",
+      );
+      const content: LocalEthokoConfigInput = {
+        projects: [promptResult.project],
+      };
+      const writeLocalConfigResult = await toAsyncResult(
+        fs.writeFile(
+          localConfigFilePath.resolvedPath,
+          JSON.stringify(content, null, 2) + "\n",
+          "utf-8",
+        ),
+      );
+      if (!writeLocalConfigResult.success) {
+        throw new CliError(
+          `Failed to write local config file at ${localConfigFilePath.resolvedPath}. Please verify permissions or contact us if the problem persists.`,
+        );
+      }
+    }
+  }
+
+  const projectLines = [];
+  if (promptResult.scope === "global") {
+    if (config.globalConfigPath) {
+      projectLines.push(
+        `Global config updated at ${config.globalConfigPath.resolvedPath}`,
+      );
+    } else {
+      projectLines.push(
+        `Global config created at ${getEthokoGlobalConfigPath().resolvedPath}`,
+      );
+    }
+  } else {
+    if (config.localConfigPath) {
+      projectLines.push(
+        `Local config updated at ${config.localConfigPath.resolvedPath}`,
+      );
+    } else {
+      const localConfigFilePath = new AbsolutePath(
+        process.cwd(),
+        "ethoko.config.json",
+      );
+      projectLines.push(
+        `Local config created at ${localConfigFilePath.resolvedPath}`,
+      );
+    }
+  }
+
+  projectLines.push(
+    "",
+    `New project: "${promptResult.project.name}" (${promptResult.scope})`,
+    ` Storage type: ${promptResult.project.storage.type === "aws" ? "AWS S3" : "Filesystem"}`,
+  );
+  if (promptResult.project.storage.type === "aws") {
+    projectLines.push(` AWS region: ${promptResult.project.storage.awsRegion}`);
+    projectLines.push(
+      ` S3 bucket: ${promptResult.project.storage.awsBucketName}`,
+    );
+    if (promptResult.project.storage.awsProfile) {
+      projectLines.push(
+        ` AWS profile: ${promptResult.project.storage.awsProfile}`,
+      );
+    } else if (promptResult.project.storage.awsAccessKeyId) {
+      projectLines.push(
+        ` AWS access key ID: ${promptResult.project.storage.awsAccessKeyId}`,
+      );
+      projectLines.push(` AWS secret access key: ****`);
+      if (promptResult.project.storage.awsRoleArn) {
+        projectLines.push(
+          ` AWS role ARN: ${promptResult.project.storage.awsRoleArn}`,
+        );
+      }
+    } else {
+      projectLines.push(` Authentication: environment (default)`);
+    }
+  } else {
+    projectLines.push(
+      ` Storage path: ${promptResult.project.storage.path ?? (promptResult.scope === "global" ? "~/.ethoko/storage" : ".ethoko-storage (relative to project)")} `,
+    );
+  }
+  projectLines.push("");
+
+  logger.note(projectLines.join("\n"), "Project summary");
+  logger.success("Project configured successfully!");
+
+  return promptResult;
+}
+
+/**
+ * Prompt the user to configure a new project, including storage type, scope (global or local), and related settings.
+ *
+ * Flow is as follows:
+ * 1. Ask for project name with validation (non-empty, not already in use).
+ * 2. Ask user to select storage type (AWS S3 or filesystem).
+ * 3. Ask if project is global (saved to ~/.ethoko/config.json, recommended) or local (saved to ./ethoko.config.json).
+ *  3.A. AWS S3 selected: use `promptAwsS3Config` to gather AWS-specific configuration details.
+ *  3.B. Filesystem selected: ask for the storage path, with default value based on scope:
+ *       global: "storage" (resolves to ~/.ethoko/storage), local: ".ethoko-storage" (relative to cwd).
+ * @returns An object containing the scope, configured project, or a cancellation flag if the user cancels at any point.
+ */
+async function promptProject(
+  logger: CommandLogger,
+  config: EthokoCliConfig,
+): Promise<
+  | {
+      cancelled: false;
+      scope: "global" | "local";
+      project: ProjectConfigInput;
+    }
+  | { cancelled: true }
+> {
   const projectName = await logger.prompts.text({
-    message: "Enter the name of your first project:",
+    message: "Enter the name of your project:",
     validate: (value) => {
       if (!value || value.trim().length === 0) {
         return "Project name cannot be empty";
+      }
+      if (
+        config.localProjectNames.has(value.trim()) ||
+        config.globalProjectNames.has(value.trim())
+      ) {
+        return `Project name "${value.trim()}" is already in use`;
       }
       return undefined;
     },
@@ -338,6 +419,42 @@ async function promptFirstProject(
     return { cancelled: true };
   }
 
+  // Scope selection
+  const hints = {
+    aws: {
+      global:
+        "Recommended as project will be accessible from any location on your machine",
+      local: "Project will be accessible only from the directory",
+    },
+    filesystem: {
+      global:
+        "The project will be accessible from any location on your machine, most suited for personal projects",
+      local:
+        "The project will be local to the directory and can be committed to version control, most suited for collaborative projects",
+    },
+  };
+  const scope = await logger.prompts.select({
+    message: `Project "${projectName}" ~ Where should this project config be saved?`,
+    options: [
+      {
+        value: "global",
+        label: "Global (~/.ethoko/config.json)",
+        hint: hints[storageType].global,
+      },
+      {
+        value: "local",
+        label: "Local (./ethoko.config.json)",
+        hint: hints[storageType].local,
+      },
+    ],
+  });
+
+  if (logger.prompts.isCancel(scope)) {
+    return { cancelled: true };
+  }
+
+  const resolvedScope = scope as "global" | "local";
+
   if (storageType === "aws") {
     const awsConfigResult = await promptAwsS3Config(logger, projectName);
     if (awsConfigResult.cancelled) {
@@ -346,6 +463,7 @@ async function promptFirstProject(
 
     return {
       cancelled: false,
+      scope: resolvedScope,
       project: {
         name: projectName,
         storage: awsConfigResult.storageConfig,
@@ -354,9 +472,11 @@ async function promptFirstProject(
   }
 
   if (storageType === "filesystem") {
+    const defaultPath =
+      resolvedScope === "global" ? "storage" : ".ethoko-storage";
     const storagePath = await logger.prompts.text({
-      message: `Project "${projectName}" ~ Choose a path for the artifacts store (default is .ethoko-storage):`,
-      initialValue: ".ethoko-storage",
+      message: `Project "${projectName}" ~ Choose a path for the artifacts store (default is ${defaultPath}):`,
+      initialValue: defaultPath,
       validate: (value) => {
         if (!value || value.trim().length === 0) {
           return "Storage path cannot be empty";
@@ -371,6 +491,7 @@ async function promptFirstProject(
 
     return {
       cancelled: false,
+      scope: resolvedScope,
       project: {
         name: projectName,
         storage: {
@@ -394,7 +515,13 @@ async function promptAwsS3Config(
   logger: CommandLogger,
   projectName: string,
 ): Promise<
-  | { cancelled: false; storageConfig: Extract<StorageConfig, { type: "aws" }> }
+  | {
+      cancelled: false;
+      storageConfig: Extract<
+        NonNullable<LocalEthokoConfigInput["projects"]>[number]["storage"],
+        { type: "aws" }
+      >;
+    }
   | { cancelled: true }
 > {
   const awsRegionInput = await logger.prompts.text({
@@ -618,6 +745,152 @@ async function promptAwsS3Config(
   );
 }
 
+async function handleCompilationOutputPath(
+  logger: CommandLogger,
+  config: EthokoCliConfig,
+): Promise<
+  | { cancelled: false; compilationOutputPath: RelativePath | undefined }
+  | { cancelled: true }
+> {
+  if (config.compilationOutputPath) {
+    return { cancelled: false, compilationOutputPath: undefined };
+  }
+  const compilationOutputOptions = await deriveCompilationOutputPathsOptions();
+
+  if (compilationOutputOptions.length === 0) {
+    return { cancelled: false, compilationOutputPath: undefined };
+  }
+
+  let compilationOutputPath: RelativePath | undefined = undefined;
+
+  const compilationOutputSelection = await logger.prompts.select({
+    message: "Select the path where your compilation output are stored:",
+    options: [
+      ...compilationOutputOptions.map((option) => ({
+        value: option.path,
+        label: `${option.path.relativePath} (${option.label})`,
+      })),
+      {
+        value: RelativePath.unsafeFrom("other"),
+        label: "Other",
+        hint: "Specify another path",
+      },
+      {
+        value: RelativePath.unsafeFrom("skip"),
+        label: "Skip",
+        hint: "Skip specifying a path",
+      },
+    ],
+  });
+
+  if (logger.prompts.isCancel(compilationOutputSelection)) {
+    return { cancelled: true };
+  }
+
+  if (compilationOutputSelection.relativePath === "skip") {
+    logger.info("Skipping compilation output path configuration");
+    return { cancelled: false, compilationOutputPath: undefined };
+  }
+
+  if (compilationOutputSelection.relativePath === "other") {
+    const compilationOutputResult = await logger.prompts.text({
+      message:
+        "Input the path where your compilation output are stored (e.g. `./out` for Forge, `./artifacts` for Hardhat, use empty value to skip):",
+      validate: (value) => {
+        if (value && value.trim().length > 0) {
+          try {
+            RelativePath.unsafeFrom(value.trim());
+            return undefined;
+          } catch {
+            return "Invalid relative path";
+          }
+        } else {
+          return undefined; // Allow empty value
+        }
+      },
+    });
+
+    if (logger.prompts.isCancel(compilationOutputResult)) {
+      return { cancelled: true };
+    }
+
+    compilationOutputPath =
+      compilationOutputResult.trim().length > 0
+        ? RelativePath.unsafeFrom(compilationOutputResult.trim())
+        : undefined;
+  }
+
+  if (compilationOutputSelection.relativePath !== "other") {
+    compilationOutputPath = compilationOutputSelection;
+  }
+
+  if (!compilationOutputPath) {
+    logger.info("Skipping compilation output path configuration");
+    return { cancelled: false, compilationOutputPath: undefined };
+  }
+
+  if (config.localConfigPath) {
+    // If local config already exists, we update its content with the new compilation output path
+    const existingLocalConfigContentResult = await toAsyncResult(
+      fs
+        .readFile(config.localConfigPath.resolvedPath, "utf-8")
+        .then(JSON.parse),
+    );
+    if (!existingLocalConfigContentResult.success) {
+      throw new CliError(
+        `Local config file at ${config.localConfigPath.resolvedPath} can not be read or is not a valid JSON. Please fix it before adding a compilation output path.`,
+      );
+    }
+    const existingLocalConfigContent =
+      existingLocalConfigContentResult.value as LocalEthokoConfigInput;
+    const updatedLocalConfigContent: LocalEthokoConfigInput =
+      existingLocalConfigContent;
+    updatedLocalConfigContent.compilationOutputPath =
+      compilationOutputPath.relativePath;
+    const updateLocalConfigResult = await toAsyncResult(
+      fs.writeFile(
+        config.localConfigPath.resolvedPath,
+        JSON.stringify(updatedLocalConfigContent, null, 2) + "\n",
+        "utf-8",
+      ),
+    );
+    if (!updateLocalConfigResult.success) {
+      throw new CliError(
+        "Failed to update local config file with the compilation output path. Please verify permissions or contact us if the problem persists.",
+      );
+    }
+    logger.info(
+      `Local configuration updated with compilation output path ${compilationOutputPath.relativePath}`,
+    );
+  } else {
+    // If local config doesn't exist, we will create it in the next step with the new compilation output path and project config if applicable
+    const localConfigFilePath = new AbsolutePath(
+      process.cwd(),
+      "ethoko.config.json",
+    );
+    const content: LocalEthokoConfigInput = {
+      compilationOutputPath: compilationOutputPath.relativePath,
+    };
+    const writeLocalConfigResult = await toAsyncResult(
+      fs.writeFile(
+        localConfigFilePath.resolvedPath,
+        JSON.stringify(content, null, 2) + "\n",
+        "utf-8",
+      ),
+    );
+    if (!writeLocalConfigResult.success) {
+      throw new CliError(
+        `Failed to write local config file at ${localConfigFilePath.resolvedPath}. Please verify permissions or contact us if the problem persists.`,
+      );
+    }
+    logger.info(
+      `Local configuration created at ${localConfigFilePath.resolvedPath} with compilation output path ${compilationOutputPath.relativePath}`,
+    );
+  }
+
+  return { cancelled: false, compilationOutputPath };
+}
+
 /**
  * Identify potential compilation output paths based on common project structures (e.g., Hardhat, Foundry)
  * For Hardhat, checks for hardhat.config.js/ts, package.json with hardhat dependency, or artifacts/ directory to suggest ./artifacts
@@ -711,4 +984,103 @@ async function deriveCompilationOutputPathsOptions(): Promise<
   }
 
   return options;
+}
+
+/**
+ * Handle .gitignore updates for Ethoko-generated paths.
+ * Checks for a .git directory to determine if this is a git repo, then adds the relevant paths to .gitignore.
+ * @param logger Command logger instance
+ * @param cwd Current working directory
+ * @param typingsPath Path to the generated TypeScript typings (always added to .gitignore)
+ * @param pulledArtifactsPath Path to pulled artifacts store (added only if relative)
+ */
+async function handleGitignore(
+  logger: CommandLogger,
+  cwd: AbsolutePath,
+  typingsPath: AbsolutePath,
+  pulledArtifactsPath: AbsolutePath | undefined,
+): Promise<void> {
+  const isInAGitRepo = await isInGitRepository(cwd);
+  if (!isInAGitRepo) {
+    return;
+  }
+
+  // Determine which paths are relevant (relative paths only)
+  const pathsToAdd: { path: string; label: string }[] = [];
+  if (typingsPath.isChildOf(cwd)) {
+    pathsToAdd.push({
+      path: typingsPath.relativeTo(cwd).relativePath,
+      label: "TypeScript typings path",
+    });
+  }
+  if (pulledArtifactsPath && pulledArtifactsPath.isChildOf(cwd)) {
+    pathsToAdd.push({
+      path: pulledArtifactsPath.relativeTo(cwd).relativePath,
+      label: "pulled artifacts path",
+    });
+  }
+
+  if (pathsToAdd.length === 0) {
+    return; // No relevant paths to add to .gitignore
+  }
+
+  const gitignorePath = cwd.join(".gitignore");
+  const gitignoreExists = await fs
+    .stat(gitignorePath.resolvedPath)
+    .then(() => true)
+    .catch(() => false);
+
+  if (gitignoreExists) {
+    const content = await fs.readFile(gitignorePath.resolvedPath, "utf-8");
+    const existingLines = content.split("\n").map((l) => l.trim());
+    const missingPaths = pathsToAdd.filter(
+      // We are quite soft on the check to avoid duplicates, we check if any existing line includes the path to add, which allows for some flexibility in how users may have already added it
+      (p) => !existingLines.some((line) => line.includes(p.path)),
+    );
+    if (missingPaths.length > 0) {
+      const addition =
+        "\n# Ethoko\n" + missingPaths.map((p) => p.path).join("\n") + "\n";
+      await fs.writeFile(
+        gitignorePath.resolvedPath,
+        content + addition,
+        "utf-8",
+      );
+      logger.success(
+        `Updated .gitignore with ${missingPaths.map((p) => p.label).join(" and ")}`,
+      );
+    }
+  } else {
+    const content =
+      "# Ethoko\n" + pathsToAdd.map((p) => p.path).join("\n") + "\n";
+    await fs.writeFile(gitignorePath.resolvedPath, content, "utf-8");
+    logger.success(
+      `Created .gitignore with ${pathsToAdd.map((p) => p.label).join(" and ")}`,
+    );
+  }
+}
+
+/**
+ * Recursively checks if the given directory is part of a Git repository by looking for a .git folder in the current or parent directories.
+ */
+async function isInGitRepository(startDir: AbsolutePath): Promise<boolean> {
+  let currentDir = startDir;
+  while (true) {
+    const candidate = currentDir.join(".git");
+    const exists = await fs
+      .stat(candidate.resolvedPath)
+      .then(() => true)
+      .catch(() => false);
+    if (exists) {
+      return true;
+    }
+
+    if (isRootPath(currentDir)) {
+      return false;
+    }
+    currentDir = currentDir.dirname();
+  }
+}
+
+function isRootPath(currentPath: AbsolutePath): boolean {
+  return currentPath.dirname().resolvedPath === currentPath.resolvedPath;
 }

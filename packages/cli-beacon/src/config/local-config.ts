@@ -101,6 +101,7 @@ const EthokoLocalConfigSchema = z
     }
   });
 
+export type LocalEthokoConfigInput = z.input<typeof EthokoLocalConfigSchema>;
 export type LocalEthokoConfig = z.infer<typeof EthokoLocalConfigSchema> & {
   configPath: AbsolutePath | undefined;
 };
