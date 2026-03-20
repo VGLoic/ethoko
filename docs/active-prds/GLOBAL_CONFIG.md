@@ -1,4 +1,4 @@
-# Global Config Research
+# Global Config PRD
 
 ## Implementation Status
 
@@ -6,8 +6,9 @@
 |-------|-------------|--------|
 | Phase 1 | Foundation (global config discovery, `~` path expansion, config validation) | ✅ Complete (commit `10673b9`) |
 | Phase 2 | Core Global Features (global pulled artifacts path, global projects, merge logic) | ✅ Complete (commit `10673b9`) |
-| Phase 3 | User Experience (`ethoko init` rework, `ethoko config`) | 🔄 In Progress |
-| Phase 4 | Advanced Features (XDG support) | ⬜ Not Started |
+| Phase 3 | User Experience (`ethoko init` rework, `ethoko config`) | ✅ Complete (commit `381ecf0`) |
+| Phase 4 | Cache Management (`ethoko prune`) | ⬜ Not Started |
+| Phase 5 | Advanced Features (XDG support) | ⬜ Not Started |
 
 ---
 
@@ -467,9 +468,11 @@ ethoko init    # Interactive local init — always writes ./ethoko.config.json
 1. **Welcome** — intro message
 2. **Load configs** — merges global (`~/.ethoko/config.json`) + local (`./ethoko.config.json`) configs
 3. **Projects** — shows existing projects; offers to add one new project (global or local scope)
-4. **Compilation output path** — detects Hardhat/Foundry, suggests defaults
+4. **Compilation output path** — detects Hardhat/Foundry, suggests defaults (can skip)
 5. **`.gitignore` handling** — adds typings path (and relative pulled-artifacts path) automatically
-6. **Summary + confirm + write** — writes `./ethoko.config.json` (always) and `~/.ethoko/config.json` (only if a global project was added)
+6. **Outro** — shows config file paths and next steps
+
+> Note: `pulledArtifactsPath` and `typingsPath` are **not prompted** — they use defaults and can be changed by editing config files directly. There is no final "Save?" confirmation; writes happen as each step completes.
 
 **Project Scope Selection (step 3):**
 
@@ -486,7 +489,9 @@ Filesystem storage path defaults:
 ```
 $ ethoko init
 
-Welcome to Ethoko CLI Configuration
+◆ Welcome to Ethoko CLI Configuration!
+│ This interactive setup will guide you through configuring your Ethoko projects and settings.
+│ If the script is not enough, we encourage you to edit the configuration files directly for full customization.
 
 ✔ No projects configured yet. Add your first project? … yes
 ✔ Enter the name of your project: … my-contracts
@@ -495,22 +500,24 @@ Welcome to Ethoko CLI Configuration
 ✔ Enter AWS Region: … us-east-1
 ✔ Enter S3 Bucket Name: … my-bucket
 ✔ Select AWS Authentication method: › Environment (default credentials)
-✔ Project "my-contracts" configured!
+◆ Project summary
+│ Global config created at ~/.ethoko/config.json
+│
+│ New project: "my-contracts" (global)
+│  Storage type: AWS S3
+│  Authentication: environment (default)
+✔ Project configured successfully!
 
-✔ Compilation output path: › ./out (Foundry default output)
-✔ Typings path: … .ethoko-typings
-✔ Pulled artifacts path: … (Enter — global default)
+✔ Select the path where your compilation output are stored: › ./out (Foundry default output)
 
-✓ Created .gitignore
+✔ Updated .gitignore with TypeScript typings path
 
-[Configuration summary shown]
+◆ For further customization, edit the configuration files directly:
+│  - Global config: ~/.ethoko/config.json
+│  - Local config: ./ethoko.config.json
+│ You can use this init script again anytime to add more projects or update your configuration.
 
-✔ Save this configuration? … yes
-
-Global config saved to ~/.ethoko/config.json
-Local config saved to ./ethoko.config.json
-
-Run "ethoko pull my-contracts" to pull artifacts for your project.
+◆ Configuration completed
 ```
 
 **Example — Existing projects:**
@@ -785,68 +792,43 @@ $ ethoko prune --project old-project
 Removed 890MB from old-project
 ```
 
-**Behavior Details:**
+**Behavior Details (implemented):**
 
-**Local Init (`ethoko init`)**:
+**`ethoko init`**:
 
-- Current behavior maintained
-- Prompts for:
-  1. Project name and storage config (first project)
-  2. Compilation output path
-  3. Pulled artifacts path (default: `.ethoko`)
-  4. Typings path (default: `.ethoko-typings`)
-- Creates `./ethoko.config.json`
-- Offers to add more projects at the end: "Add another project? (y/N)"
+- Loads existing global (`~/.ethoko/config.json`) and local (`./ethoko.config.json`) configs
+- Shows existing projects (if any) before prompting
+- Offers to add **one** project per run (with scope selection: global or local)
+- Prompts for compilation output path (auto-detects Hardhat/Foundry, can skip)
+- Does **not** prompt for `pulledArtifactsPath` or `typingsPath` — these use defaults and can be edited directly
+- No `--force` flag — additive only, never overwrites existing projects
+- No `--global` flag — project scope is selected per-project during the flow
+- Writes to global config only if a global-scope project was added; always updates local config for compilation output path
 
-**Global Init (`ethoko init --global`)**:
-
-- Creates/edits `~/.ethoko/config.json`
-- Prompts for:
-  1. Pulled artifacts path (default: `~/.ethoko/pulled-artifacts`)
-  2. First project (optional): "Would you like to add a project? (Y/n)"
-  3. After first project: "Add another project? (Y/n)"
-- Does NOT prompt for `compilationOutputPath` or `typingsPath` (local-only fields)
-- Shows clear messaging: "Global config will be used across all repositories"
-
-**3.2 Project Management Within `ethoko init`**
-
-Rather than creating separate commands, enhance `ethoko init` to handle project management:
-
-**Interactive Project Addition Flow:**
+**`ethoko init` (adding a second project, existing config):**
 
 ```
-$ ethoko init --global
+$ ethoko init
 
-✔ Use default pulled artifacts path? (~/.ethoko/pulled-artifacts) … yes
-✔ Would you like to add a project? … yes
+◆ Welcome to Ethoko CLI Configuration!
 
-✔ Project name: company-core-contracts
-✔ Storage type: AWS S3
-✔ AWS Region: us-east-1
-✔ S3 Bucket: company-ethoko-prod
-✔ Authentication: AWS Profile
-✔ AWS Profile: company-sso
+◆ Existing projects
+│  • my-contracts (aws) [global]
 
-✓ Project "company-core-contracts" configured!
+✔ Do you want to add another project? … yes
+✔ Enter the name of your project: … local-dev
+✔ Select the storage type: › Filesystem
+✔ Where should this project config be saved? › Local (./ethoko.config.json)
+✔ Choose a path for the artifacts store (default is .ethoko-storage): … .ethoko-storage
+◆ Project summary
+│ Local config updated at ./ethoko.config.json
+│
+│ New project: "local-dev" (local)
+│  Storage type: Filesystem
+│  Storage path: .ethoko-storage (relative to project)
+✔ Project configured successfully!
 
-✔ Add another project? … yes
-
-✔ Project name: personal-experiments
-✔ Storage type: Filesystem
-✔ Storage path: ~/.ethoko/storage/personal
-
-✓ Project "personal-experiments" configured!
-
-✔ Add another project? … no
-
-[Summary shown]
-
-✔ Save configuration? … yes
-
-✓ Global configuration saved to ~/.ethoko/config.json
-
-You can edit this file directly to add/remove projects,
-or run 'ethoko init --global' again to modify interactively.
+[continues to compilation output / gitignore steps]
 ```
 
 **3.3 Config Inspection Commands**
@@ -907,9 +889,19 @@ ethoko init
 ```
 
 
-### Phase 4: Advanced Features (Future)
+### Phase 4: Cache Management
 
-**4.1 XDG Directory Support**
+**4.1 `ethoko prune` Command**
+
+- Remove orphaned artifacts (not referenced by any config)
+- Prune by project, tag, or ID
+- `--dry-run` mode to preview removals
+- `--yes` flag for CI/automation (except for `--all`)
+- `--all` requires typed confirmation as a safety guard
+
+### Phase 5: Advanced Features (Future)
+
+**5.1 XDG Directory Support**
 
 - Platform-specific config locations
 - Maintain backward compatibility
@@ -997,12 +989,12 @@ ethoko init
 
 ### Future Enhancements
 
-1. **Cache management enhancements** (Phase 3+)
+1. **Cache management** (Phase 4)
    - `ethoko prune` with smart eviction policies
    - Size-based cleanup options
    - TTL-based artifact expiration
 
-2. **Advanced path features** (Future)
+2. **Advanced path features** (Phase 5)
    - XDG Base Directory support
    - Platform-specific defaults
 
@@ -1172,26 +1164,6 @@ The hybrid approach maintains **backward compatibility** while enabling:
 4. Consistent team configuration
 
 **Implementation Strategy (Phased):**
-
-**Phase 1: Global Pulled Artifacts**
-
-1. Add global config discovery (`~/.ethoko/config.json`)
-2. Support `~` path expansion
-3. Default `pulledArtifactsPath` to `~/.ethoko/pulled-artifacts`
-4. Maintain local override capability
-
-**Phase 2: Global Projects**
-
-1. Implement project merging (global + local)
-2. Enhance `ethoko init` to be fully context-aware
-3. Add `ethoko config` for inspection
-4. Document override behavior
-
-**Phase 3: Enhanced UX**
-
-1. Add `ethoko prune` for cache management
-2. Improve error messages for config conflicts
-3. Add comprehensive documentation and examples
 
 **Command Summary:**
 
