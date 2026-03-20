@@ -10,7 +10,7 @@ import { registerPullCommand } from "./commands/pull.js";
 import { registerPushCommand } from "./commands/push.js";
 import { registerRestoreCommand } from "./commands/restore.js";
 import { registerTypingsCommand } from "./commands/typings.js";
-import { registerProjectsCommand } from "./commands/projects.js";
+import { registerConfigCommand } from "./commands/config.js";
 import { registerUninstallCommand } from "./commands/uninstall.js";
 import { registerUpgradeCommand } from "./commands/upgrade.js";
 import { VERSION } from "./version.js";
@@ -32,7 +32,7 @@ const getConfig = async () =>
   });
 
 registerInitCommand(program);
-registerProjectsCommand(program, getConfig);
+registerConfigCommand(program, getConfig);
 registerPushCommand(program, getConfig);
 registerPullCommand(program, getConfig);
 registerDiffCommand(program, getConfig);

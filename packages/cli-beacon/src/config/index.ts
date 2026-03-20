@@ -8,6 +8,7 @@ export type EthokoStorageConfig = ProjectConfig["storage"];
 
 export class EthokoCliConfig {
   public pulledArtifactsPath: AbsolutePath;
+  public pulledArtifactsSource: "local" | "global";
   public typingsPath: AbsolutePath;
   public compilationOutputPath: AbsolutePath | undefined;
   public projects: ProjectConfig[];
@@ -19,6 +20,7 @@ export class EthokoCliConfig {
 
   constructor(config: EthokoConfig) {
     this.pulledArtifactsPath = config.pulledArtifactsPath;
+    this.pulledArtifactsSource = config.pulledArtifactsSource;
     this.typingsPath = config.typingsPath;
     this.compilationOutputPath = config.compilationOutputPath;
     this.debug = config.debug;
@@ -35,6 +37,7 @@ export class EthokoCliConfig {
 }
 interface EthokoConfig {
   pulledArtifactsPath: AbsolutePath;
+  pulledArtifactsSource: "local" | "global";
   typingsPath: AbsolutePath;
   compilationOutputPath: AbsolutePath | undefined;
   projects: ProjectConfig[];
@@ -91,6 +94,7 @@ function mergeConfigs(
   return {
     pulledArtifactsPath:
       localConfig.pulledArtifactsPath || globalConfig.pulledArtifactsPath,
+    pulledArtifactsSource: localConfig.pulledArtifactsPath ? "local" : "global",
     typingsPath: localConfig.typingsPath,
     compilationOutputPath: localConfig.compilationOutputPath,
     projects: mergedProjects,
