@@ -1,5 +1,13 @@
 # @ethoko/cli-beacon
 
+## 0.8.0
+
+### Minor Changes
+
+- 10673b9: Introduce global config, expose `config` command in order to print the merged configuration and the managed projects.
+- 561a527: Distinguis absolute and relative paths, protect against tag with delimiters
+- 7470259: Rework init command to allow for new project addition and gitignore handling
+
 ## 0.7.0
 
 ### Minor Changes
