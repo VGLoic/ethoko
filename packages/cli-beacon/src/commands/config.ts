@@ -72,7 +72,10 @@ export function registerConfigCommand(
           );
           projectLines.push("");
         }
-        logger.note(projectLines.join("\n"), `Projects (${projects.length} total)`);
+        logger.note(
+          projectLines.join("\n"),
+          `Projects (${projects.length} total)`,
+        );
       }
 
       logger.outro();
