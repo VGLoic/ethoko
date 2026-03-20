@@ -26,7 +26,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       const tempOutputDirName = await fs.mkdtemp(
         path.join(os.tmpdir(), TEST_CONSTANTS.PATHS.TEMP_DIR_PREFIX),
       );
-      tempOutputDir = AbsolutePath.from(tempOutputDirName);
+      tempOutputDir = new AbsolutePath(tempOutputDirName);
 
       return async () => {
         await fs.rm(tempOutputDir.resolvedPath, {

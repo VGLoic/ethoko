@@ -134,12 +134,12 @@ Proceed with uninstallation?`,
       }
 
       try {
-        const installDir = AbsolutePath.from(homedir(), ".ethoko");
+        const installDir = new AbsolutePath(homedir(), ".ethoko");
         await removeInstallDirectory(logger, installDir, opts);
 
         const profiles = [
-          AbsolutePath.from(homedir(), ".bashrc"),
-          AbsolutePath.from(homedir(), ".zshrc"),
+          new AbsolutePath(homedir(), ".bashrc"),
+          new AbsolutePath(homedir(), ".zshrc"),
         ];
 
         for (const profile of profiles) {

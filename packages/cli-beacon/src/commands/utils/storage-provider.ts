@@ -3,7 +3,7 @@ import {
   S3BucketProvider,
 } from "@/storage-provider";
 
-import type { EthokoStorageConfig } from "../../config/config.js";
+import type { EthokoStorageConfig } from "../../config";
 
 export function createStorageProvider(
   storageConfig: EthokoStorageConfig,

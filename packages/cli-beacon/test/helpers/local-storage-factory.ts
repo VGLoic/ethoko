@@ -14,7 +14,7 @@ export async function createTestPulledArtifactStore(): Promise<{
   );
 
   const pulledArtifactStore = new PulledArtifactStore(
-    AbsolutePath.from(tempDir),
+    new AbsolutePath(tempDir),
   );
 
   const cleanup = async () => {

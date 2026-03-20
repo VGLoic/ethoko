@@ -5,7 +5,7 @@ import { LOG_COLORS, CommandLogger } from "@/ui/index.js";
 import { CliError, inspectArtifact, InspectResult } from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
-import type { EthokoCliConfig } from "../config/config.js";
+import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
 import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
 

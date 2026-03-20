@@ -6,7 +6,18 @@ import z from "zod";
  */
 export class AbsolutePath {
   public resolvedPath: string;
-  private constructor(resolvedPath: string) {
+  /**
+   * Creates an AbsolutePath instance from the given paths. The paths will be resolved to an absolute path.
+   * @example
+   * ```typescript
+   * const absPath1 = new AbsolutePath("/foo/bar");
+   * console.log(absPath1.resolvedPath); // Output: "/foo/bar"
+   * const absPath2 = new AbsolutePath("foo/bar");
+   * console.log(absPath2.resolvedPath); // Output: "/current/working/directory/foo/bar"
+   * ```
+   */
+  public constructor(...from: string[]) {
+    const resolvedPath = path.resolve(...from);
     this.resolvedPath = resolvedPath;
   }
 
@@ -14,7 +25,7 @@ export class AbsolutePath {
    * Returns the directory name of the path.
    * @example
    * ```typescript
-   * const absPath = AbsolutePath.from("/foo/bar/baz");
+   * const absPath = new AbsolutePath("/foo/bar/baz");
    * const dirName = absPath.dirname();
    * console.log(dirName.resolvedPath); // Output: "/foo/bar"
    * ```
@@ -27,7 +38,7 @@ export class AbsolutePath {
    * Joins the path with the given paths.
    * @example
    * ```typescript
-   * const absPath = AbsolutePath.from("/foo");
+   * const absPath = new AbsolutePath("/foo");
    * const joinedPath = absPath.join("bar", "baz");
    * console.log(joinedPath.resolvedPath); // Output: "/foo/bar/baz"
    * ```
@@ -44,8 +55,8 @@ export class AbsolutePath {
    * Returns the relative path from the base path to the current path.
    * @example
    * ```typescript
-   * const absPath = AbsolutePath.from("/foo/bar/baz");
-   * const basePath = AbsolutePath.from("/foo");
+   * const absPath = new AbsolutePath("/foo/bar/baz");
+   * const basePath = new AbsolutePath("/foo");
    * const relativePath = absPath.relativeTo(basePath);
    * console.log(relativePath.relativePath); // Output: "bar/baz"
    * ```
@@ -56,18 +67,23 @@ export class AbsolutePath {
   }
 
   /**
-   * Creates an AbsolutePath instance from the given paths. The paths will be resolved to an absolute path.
-   * @example
-   * ```typescript
-   * const absPath1 = AbsolutePath.from("/foo/bar");
-   * console.log(absPath1.resolvedPath); // Output: "/foo/bar"
-   * const absPath2 = AbsolutePath.from("foo/bar");
-   * console.log(absPath2.resolvedPath); // Output: "/current/working/directory/foo/bar"
-   * ```
+   * Returns true if the current path is a child path of the given parent path.
+   * A child path means that
+   *  - the current path is located within the directory tree of the parent path,
+   *  - but is not the same as the parent path itself.
    */
-  public static from(...from: string[]): AbsolutePath {
-    const resolvedPath = path.resolve(...from);
-    return new AbsolutePath(resolvedPath);
+  public isChildOf(parent: AbsolutePath): boolean {
+    return (
+      parent.resolvedPath !== this.resolvedPath &&
+      this.resolvedPath.startsWith(parent.resolvedPath + path.sep)
+    );
+  }
+
+  /**
+   * Returns true if the current path is the same as the other path.
+   */
+  public eq(other: AbsolutePath): boolean {
+    return this.resolvedPath === other.resolvedPath;
   }
 
   /**
@@ -123,13 +139,35 @@ export class RelativePath {
   }
 }
 
-export const AbsolutePathSchema = z.string().transform((str, ctx) => {
+export function generateAbsolutePathSchema(
+  basePathResolver: () => AbsolutePath,
+) {
+  return z
+    .string()
+    .min(1)
+    .transform((pathStr) => {
+      // If the path is relative, resolve it against the base path.
+      // Else, return the path as is
+      const relativePathResult = RelativePathSchema.safeParse(pathStr);
+      if (!relativePathResult.success) {
+        return new AbsolutePath(pathStr);
+      }
+      return basePathResolver().join(relativePathResult.data);
+    });
+}
+
+export const AbsolutePathSchema = z
+  .string()
+  .min(1)
+  .refine((pathStr) => path.isAbsolute(pathStr), "Invalid absolute path");
+
+const RelativePathSchema = z.string().transform((str, ctx) => {
   try {
-    return AbsolutePath.from(str);
+    return RelativePath.unsafeFrom(str);
   } catch (error) {
     ctx.addIssue({
       code: "custom",
-      message: `Invalid absolute path: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Invalid relative path: ${error instanceof Error ? error.message : String(error)}`,
     });
     return z.NEVER;
   }

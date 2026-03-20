@@ -71,7 +71,7 @@ async function runInit(
 ): Promise<void> {
   logger.intro("Welcome to Ethoko CLI Configuration");
 
-  const configPath = AbsolutePath.from(opts.config);
+  const configPath = new AbsolutePath(opts.config);
 
   // Check if config already exists
   const configExists = await fs
@@ -170,7 +170,7 @@ async function runInit(
         return "Pulled artifacts path cannot be empty";
       }
       try {
-        AbsolutePath.from(value.trim());
+        new AbsolutePath(value.trim());
         return undefined;
       } catch {
         return "Invalid path, must be a valid absolute or relative path";
@@ -192,7 +192,7 @@ async function runInit(
         return "Typings path cannot be empty";
       }
       try {
-        AbsolutePath.from(value.trim());
+        new AbsolutePath(value.trim());
         return undefined;
       } catch {
         return "Invalid path, must be a valid absolute or relative path";
@@ -207,10 +207,10 @@ async function runInit(
 
   // Build config object
   const configData: ConfigData = {
-    pulledArtifactsPath: AbsolutePath.from(pulledArtifactsPath),
-    typingsPath: AbsolutePath.from(typingsPath),
+    pulledArtifactsPath: new AbsolutePath(pulledArtifactsPath),
+    typingsPath: new AbsolutePath(typingsPath),
     compilationOutputPath: compilationOutputPath
-      ? AbsolutePath.from(compilationOutputPath.relativePath)
+      ? new AbsolutePath(compilationOutputPath.relativePath)
       : undefined,
     projects: [projectConfigResult.project],
     debug: false,

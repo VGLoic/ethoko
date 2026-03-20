@@ -3,35 +3,89 @@ import path from "path";
 import { AbsolutePath, RelativePath } from "./path";
 
 describe("absolute path utils", () => {
-  test("AbsolutePath.from should resolve absolute paths from absolute paths", () => {
-    const absPath = AbsolutePath.from("/foo/bar");
+  test("new AbsolutePath should resolve absolute paths from absolute paths", () => {
+    const absPath = new AbsolutePath("/foo/bar");
     expect(absPath.resolvedPath).toBe("/foo/bar");
   });
 
-  test("AbsolutePath.from should resolve absolute paths from relative paths", () => {
-    const absPath = AbsolutePath.from("foo/bar");
+  test("new AbsolutePath should resolve absolute paths from relative paths", () => {
+    const absPath = new AbsolutePath("foo/bar");
     expect(absPath.resolvedPath).toBe(path.resolve("foo/bar"));
   });
 
   test("AbsolutePath.dirname should return the directory name of the path", () => {
-    const absPath = AbsolutePath.from("/foo/bar/baz");
+    const absPath = new AbsolutePath("/foo/bar/baz");
     const dirName = absPath.dirname();
     expect(dirName.resolvedPath).toBe("/foo/bar");
   });
 
   test("AbsolutePath.join should join the path with the given paths", () => {
-    const absPath = AbsolutePath.from("/foo");
+    const absPath = new AbsolutePath("/foo");
     const joinedPath = absPath.join("bar", "baz");
     expect(joinedPath.resolvedPath).toBe("/foo/bar/baz");
   });
 
   test("AbsolutePath.relativeTo should return the relative path from the base path", () => {
-    const absPath = AbsolutePath.from("/foo/bar/baz");
-    const basePath = AbsolutePath.from("/foo");
+    const absPath = new AbsolutePath("/foo/bar/baz");
+    const basePath = new AbsolutePath("/foo");
     const relativePath = absPath.relativeTo(basePath);
     expect(relativePath.relativePath).toBe("bar/baz");
   });
+
+  test("Case #0 absolute path - AbsolutePath.isChildOf should return true if the current path is a child of the given parent path", () => {
+    const parentPath = new AbsolutePath("/foo/bar");
+
+    expect(new AbsolutePath("/foo/bar/baz").isChildOf(parentPath)).toBe(true);
+    expect(new AbsolutePath("/foo/bar").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("/foo/bar/").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("/foo").isChildOf(parentPath)).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo/"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo/bar"))).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo/bar/"))).toBe(false);
+  });
+
+  test("Case #1 absolute path with separator - AbsolutePath.isChildOf should return true if the current path is a child of the given parent path", () => {
+    const parentPath = new AbsolutePath("/foo/bar/");
+
+    expect(new AbsolutePath("/foo/bar/baz").isChildOf(parentPath)).toBe(true);
+    expect(new AbsolutePath("/foo/bar").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("/foo/bar/").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("/foo").isChildOf(parentPath)).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo/"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo/bar"))).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("/foo/bar/"))).toBe(false);
+  });
+
+  test("Case #2 relative path - AbsolutePath.isChildOf should return true if the current path is a child of the given parent path", () => {
+    const parentPath = new AbsolutePath("foo/bar");
+
+    expect(new AbsolutePath("foo/bar/baz").isChildOf(parentPath)).toBe(true);
+    expect(new AbsolutePath("foo/bar").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("foo/bar/").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("foo").isChildOf(parentPath)).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("foo"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("foo/"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("foo/bar"))).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("foo/bar/"))).toBe(false);
+  });
+
+  test("Case #3 relative path with separator - AbsolutePath.isChildOf should return true if the current path is a child of the given parent path", () => {
+    const parentPath = new AbsolutePath("foo/bar/");
+
+    expect(new AbsolutePath("foo/bar/baz").isChildOf(parentPath)).toBe(true);
+    expect(new AbsolutePath("foo/bar").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("foo/bar/").isChildOf(parentPath)).toBe(false);
+    expect(new AbsolutePath("foo").isChildOf(parentPath)).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("foo"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("foo/"))).toBe(true);
+    expect(parentPath.isChildOf(new AbsolutePath("foo/bar"))).toBe(false);
+    expect(parentPath.isChildOf(new AbsolutePath("foo/bar/"))).toBe(false);
+  });
 });
+// typingsPath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/',
+//   pulledArtifactsPath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/typings',
 
 describe("relative path utils", () => {
   const VALID_RELATIVE_PATHS = [

@@ -96,7 +96,7 @@ export async function lookForCandidateArtifacts(
       format.artifact.format === "hardhat-v3-input-no-isolated-build"
     ) {
       // We verify that the corresponding output file exists
-      const matchingOutputPath = AbsolutePath.from(
+      const matchingOutputPath = new AbsolutePath(
         inputPath.resolvedPath.replace(".json", ".output.json"),
       );
       const outputCheckResult = await toAsyncResult(
@@ -140,7 +140,7 @@ export async function lookForCandidateArtifacts(
     }
     if (format.artifact.format === "hardhat-v3-output") {
       // We verify that the corresponding input file exists
-      const matchingInputPath = AbsolutePath.from(
+      const matchingInputPath = new AbsolutePath(
         inputPath.resolvedPath.replace(".output.json", ".json"),
       );
       const inputCheckResult = await toAsyncResult(

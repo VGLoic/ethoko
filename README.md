@@ -45,9 +45,20 @@ npm install --save-dev @ethoko/cli
 
 ### Configuration
 
-Ethoko CLI can be configured through an `ethoko.config.json` file at the root of your repository.
+Ethoko CLI manages various `projects`, each of them storing their dedicated compilation artifacts in a `storage` backend. Two types of storage backends are currently supported:
+- `aws`: store the compilation artifacts in an AWS S3 bucket. The bucket must be created beforehand, and the AWS credentials must be configured locally for Ethoko to be able to access it.
+- `filesystem`: store the compilation artifacts locally in the specified directory.
 
+Ethoko CLI can be configured either using the global configuration file at `~/.ethoko/config.json` or using a local configuration file `ethoko.config.json` at the root of your repository. The local configuration file will override the global one if both are present.
+
+For a quick guided setup, it is recommended to use the init command:
+```bash
+ethoko init
+```
+
+Generally, the global configuration file will define the projects
 ```json
+// Global ~/.ethoko/config.json: defines global projects
 {
   "projects": [
     {
@@ -60,17 +71,16 @@ Ethoko CLI can be configured through an `ethoko.config.json` file at the root of
       }
     }
   ],
-  "compilationOutputPath": "./out",
 }
 ```
 
-Each project can be configured with its own storage backend, Ethoko supports two types of storage backends for now:
-- `aws`: store the compilation artifacts in an AWS S3 bucket. The bucket must be created beforehand, and the AWS credentials must be configured locally for Ethoko to be able to access it.
-- `filesystem`: store the compilation artifacts locally in the directory.
+While the local configuration file will refine the configuration for a specific project or specify local project hosted directly in the directory:
 
-For a quick setup, it is recommended to use the init command:
-```bash
-ethoko init
+```json
+// Local ethoko.config.json: 
+{
+  "compilationOutputPath": "./artifacts"
+}
 ```
 
 Check out the full [configuration reference in the docs](docs/external/CONFIGURATION.md).
@@ -95,7 +105,7 @@ Or use a tag to associate the compilation artifact with it
 ethoko push my-project:2026-02-02
 ```
 
-If not setup in the configuration with `compilationOutputPath` or need to be overriden, the path to the compilation artifact can be provided
+If not setup in the local configuration with `compilationOutputPath` or need to be overriden, the path to the compilation artifact can be provided
 
 ```bash
 # e.g. ./artifacts for Hardhat, ./out for Foundry, etc...

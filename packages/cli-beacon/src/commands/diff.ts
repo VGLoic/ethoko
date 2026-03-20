@@ -9,10 +9,10 @@ import {
 } from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
-import type { EthokoCliConfig } from "../config/config.js";
+import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
 import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
-import { AbsolutePathSchema } from "@/utils/path.js";
+import { AbsolutePath, generateAbsolutePathSchema } from "@/utils/path.js";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -89,7 +89,9 @@ export function registerDiffCommand(
               1,
               'The "artifactPath" cannot be empty. Provide a valid path to compilation artifacts or set compilationOutputPath in ethoko.config.json',
             )
-            .pipe(AbsolutePathSchema)
+            .pipe(
+              generateAbsolutePathSchema(() => new AbsolutePath(process.cwd())),
+            )
             .optional(),
           debug: z
             .boolean('The "debug" option must be a boolean')

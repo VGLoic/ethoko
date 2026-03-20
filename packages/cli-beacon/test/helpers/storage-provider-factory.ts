@@ -30,7 +30,7 @@ export class TestFilesystemStorageProviderFactory extends StorageProviderFactory
     );
 
     const storageProvider = new FilesystemStorageProvider({
-      path: AbsolutePath.from(tempDir),
+      path: new AbsolutePath(tempDir),
       debug: this.debug,
     });
 
