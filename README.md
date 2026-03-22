@@ -11,7 +11,7 @@
 
 ## What is Ethoko?
 
-Ethoko enables teams to **store** and **share** versionned smart-contract compilation artifacts.  
+Ethoko enables teams to **store** and **share** versioned smart-contract compilation artifacts.  
 As such, it decouples the compilation process from the operation processes.
 
 Define the storage backend of your choice, push your compilation artifacts to Ethoko and pull them back when you need them, in a safe and transparent way.
@@ -24,13 +24,11 @@ Ethoko supports both Hardhat and Foundry development environments, compile once,
     <img alt="Ethoko workflow" src="images/ethoko-workflow-light.svg" />
 </picture>
 
-## CLI
+## Install
 
 Ethoko ships as a standalone CLI.
 
-### Install
-
-The easiest way to install the Ethoko CLI is to through the installation script:
+The easiest way to install the Ethoko CLI is through the installation script:
 
 ```bash
 curl -fsSL https://install.ethoko.com | bash
@@ -43,7 +41,7 @@ npm install -g @ethoko/cli
 npm install --save-dev @ethoko/cli
 ```
 
-### Configuration
+## Configuration
 
 Ethoko CLI manages various `projects`, each of them storing their dedicated compilation artifacts in a `storage` backend. Two types of storage backends are currently supported:
 - `aws`: store the compilation artifacts in an AWS S3 bucket. The bucket must be created beforehand, and the AWS credentials must be configured locally for Ethoko to be able to access it.
@@ -70,7 +68,7 @@ Generally, the global configuration file will define the projects
         "awsProfile": "my-profile"
       }
     }
-  ],
+  ]
 }
 ```
 
@@ -85,7 +83,7 @@ While the local configuration file will refine the configuration for a specific 
 
 Check out the full [configuration reference in the docs](docs/external/CONFIGURATION.md).
 
-### Projects, tags and IDs
+## Projects, tags and IDs
 
 A developer will interact with a list of **projects**, e.g. `my-project`, each of them gathering many compilation artifacts. A project is defined by its name and storage backend.
 
@@ -93,11 +91,11 @@ Each artifact is uniquely identified by its **ID**, e.g. `b5e41181986a`, which i
 
 Finally, a **tag**, e.g. `2026-02-02` or `v1.2.3`, can be associated to a compilation artifact when pushed.
 
-### Commands
+## Commands
 
 Run `ethoko --help` for a full list of available commands and options. Use the `--help` flag with any command to get more details about its usage, e.g. `ethoko push --help`.
 
-#### Push
+### Push
 
 Push a local compilation artifact for the configured project, creating the remote artifact with its ID and optionally tagging it.
 
@@ -113,7 +111,7 @@ Or use a tag to associate the compilation artifact with it
 ethoko push my-project:2026-02-02
 ```
 
-If not setup in the local configuration with `compilationOutputPath` or need to be overriden, the path to the compilation artifact can be provided
+If not setup in the local configuration with `compilationOutputPath` or need to be overridden, the path to the compilation artifact can be provided
 
 ```bash
 # e.g. ./artifacts for Hardhat, ./out for Foundry, etc...
@@ -123,7 +121,7 @@ ethoko push my-project --artifact-path ./path/to/artifacts
 > [!NOTE]  
 > Ethoko will try to read the compilation artifact from the configured or provided path. If multiple choices are possible, it will ask the user to select one of them. One can avoid this prompt by providing the full path to the compilation artifact or ensure there is only one compilation artifact in the provided path.
 
-#### Pull
+### Pull
 
 Pull locally the missing artifacts for a configured project.
 
@@ -140,7 +138,7 @@ ethoko pull my-project@b5e41181986a
 ethoko pull my-project:2026-02-02
 ```
 
-#### Export
+### Export
 
 Export a contract artifact from a locally pulled artifact.
 
@@ -169,7 +167,7 @@ Export the ABI as a TypeScript `const`:
 echo "export const MY_ABI = $(ethoko export my-project:2026-02-02 --contract Counter | jq .abi) as const;" > ./my-abi.ts
 ```
 
-#### Typings
+### Typings
 
 Once the artifacts have been pulled, one can generate the TypeScript typings based on the pulled projects.
 
@@ -180,7 +178,7 @@ ethoko typings
 > [!NOTE]  
 > If no projects have been pulled, one can still generate the default typings using this command. It may be helpful for those who do not care about the scripts involving Ethoko but want to be unblocked in case of missing files.
 
-#### List artifacts
+### Artifacts
 
 List the pulled compilation artifacts with their project.
 
@@ -188,7 +186,7 @@ List the pulled compilation artifacts with their project.
 ethoko artifacts
 ```
 
-#### Inspect
+### Inspect
 
 Inspect a pulled compilation artifact to list contracts and metadata.
 
@@ -203,7 +201,7 @@ Output JSON for scripting:
 ethoko inspect my-project:2026-02-02 --json
 ```
 
-#### Config
+### Config
 
 Display the effective configuration — the result of merging the global and local config files. Useful to verify which projects are available and where values come from.
 
@@ -213,7 +211,7 @@ ethoko config
 
 Each project is labelled with its source: `[global]`, `[local]`, or `[local - overrides global]` when both configs define the same project name.
 
-#### Init
+### Init
 
 Initialize the Ethoko configuration through an interactive wizard. It guides you through:
 
@@ -234,7 +232,7 @@ ethoko init --config ./path/to/ethoko.config.json
 > [!NOTE]  
 > Running `ethoko init` again will let you add more projects to an existing configuration without overwriting it.
 
-#### Restore
+### Restore
 
 Original compilation artifacts are never lost and can be restored from a locally pulled artifact to a local directory.
 
@@ -246,7 +244,7 @@ ethoko restore my-project:2026-02-02 --output ./restored
 > [!NOTE]  
 > The artifact must be pulled locally before restoring, and the output directory must be empty unless the `--force` flag is used.
 
-#### Diff
+### Diff
 
 Compare a local compilation artifacts with an existing compilation artifact and print the contracts for which differences have been found.
 
@@ -263,7 +261,7 @@ If not setup in the configuration or need to be overriden, the path to the compi
 ethoko diff my-project:2026-02-02 --artifact-path ./path/to/artifacts
 ```
 
-### Using the exported artifacts in scripts
+## Using the exported artifacts in scripts
 
 The exported artifacts can be used as any JSON files in scripts for various purposes, e.g. deployment, verification, etc... Adapt the example below to your own deployment tooling.
 
@@ -291,7 +289,7 @@ export default deployScript(
 );
 ```
 
-### Using the typings in a Typescript environment
+## Using the typings in a Typescript environment
 
 The typings are exposed in order to help the developer retrieve easily and safely a contract artifact (ABI, bytecode, etc...).
 
@@ -305,7 +303,7 @@ export default deployScript(
   async ({ deploy, namedAccounts }) => {
     const { deployer } = namedAccounts;
 
-    const counterArtifact = await project("doubtful-project")
+    const counterArtifact = await project("my-project")
       .tag("2026-02-04")
       .getContractArtifact("src/Counter.sol:Counter");
 
@@ -326,9 +324,9 @@ If typings have been generated from existing projects, the inputs of the utils w
 
 In case there are no projects or the projects have not been pulled, the generated typings are made in such a way that strong typecheck disappears and any string can be used with the helper functions.
 
-#### Retrieve input and outputs compilation artifacts
+### Retrieve input and outputs compilation artifacts
 
-The input and contract outputs compilation artifacts of a tag can be retrieved using the `project("doubtful-project").tag("2026-02-02").{getInputCompilationArtifact, getContractOutputCompilationArtifact}` methods.
+The input and contract outputs compilation artifacts of a tag can be retrieved using the `project("my-project").tag("2026-02-02").{getInputCompilationArtifact, getContractOutputCompilationArtifact}` methods.
 
 The input compilation artifact contains the sources and settings used for compilation. There is one output compilation artifact per contract, each containing the ABI, bytecode and metadata for the contract.
 

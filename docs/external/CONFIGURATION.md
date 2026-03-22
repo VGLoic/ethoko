@@ -86,7 +86,7 @@ Default configuration example:
 
 ```json
 {
-  "project": "my-project",
+  "name": "my-project",
   "storage": {
     "type": "aws",
     "awsRegion": "us-east-1",
@@ -114,7 +114,7 @@ aws_secret_access_key = YOUR_SECRET_ACCESS_KEY
 
 ```json
 {
-  "project": "my-project",
+  "name": "my-project",
   "storage": {
     "type": "aws",
     "awsRegion": "us-east-1",
@@ -134,7 +134,7 @@ Alternatively, provide explicit static credentials (for example in CI):
 
 ```json
 {
-  "project": "my-project",
+  "name": "my-project",
   "storage": {
     "type": "aws",
     "awsRegion": "us-east-1",
@@ -181,7 +181,7 @@ The local filesystem provider stores artifacts in a local directory, making it a
 
 This storage is compatible with sharing through version control (commit the storage directory) or a shared drive.
 
-Default configuration example:
+Minimal configuration example:
 
 ```json
 {
