@@ -9,12 +9,7 @@ import type { EthokoCliConfig } from "../config";
 
 type GetConfig = () => Promise<EthokoCliConfig>;
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(2)}GB`;
-  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(2)}MB`;
-  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(2)}KB`;
-  return `${bytes}B`;
-}
+// REMIND ME: Implement client methods and try to keep display only here
 
 export function registerPruneCommand(
   program: Command,
@@ -48,81 +43,131 @@ export function registerPruneCommand(
 
       const config = configResult.value;
       const store = new PulledArtifactStore(config.pulledArtifactsPath);
-      const dryRun = options.dryRun as boolean;
+      const dryRun = Boolean(options.dryRun);
 
-      logger.intro("Ethoko Prune");
-      logger.info(
-        `Pulled artifacts location: ${config.pulledArtifactsPath.resolvedPath}`,
-      );
-
-      const runResult = await toAsyncResult(
-        (async () => {
-          if (!artifactKey) {
-            await pruneOrphaned(store, config, logger, dryRun, debug);
-          } else {
-            const parsed = ArtifactKeySchema.safeParse(artifactKey);
-            if (!parsed.success) {
-              throw new CliError(
-                `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
-              );
-            }
-            const key = parsed.data;
-            if (!key.artifact) {
-              await pruneProject(
-                store,
-                config,
-                key.project,
-                logger,
-                dryRun,
-                debug,
-              );
-            } else if (key.artifact.type === "tag") {
-              await pruneTag(
-                store,
-                key.project,
-                key.artifact.tag,
-                logger,
-                dryRun,
-                debug,
-              );
+      if (!artifactKey) {
+        logger.intro("Pruning orphaned and untagged artifacts");
+        await pruneOrphaned(store, config, { logger, dryRun, debug })
+          .then(() => {
+            logger.outro();
+          })
+          .catch((error) => {
+            if (error instanceof CliError) {
+              logger.error(error.message);
             } else {
-              await pruneId(
-                store,
-                key.project,
-                key.artifact.id,
-                logger,
-                dryRun,
-                debug,
+              logger.error(
+                "An unexpected error occurred, please fill an issue with the error details if the problem persists",
               );
+              console.error(error);
             }
-          }
-        })(),
-        { debug },
-      );
+            process.exitCode = 1;
+          });
+        return;
+      }
 
-      if (!runResult.success) {
+      const parsedKeyResult = ArtifactKeySchema.safeParse(artifactKey);
+      if (!parsedKeyResult.success) {
         logger.error(
-          runResult.error instanceof Error
-            ? runResult.error.message
-            : String(runResult.error),
+          `Invalid artifact argument:\nThe artifact argument must be a string in the format PROJECT[:TAG|@ID]`,
         );
         process.exitCode = 1;
         return;
       }
 
-      logger.outro();
+      if (!parsedKeyResult.data.artifact) {
+        logger.intro(
+          `Pruning all artifacts for project "${parsedKeyResult.data.project}"`,
+        );
+        await pruneProject(store, config, parsedKeyResult.data.project, {
+          logger,
+          dryRun,
+          debug,
+        })
+          .then(() => {
+            logger.outro();
+          })
+          .catch((error) => {
+            if (error instanceof CliError) {
+              logger.error(error.message);
+            } else {
+              logger.error(
+                "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+              );
+              console.error(error);
+            }
+            process.exitCode = 1;
+          });
+        return;
+      }
+
+      if (parsedKeyResult.data.artifact.type === "tag") {
+        logger.intro(
+          `Pruning "${parsedKeyResult.data.project}:${parsedKeyResult.data.artifact.tag}"`,
+        );
+        await pruneTag(
+          store,
+          parsedKeyResult.data.project,
+          parsedKeyResult.data.artifact.tag,
+          {
+            logger,
+            dryRun,
+            debug,
+          },
+        )
+          .then(() => {
+            logger.outro();
+          })
+          .catch((error) => {
+            if (error instanceof CliError) {
+              logger.error(error.message);
+            } else {
+              logger.error(
+                "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+              );
+              console.error(error);
+            }
+            process.exitCode = 1;
+          });
+        return;
+      }
+
+      logger.intro(
+        `Pruning "${parsedKeyResult.data.project}@${parsedKeyResult.data.artifact.id}"`,
+      );
+      await pruneId(
+        store,
+        parsedKeyResult.data.project,
+        parsedKeyResult.data.artifact.id,
+        { logger, dryRun, debug },
+      )
+        .then(() => {
+          logger.outro();
+        })
+        .catch((error) => {
+          if (error instanceof CliError) {
+            logger.error(error.message);
+          } else {
+            logger.error(
+              "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+            );
+            console.error(error);
+          }
+          process.exitCode = 1;
+        });
     });
 }
 
 async function pruneOrphaned(
   store: PulledArtifactStore,
   config: EthokoCliConfig,
-  logger: CommandLogger,
-  dryRun: boolean,
-  debug: boolean,
+  opts: {
+    logger: CommandLogger;
+    dryRun: boolean;
+    debug: boolean;
+  },
 ): Promise<void> {
   const storedProjectsResult = await toAsyncResult(store.listProjects(), {
-    debug,
+    debug: opts.debug,
   });
   if (!storedProjectsResult.success) {
     throw new CliError("Failed to read pulled artifacts store.");
@@ -149,9 +194,13 @@ async function pruneOrphaned(
   const untaggedEntries: UntaggedEntry[] = [];
 
   for (const project of configuredStoredProjects) {
-    const idsResult = await toAsyncResult(store.listIds(project), { debug });
+    const idsResult = await toAsyncResult(store.listIds(project), {
+      debug: opts.debug,
+    });
     if (!idsResult.success) continue;
-    const tagsResult = await toAsyncResult(store.listTags(project), { debug });
+    const tagsResult = await toAsyncResult(store.listTags(project), {
+      debug: opts.debug,
+    });
     if (!tagsResult.success) continue;
     const idWithTag: Set<string> = new Set(
       tagsResult.value.map(({ id }) => id),
@@ -167,7 +216,7 @@ async function pruneOrphaned(
   }
 
   if (orphanedWithSizes.length === 0 && untaggedEntries.length === 0) {
-    logger.success("Nothing to prune.");
+    opts.logger.success("Nothing to prune.");
     return;
   }
 
@@ -199,36 +248,38 @@ async function pruneOrphaned(
   lines.push(`  Total: ${formatBytes(totalBytes)}`);
   lines.push("");
 
-  logger.note(lines.join("\n"), "To be removed");
+  opts.logger.note(lines.join("\n"), "To be removed");
 
-  if (dryRun) {
-    logger.info("No changes made (dry-run mode)");
+  if (opts.dryRun) {
+    opts.logger.info("No changes made (dry-run mode)");
     return;
   }
 
   for (const { project } of orphanedWithSizes) {
     await store.deleteProject(project);
-    logger.success(`Removed orphaned project "${project}"`);
+    opts.logger.success(`Removed orphaned project "${project}"`);
   }
 
   for (const { project, id } of untaggedEntries) {
     await store.deleteId(project, id);
-    logger.success(`Removed untagged ID "${id}" from "${project}"`);
+    opts.logger.success(`Removed untagged ID "${id}" from "${project}"`);
   }
 
-  logger.info(`Total space freed: ${formatBytes(totalBytes)}`);
+  opts.logger.info(`Total space freed: ${formatBytes(totalBytes)}`);
 }
 
 async function pruneProject(
   store: PulledArtifactStore,
   config: EthokoCliConfig,
   project: string,
-  logger: CommandLogger,
-  dryRun: boolean,
-  debug: boolean,
+  opts: {
+    logger: CommandLogger;
+    dryRun: boolean;
+    debug: boolean;
+  },
 ): Promise<void> {
   const storedProjectsResult = await toAsyncResult(store.listProjects(), {
-    debug,
+    debug: opts.debug,
   });
   if (!storedProjectsResult.success) {
     throw new CliError("Failed to read pulled artifacts store.");
@@ -240,14 +291,14 @@ async function pruneProject(
   }
 
   if (config.getProjectConfig(project)) {
-    logger.warn(
+    opts.logger.warn(
       `"${project}" is defined in your config. Its artifacts will be removed from the local cache but the project configuration will remain.`,
     );
   }
 
   const [tagsResult, idsResult] = await Promise.all([
-    toAsyncResult(store.listTags(project), { debug }),
-    toAsyncResult(store.listIds(project), { debug }),
+    toAsyncResult(store.listTags(project), { debug: opts.debug }),
+    toAsyncResult(store.listIds(project), { debug: opts.debug }),
   ]);
 
   const tagCount = tagsResult.success ? tagsResult.value.length : 0;
@@ -262,15 +313,15 @@ async function pruneProject(
     `  Size: ${formatBytes(size)}`,
     "",
   ];
-  logger.note(lines.join("\n"), "To be removed");
+  opts.logger.note(lines.join("\n"), "To be removed");
 
-  if (dryRun) {
-    logger.info("No changes made (dry-run mode)");
+  if (opts.dryRun) {
+    opts.logger.info("No changes made (dry-run mode)");
     return;
   }
 
   await store.deleteProject(project);
-  logger.success(
+  opts.logger.success(
     `Removed all artifacts for "${project}" (${formatBytes(size)} freed)`,
   );
 }
@@ -279,19 +330,21 @@ async function pruneTag(
   store: PulledArtifactStore,
   project: string,
   tag: string,
-  logger: CommandLogger,
-  dryRun: boolean,
-  debug: boolean,
+  opts: {
+    logger: CommandLogger;
+    dryRun: boolean;
+    debug: boolean;
+  },
 ): Promise<void> {
   const tagExistsResult = await toAsyncResult(store.hasTag(project, tag), {
-    debug,
+    debug: opts.debug,
   });
   if (!tagExistsResult.success || !tagExistsResult.value) {
     throw new CliError(`Tag "${tag}" not found for project "${project}".`);
   }
 
   const idResult = await toAsyncResult(store.retrieveArtifactId(project, tag), {
-    debug,
+    debug: opts.debug,
   });
   if (!idResult.success) {
     throw new CliError(
@@ -300,7 +353,9 @@ async function pruneTag(
   }
   const id = idResult.value;
 
-  const tagsResult = await toAsyncResult(store.listTags(project), { debug });
+  const tagsResult = await toAsyncResult(store.listTags(project), {
+    debug: opts.debug,
+  });
   if (!tagsResult.success) {
     throw new CliError(
       `Failed to list tags for project "${project}". Cannot proceed with pruning tag "${tag}".`,
@@ -329,19 +384,19 @@ async function pruneTag(
   }
   lines.push("");
 
-  logger.note(lines.join("\n"), "To be removed");
+  opts.logger.note(lines.join("\n"), "To be removed");
 
-  if (dryRun) {
-    logger.info("No changes made (dry-run mode)");
+  if (opts.dryRun) {
+    opts.logger.info("No changes made (dry-run mode)");
     return;
   }
 
   await store.deleteTag(project, tag);
-  logger.success(`Removed tag "${tag}"`);
+  opts.logger.success(`Removed tag "${tag}"`);
 
   if (idWillBeRemoved) {
     await store.deleteId(project, id);
-    logger.success(`Removed ID "${id}" (${formatBytes(idSize)} freed)`);
+    opts.logger.success(`Removed ID "${id}" (${formatBytes(idSize)} freed)`);
   }
 }
 
@@ -349,18 +404,22 @@ async function pruneId(
   store: PulledArtifactStore,
   project: string,
   id: string,
-  logger: CommandLogger,
-  dryRun: boolean,
-  debug: boolean,
+  opts: {
+    logger: CommandLogger;
+    dryRun: boolean;
+    debug: boolean;
+  },
 ): Promise<void> {
   const idExistsResult = await toAsyncResult(store.hasId(project, id), {
-    debug,
+    debug: opts.debug,
   });
   if (!idExistsResult.success || !idExistsResult.value) {
     throw new CliError(`ID "${id}" not found for project "${project}".`);
   }
 
-  const tagsResult = await toAsyncResult(store.listTags(project), { debug });
+  const tagsResult = await toAsyncResult(store.listTags(project), {
+    debug: opts.debug,
+  });
   if (!tagsResult.success) {
     throw new CliError(
       `Failed to list tags for project "${project}". Cannot proceed with pruning ID "${id}".`,
@@ -385,16 +444,16 @@ async function pruneId(
   }
   lines.push("");
 
-  logger.note(lines.join("\n"), "To be removed");
+  opts.logger.note(lines.join("\n"), "To be removed");
 
   if (referencingTags.length > 0) {
-    logger.warn(
+    opts.logger.warn(
       `This will also remove ${referencingTags.length} tag(s): ${referencingTags.join(", ")}`,
     );
   }
 
-  if (dryRun) {
-    logger.info("No changes made (dry-run mode)");
+  if (opts.dryRun) {
+    opts.logger.info("No changes made (dry-run mode)");
     return;
   }
 
@@ -402,5 +461,12 @@ async function pruneId(
     await store.deleteTag(project, tag);
   }
   await store.deleteId(project, id);
-  logger.success(`Removed ID "${id}" (${formatBytes(size)} freed)`);
+  opts.logger.success(`Removed ID "${id}" (${formatBytes(size)} freed)`);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(2)}GB`;
+  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(2)}MB`;
+  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(2)}KB`;
+  return `${bytes}B`;
 }
