@@ -13,6 +13,7 @@ Ethoko is a warehouse for smart-contract compilation artifacts. It enables teams
 - `apps/*`: Integration examples with different frameworks (e.g., Foundry and Hardhat)
 
 CLI delivery strategy overview: `docs/CLI_DELIVERY.md`
+Configuration strategy overview: `docs/CONFIG.md`
 
 ## Build System
 
