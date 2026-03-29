@@ -88,9 +88,10 @@ jobs:
       # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
       - run: pnpm build --filter=@ethoko/cli-beacon
       - run: pnpm install
+      - name: Prepare .env.localstack file
+        run: |
+          echo "LOCALSTACK_AUTH_TOKEN=${{ secrets.LOCALSTACK_AUTH_TOKEN }}" > packages/cli-beacon/.env.localstack
       - run: pnpm test:e2e:core
-        env:
-          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
   test-e2e-apps:
     runs-on: ubuntu-latest
     steps:
