@@ -89,6 +89,8 @@ jobs:
       - run: pnpm build --filter=@ethoko/cli-beacon
       - run: pnpm install
       - run: pnpm test:e2e:core
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
   test-e2e-apps:
     runs-on: ubuntu-latest
     steps:
