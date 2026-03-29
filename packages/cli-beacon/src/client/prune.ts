@@ -131,7 +131,9 @@ export async function pruneOrphanedAndUntaggedArtifacts(
   const deleteSettlements = await Promise.allSettled(
     artifactsWithSize.map((artifact) => {
       const promise = artifact.tag
-        ? store.deleteTag(artifact.project, artifact.tag)
+        ? store
+            .deleteTag(artifact.project, artifact.tag)
+            .then(() => store.deleteId(artifact.project, artifact.id))
         : store.deleteId(artifact.project, artifact.id);
       return promise
         .then(() => artifact)
@@ -225,7 +227,9 @@ export async function pruneProjectArtifacts(
   const deleteSettlements = await Promise.allSettled(
     artifactsWithSize.map((artifact) => {
       const promise = artifact.tag
-        ? store.deleteTag(artifact.project, artifact.tag)
+        ? store
+            .deleteTag(artifact.project, artifact.tag)
+            .then(() => store.deleteId(artifact.project, artifact.id))
         : store.deleteId(artifact.project, artifact.id);
       return promise
         .then(() => artifact)
