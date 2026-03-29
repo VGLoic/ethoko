@@ -1,5 +1,12 @@
 # @ethoko/cli-beacon
 
+## 0.9.0
+
+### Minor Changes
+
+- 3e4f5e1: Update documentation
+- fcba00e: Expose prune command in order to clean up pulled artifacts.
+
 ## 0.8.0
 
 ### Minor Changes
