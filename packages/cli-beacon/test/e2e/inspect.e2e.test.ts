@@ -15,196 +15,130 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     const logger = new CommandLogger(true);
     storageProviderTest.scoped({ storageProviderFactory });
 
-    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
-      "%s artifacts - inspect pulled artifact by tag",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
-        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-        const tag = TEST_CONSTANTS.TAGS.V1;
+    describe.for([[false], [true]] as const)(
+      "artifact already pulled: %s",
+      ([artifactAlreadyPulled]) => {
+        storageProviderTest.for(ARTIFACTS_STRATEGIES)(
+          "%s artifacts - inspect pulled artifact by tag",
+          async (
+            [, artifactFixture],
+            { storageProvider, pulledArtifactStore },
+          ) => {
+            const project = createTestProjectName(
+              TEST_CONSTANTS.PROJECTS.DEFAULT,
+            );
+            const tag = TEST_CONSTANTS.TAGS.V1;
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+            await pulledArtifactStore.ensureProjectSetup(project);
 
-        const artifactId = await push(
-          artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          {
-            force: false,
-            debug: true,
-            logger,
+            const artifactId = await push(
+              artifactFixture.folderPath,
+              project,
+              tag,
+              storageProvider,
+              {
+                force: false,
+                debug: true,
+                logger,
+              },
+            );
+
+            if (!artifactAlreadyPulled) {
+              await pull(
+                project,
+                { type: "tag", tag },
+                storageProvider,
+                pulledArtifactStore,
+                {
+                  force: false,
+                  debug: false,
+                  logger,
+                },
+              );
+            }
+
+            const inspectResult = await inspectArtifact(
+              { project, search: { type: "tag", tag } },
+              storageProvider,
+              pulledArtifactStore,
+              { debug: false, logger },
+            );
+
+            expect(inspectResult.project).toBe(project);
+            expect(inspectResult.tag).toBe(tag);
+            expect(inspectResult.id).toBe(artifactId);
+            expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
+            expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
+            const fullyQualifiedPathsResult = inspectResult.contractsBySource
+              .map((c) =>
+                c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
+              )
+              .flat();
+            expect(new Set(fullyQualifiedPathsResult)).toEqual(
+              new Set(artifactFixture.fullyQualifiedContractPaths),
+            );
           },
         );
 
-        await pull(
-          project,
-          { type: "tag", tag },
-          storageProvider,
-          pulledArtifactStore,
-          {
-            force: false,
-            debug: false,
-            logger,
+        storageProviderTest.for(ARTIFACTS_STRATEGIES)(
+          "%s artifacts - inspect pulled artifact by ID",
+          async (
+            [, artifactFixture],
+            { storageProvider, pulledArtifactStore },
+          ) => {
+            const project = createTestProjectName(
+              TEST_CONSTANTS.PROJECTS.DEFAULT,
+            );
+
+            await pulledArtifactStore.ensureProjectSetup(project);
+
+            const artifactId = await push(
+              artifactFixture.folderPath,
+              project,
+              undefined,
+              storageProvider,
+              {
+                force: false,
+                debug: false,
+                logger,
+              },
+            );
+
+            if (!artifactAlreadyPulled) {
+              await pull(
+                project,
+                { type: "id", id: artifactId },
+                storageProvider,
+                pulledArtifactStore,
+                {
+                  force: false,
+                  debug: false,
+                  logger,
+                },
+              );
+            }
+
+            const inspectResult = await inspectArtifact(
+              { project, search: { type: "id", id: artifactId } },
+              storageProvider,
+              pulledArtifactStore,
+              { debug: false, logger },
+            );
+
+            expect(inspectResult.project).toBe(project);
+            expect(inspectResult.tag).toBe(null);
+            expect(inspectResult.id).toBe(artifactId);
+            expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
+            expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
+            const fullyQualifiedPathsResult = inspectResult.contractsBySource
+              .map((c) =>
+                c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
+              )
+              .flat();
+            expect(new Set(fullyQualifiedPathsResult)).toEqual(
+              new Set(artifactFixture.fullyQualifiedContractPaths),
+            );
           },
-        );
-
-        const inspectResult = await inspectArtifact(
-          { project, search: { type: "tag", tag } },
-          storageProvider,
-          pulledArtifactStore,
-          { debug: false, logger },
-        );
-
-        expect(inspectResult.project).toBe(project);
-        expect(inspectResult.tag).toBe(tag);
-        expect(inspectResult.id).toBe(artifactId);
-        expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
-        expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
-        const fullyQualifiedPathsResult = inspectResult.contractsBySource
-          .map((c) =>
-            c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
-          )
-          .flat();
-        expect(new Set(fullyQualifiedPathsResult)).toEqual(
-          new Set(artifactFixture.fullyQualifiedContractPaths),
-        );
-      },
-    );
-
-    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
-      "%s artifacts - inspect non pulled artifact by tag",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
-        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-        const tag = TEST_CONSTANTS.TAGS.V1;
-
-        await pulledArtifactStore.ensureProjectSetup(project);
-
-        const artifactId = await push(
-          artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          {
-            force: false,
-            debug: true,
-            logger,
-          },
-        );
-
-        const inspectResult = await inspectArtifact(
-          { project, search: { type: "tag", tag } },
-          storageProvider,
-          pulledArtifactStore,
-          { debug: false, logger },
-        );
-
-        expect(inspectResult.project).toBe(project);
-        expect(inspectResult.tag).toBe(tag);
-        expect(inspectResult.id).toBe(artifactId);
-        expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
-        expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
-        const fullyQualifiedPathsResult = inspectResult.contractsBySource
-          .map((c) =>
-            c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
-          )
-          .flat();
-        expect(new Set(fullyQualifiedPathsResult)).toEqual(
-          new Set(artifactFixture.fullyQualifiedContractPaths),
-        );
-      },
-    );
-
-    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
-      "%s artifacts - inspect pulled artifact by ID",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
-        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-
-        await pulledArtifactStore.ensureProjectSetup(project);
-
-        const artifactId = await push(
-          artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
-        );
-
-        await pull(
-          project,
-          { type: "id", id: artifactId },
-          storageProvider,
-          pulledArtifactStore,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
-        );
-
-        const inspectResult = await inspectArtifact(
-          { project, search: { type: "id", id: artifactId } },
-          storageProvider,
-          pulledArtifactStore,
-          { debug: false, logger },
-        );
-
-        expect(inspectResult.project).toBe(project);
-        expect(inspectResult.tag).toBe(null);
-        expect(inspectResult.id).toBe(artifactId);
-        expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
-        expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
-        const fullyQualifiedPathsResult = inspectResult.contractsBySource
-          .map((c) =>
-            c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
-          )
-          .flat();
-        expect(new Set(fullyQualifiedPathsResult)).toEqual(
-          new Set(artifactFixture.fullyQualifiedContractPaths),
-        );
-      },
-    );
-
-    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
-      "%s artifacts - inspect non pulled artifact by ID",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
-        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-
-        await pulledArtifactStore.ensureProjectSetup(project);
-
-        const artifactId = await push(
-          artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
-        );
-
-        const inspectResult = await inspectArtifact(
-          { project, search: { type: "id", id: artifactId } },
-          storageProvider,
-          pulledArtifactStore,
-          { debug: false, logger },
-        );
-
-        expect(inspectResult.project).toBe(project);
-        expect(inspectResult.tag).toBe(null);
-        expect(inspectResult.id).toBe(artifactId);
-        expect(inspectResult.contractsBySource.length).toBeGreaterThan(0);
-        expect(inspectResult.sourceFiles.length).toBeGreaterThan(0);
-        const fullyQualifiedPathsResult = inspectResult.contractsBySource
-          .map((c) =>
-            c.contracts.map((contract) => `${c.sourcePath}:${contract}`),
-          )
-          .flat();
-        expect(new Set(fullyQualifiedPathsResult)).toEqual(
-          new Set(artifactFixture.fullyQualifiedContractPaths),
         );
       },
     );
