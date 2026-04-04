@@ -13,6 +13,7 @@ import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
 import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
 import { AbsolutePath, generateAbsolutePathSchema } from "@/utils/path.js";
+import { createStorageProvider } from "./utils/storage-provider";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -120,6 +121,10 @@ export function registerDiffCommand(
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
       );
+      const storageProvider = createStorageProvider(
+        projectConfig.storage,
+        paramParsingResult.data.debug,
+      );
 
       await generateDiffWithTargetRelease(
         finalArtifactPath,
@@ -127,6 +132,7 @@ export function registerDiffCommand(
           project: artifactKeyParsingResult.data.project,
           search: artifactKeyParsingResult.data.search,
         },
+        storageProvider,
         pulledArtifactStore,
         {
           debug: paramParsingResult.data.debug,

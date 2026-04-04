@@ -5,6 +5,7 @@ import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import { CommandLogger } from "@/ui";
 import { AbsolutePath, RelativePath } from "@/utils/path";
+import { retrieveOrPullArtifact } from "./helpers/retrieve-or-pull-artifact";
 
 export type RestoreResult = {
   project: string;
@@ -36,41 +37,13 @@ export async function restore(
     );
   }
 
-  let artifactId: string;
-  if (artifact.search.type === "tag") {
-    const artifactIdResult = await toAsyncResult(
-      pulledArtifactStore.retrieveArtifactId(
-        artifact.project,
-        artifact.search.tag,
-      ),
-      { debug: opts.debug },
-    );
-    if (!artifactIdResult.success) {
-      spinner1.fail("Failed to resolve artifact ID");
-      throw new CliError(
-        "Unable to retrieve the artifact ID, please ensure the artifact is pulled locally. Run with debug mode for more info",
-      );
-    }
-    artifactId = artifactIdResult.value;
-  } else {
-    const hasIdResult = await toAsyncResult(
-      pulledArtifactStore.hasId(artifact.project, artifact.search.id),
-      { debug: opts.debug },
-    );
-    if (!hasIdResult.success) {
-      spinner1.fail("Failed to verify artifact ID");
-      throw new CliError(
-        "Unable to verify the artifact ID, please ensure the artifact is pulled locally. Run with debug mode for more info",
-      );
-    }
-    if (!hasIdResult.value) {
-      spinner1.fail("Artifact ID not found");
-      throw new CliError(
-        "Artifact ID not found locally, please ensure the artifact is pulled before restoring",
-      );
-    }
-    artifactId = artifact.search.id;
-  }
+  const artifactId = await retrieveOrPullArtifact(
+    artifact.project,
+    artifact.search,
+    storageProvider,
+    pulledArtifactStore,
+    { debug: opts.debug, logger: opts.logger },
+  );
   spinner1.succeed("Artifact identified");
 
   const spinner2 = opts.logger.createSpinner("Checking output directory...");

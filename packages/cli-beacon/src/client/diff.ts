@@ -13,6 +13,8 @@ import {
   OriginalBuildInfoPaths,
 } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
 import { AbsolutePath } from "@/utils/path";
+import { retrieveOrPullArtifact } from "./helpers/retrieve-or-pull-artifact";
+import { StorageProvider } from "@/storage-provider";
 
 function buildInfoPathToSuccessText(paths: OriginalBuildInfoPaths): string {
   if (paths.format === "hardhat-v3") {
@@ -132,6 +134,7 @@ export type Difference = {
  * @throws CliError if there is an error during the execution of the steps, with user-friendly messages that can be directly shown to the user
  * @param artifactPath The path to the artifact to compare with,
  * @param artifact The artifact to compare with, containing the project and the tag or id of the target artifact
+ * @param storageProvider The StorageProvider instance to use for retrieving the target artifact if it's not available locally
  * @param pulledArtifactStore The store used to persist pulled artifacts
  * @param opts Options for the diff command
  * @param opts.debug Enable debug mode for more verbose logging
@@ -145,6 +148,7 @@ export async function generateDiffWithTargetRelease(
     project: string;
     search: { type: "tag"; tag: string } | { type: "id"; id: string };
   },
+  storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
 ): Promise<Difference[]> {
@@ -164,42 +168,17 @@ export async function generateDiffWithTargetRelease(
     );
   }
 
-  if (artifact.search.type === "tag") {
-    const hasTagResult = await toAsyncResult(
-      pulledArtifactStore.hasTag(artifact.project, artifact.search.tag),
-      { debug: opts.debug },
-    );
-    if (!hasTagResult.success) {
-      spinner1.fail("Failed to check pulled artifact store");
-      throw new CliError(
-        "Error checking pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
-      );
-    }
-    if (!hasTagResult.value) {
-      spinner1.fail("Artifact not found locally");
-      throw new CliError(
-        `The artifact "${artifact.project}:${artifact.search.tag}" has not been found locally. Please, make sure to have the artifact locally before running the diff command. Run with debug mode for more info`,
-      );
-    }
-  } else {
-    const hasIdResult = await toAsyncResult(
-      pulledArtifactStore.hasId(artifact.project, artifact.search.id),
-      { debug: opts.debug },
-    );
-    if (!hasIdResult.success) {
-      spinner1.fail("Failed to check pulled artifact store");
-      throw new CliError(
-        "Error checking pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
-      );
-    }
-    if (!hasIdResult.value) {
-      spinner1.fail("Artifact not found locally");
-      throw new CliError(
-        `The artifact "${artifact.project}:${artifact.search.id}" has not been found locally. Please, make sure to have the artifact locally before running the diff command. Run with debug mode for more info`,
-      );
-    }
-  }
-  spinner1.succeed("Artifact found locally");
+  const artifactId = await retrieveOrPullArtifact(
+    artifact.project,
+    artifact.search,
+    storageProvider,
+    pulledArtifactStore,
+    { debug: opts.debug, logger: opts.logger },
+  ).catch((err) => {
+    spinner1.fail("Failed to retrieve or pull the target artifact");
+    throw err;
+  });
+  spinner1.succeed("Artifact found");
 
   // Step 2: Look for compilation artifact
   const spinner2 = opts.logger.createSpinner(
@@ -284,26 +263,6 @@ export async function generateDiffWithTargetRelease(
   spinner3.succeed("Fresh artifact loaded");
 
   const spinner4 = opts.logger.createSpinner("Reading target artifact...");
-  let artifactId: string;
-  if (artifact.search.type === "id") {
-    artifactId = artifact.search.id;
-  } else {
-    const idResult = await toAsyncResult(
-      pulledArtifactStore.retrieveArtifactId(
-        artifact.project,
-        artifact.search.tag,
-      ),
-      { debug: opts.debug },
-    );
-    if (!idResult.success) {
-      spinner4.fail("Failed to retrieve artifact ID");
-      throw new CliError(
-        `Unable to find an artifact with tag ${artifact.search.tag} for project ${artifact.project}, please ensure it exists locally. Run with debug mode for more info`,
-      );
-    }
-    artifactId = idResult.value;
-  }
-
   const contractListResult = await toAsyncResult(
     pulledArtifactStore.listContractArtifacts(artifact.project, artifactId),
     { debug: opts.debug },

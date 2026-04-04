@@ -4,6 +4,8 @@ import { toAsyncResult, toResult } from "../utils/result";
 import { CliError } from "./error";
 import { ContractMetadataSchema } from "@/solc-artifacts/v0.8.33/contract-metadata-json";
 import z from "zod";
+import { retrieveOrPullArtifact } from "./helpers/retrieve-or-pull-artifact";
+import { StorageProvider } from "@/storage-provider/storage-provider.interface";
 
 type ContractBytecode = {
   functionDebugData?: unknown;
@@ -58,6 +60,7 @@ export async function exportContractArtifact(
     search: { type: "tag"; tag: string } | { type: "id"; id: string };
   },
   shortOrFullyQualifiedContractName: string,
+  storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { debug: boolean; logger: CommandLogger },
 ): Promise<ExportContractArtifactResult> {
@@ -71,24 +74,15 @@ export async function exportContractArtifact(
     );
   }
 
-  let artifactId: string;
-  if (artifact.search.type === "id") {
-    artifactId = artifact.search.id;
-  } else {
-    const idResult = await toAsyncResult(
-      pulledArtifactStore.retrieveArtifactId(
-        artifact.project,
-        artifact.search.tag,
-      ),
-      { debug: opts.debug },
-    );
-    if (!idResult.success) {
-      throw new CliError(
-        `Unable to find an artifact with tag ${artifact.search.tag} for project ${artifact.project}, please ensure it exists locally. Run with debug mode for more info`,
-      );
-    }
-    artifactId = idResult.value;
-  }
+  // @dev `retrieveOrPullArtifact` will throw a `CliError` if it fails
+  // so we don't need to handle the error case here
+  const artifactId = await retrieveOrPullArtifact(
+    artifact.project,
+    artifact.search,
+    storageProvider,
+    pulledArtifactStore,
+    { debug: opts.debug, logger: opts.logger },
+  );
 
   const contractListResult = await toAsyncResult(
     pulledArtifactStore.listContractArtifacts(artifact.project, artifactId),

@@ -61,18 +61,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             },
           );
 
-          await pull(
-            project,
-            { type: "tag", tag },
-            storageProvider,
-            pulledArtifactStore,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
-          );
-
           const outputPath = tempOutputDir.join("absolute-path-test");
           const result = await restore(
             { project, search: { type: "tag", tag } },
@@ -107,18 +95,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             project,
             tag,
             storageProvider,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
-          );
-
-          await pull(
-            project,
-            { type: "tag", tag },
-            storageProvider,
-            pulledArtifactStore,
             {
               force: false,
               debug: false,
@@ -169,18 +145,6 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             },
           );
 
-          await pull(
-            project,
-            { type: "tag", tag },
-            storageProvider,
-            pulledArtifactStore,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
-          );
-
           const outputPath = tempOutputDir.join("force-overwrite-test");
           await fs.mkdir(outputPath.resolvedPath, { recursive: true });
           await fs.writeFile(
@@ -201,18 +165,18 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       );
 
       storageProviderTest(
-        "error: artifact not pulled (tag not found locally)",
+        "error: artifact not existing",
         async ({ storageProvider, pulledArtifactStore }) => {
           const project = createTestProjectName(
             TEST_CONSTANTS.PROJECTS.DEFAULT,
           );
-          const outputPath = tempOutputDir.join("not-pulled-test");
+          const outputPath = tempOutputDir.join("not-existing-tag-test");
 
           await pulledArtifactStore.ensureProjectSetup(project);
 
           await expect(
             restore(
-              { project, search: { type: "tag", tag: "non-pulled-tag" } },
+              { project, search: { type: "tag", tag: "non-existing-tag" } },
               outputPath,
               storageProvider,
               pulledArtifactStore,
@@ -243,115 +207,148 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       );
     });
 
-    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
-      "%s artifacts - restore by tag",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
-        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
-        const tag = TEST_CONSTANTS.TAGS.V1;
+    describe.for([[false], [true]] as const)(
+      "artifact already pulled: %s",
+      ([artifactAlreadyPulled]) => {
+        storageProviderTest.for(ARTIFACTS_STRATEGIES)(
+          "%s artifacts - restore by tag",
+          async (
+            [, artifactFixture],
+            { storageProvider, pulledArtifactStore },
+          ) => {
+            const project = createTestProjectName(
+              TEST_CONSTANTS.PROJECTS.DEFAULT,
+            );
+            const tag = TEST_CONSTANTS.TAGS.V1;
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+            await pulledArtifactStore.ensureProjectSetup(project);
 
-        await push(artifactFixture.folderPath, project, tag, storageProvider, {
-          force: false,
-          debug: false,
-          logger,
-        });
+            await push(
+              artifactFixture.folderPath,
+              project,
+              tag,
+              storageProvider,
+              {
+                force: false,
+                debug: false,
+                logger,
+              },
+            );
 
-        await pull(
-          project,
-          { type: "tag", tag },
-          storageProvider,
-          pulledArtifactStore,
-          {
-            force: false,
-            debug: false,
-            logger,
+            if (!artifactAlreadyPulled) {
+              await pull(
+                project,
+                { type: "tag", tag },
+                storageProvider,
+                pulledArtifactStore,
+                {
+                  force: false,
+                  debug: false,
+                  logger,
+                },
+              );
+            }
+
+            const outputPath = tempOutputDir.join(`${tag}-tag-test`);
+            const result = await restore(
+              { project, search: { type: "tag", tag } },
+              outputPath,
+              storageProvider,
+              pulledArtifactStore,
+              { force: false, debug: false, logger },
+            );
+
+            expect(result.project).toBe(project);
+            expect(result.tag).toBe(tag);
+            const expectedOriginalAbsolutePaths =
+              await deriveAllAbsolutePathsInDirectory(
+                artifactFixture.folderPath,
+              );
+            const expectedRelativePaths = expectedOriginalAbsolutePaths.map(
+              (p) => p.relativeTo(artifactFixture.folderPath),
+            );
+
+            expect(result.filesRestored.length).toBe(
+              expectedRelativePaths.length,
+            );
+
+            for (const expectedRelativePath of expectedRelativePaths) {
+              const fullPath = outputPath.join(expectedRelativePath);
+              const stat = await fs.stat(fullPath.resolvedPath);
+              expect(stat.isFile()).toBe(true);
+            }
           },
         );
 
-        const outputPath = tempOutputDir.join(`${tag}-tag-test`);
-        const result = await restore(
-          { project, search: { type: "tag", tag } },
-          outputPath,
-          storageProvider,
-          pulledArtifactStore,
-          { force: false, debug: false, logger },
-        );
+        storageProviderTest.for(ARTIFACTS_STRATEGIES)(
+          "%s artifacts - restore by ID",
+          async (
+            [, artifactFixture],
+            { storageProvider, pulledArtifactStore },
+          ) => {
+            const project = createTestProjectName(
+              TEST_CONSTANTS.PROJECTS.DEFAULT,
+            );
 
-        expect(result.project).toBe(project);
-        expect(result.tag).toBe(tag);
-        const expectedOriginalAbsolutePaths =
-          await deriveAllAbsolutePathsInDirectory(artifactFixture.folderPath);
-        const expectedRelativePaths = expectedOriginalAbsolutePaths.map((p) =>
-          p.relativeTo(artifactFixture.folderPath),
-        );
+            await pulledArtifactStore.ensureProjectSetup(project);
 
-        expect(result.filesRestored.length).toBe(expectedRelativePaths.length);
+            const artifactId = await push(
+              artifactFixture.folderPath,
+              project,
+              undefined,
+              storageProvider,
+              {
+                force: false,
+                debug: false,
+                logger,
+              },
+            );
 
-        for (const expectedRelativePath of expectedRelativePaths) {
-          const fullPath = outputPath.join(expectedRelativePath);
-          const stat = await fs.stat(fullPath.resolvedPath);
-          expect(stat.isFile()).toBe(true);
-        }
-      },
-    );
+            if (!artifactAlreadyPulled) {
+              await pull(
+                project,
+                { type: "id", id: artifactId },
+                storageProvider,
+                pulledArtifactStore,
+                {
+                  force: false,
+                  debug: false,
+                  logger,
+                },
+              );
+            }
 
-    storageProviderTest.for(ARTIFACTS_STRATEGIES)(
-      "%s artifacts - restore by ID",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
-        const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
+            const outputPath = tempOutputDir.join(`${artifactId}-id-test`);
+            const result = await restore(
+              { project, search: { type: "id", id: artifactId } },
+              outputPath,
+              storageProvider,
+              pulledArtifactStore,
+              { force: false, debug: false, logger },
+            );
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+            expect(result.project).toBe(project);
+            expect(result.tag).toBe(null);
+            expect(result.id).toBe(artifactId);
+            const expectedOriginalAbsolutePaths =
+              await deriveAllAbsolutePathsInDirectory(
+                artifactFixture.folderPath,
+              );
+            const expectedRelativePaths = expectedOriginalAbsolutePaths.map(
+              (p) => p.relativeTo(artifactFixture.folderPath),
+            );
 
-        const artifactId = await push(
-          artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          {
-            force: false,
-            debug: false,
-            logger,
+            expect(result.filesRestored.length).toBe(
+              expectedRelativePaths.length,
+            );
+
+            for (const expectedRelativePath of expectedRelativePaths) {
+              const fullPath = outputPath.join(expectedRelativePath);
+              const stat = await fs.stat(fullPath.resolvedPath);
+              expect(stat.isFile()).toBe(true);
+            }
           },
         );
-
-        await pull(
-          project,
-          { type: "id", id: artifactId },
-          storageProvider,
-          pulledArtifactStore,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
-        );
-
-        const outputPath = tempOutputDir.join(`${artifactId}-id-test`);
-        const result = await restore(
-          { project, search: { type: "id", id: artifactId } },
-          outputPath,
-          storageProvider,
-          pulledArtifactStore,
-          { force: false, debug: false, logger },
-        );
-
-        expect(result.project).toBe(project);
-        expect(result.tag).toBe(null);
-        expect(result.id).toBe(artifactId);
-        const expectedOriginalAbsolutePaths =
-          await deriveAllAbsolutePathsInDirectory(artifactFixture.folderPath);
-        const expectedRelativePaths = expectedOriginalAbsolutePaths.map((p) =>
-          p.relativeTo(artifactFixture.folderPath),
-        );
-
-        expect(result.filesRestored.length).toBe(expectedRelativePaths.length);
-
-        for (const expectedRelativePath of expectedRelativePaths) {
-          const fullPath = outputPath.join(expectedRelativePath);
-          const stat = await fs.stat(fullPath.resolvedPath);
-          expect(stat.isFile()).toBe(true);
-        }
       },
     );
   },

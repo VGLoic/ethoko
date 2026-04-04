@@ -123,26 +123,9 @@ ethoko push my-project --artifact-path ./path/to/artifacts
 > [!NOTE]  
 > Ethoko will try to read the compilation artifact from the configured or provided path. If multiple choices are possible, it will ask the user to select one of them. To avoid this prompt, provide the full path to the compilation artifact, or ensure there is only one compilation artifact in the path.
 
-### Pull
-
-Pull locally the missing artifacts for a configured project.
-
-To pull all artifacts from a project, run:
-
-```bash
-ethoko pull my-project
-```
-
-Or target a specific artifact using its tag or ID:
-
-```bash
-ethoko pull my-project@b5e41181986a
-ethoko pull my-project:2026-02-02
-```
-
 ### Export
 
-Export a contract artifact from a locally pulled artifact.
+Export a contract artifact
 
 ```bash
 # Using only the contract name (case-insensitive) — fails if multiple contracts share the same name
@@ -169,9 +152,41 @@ Export the ABI as a TypeScript `const`:
 echo "export const MY_ABI = $(ethoko export my-project:2026-02-02 --contract Counter | jq .abi) as const;" > ./my-abi.ts
 ```
 
+### Inspect
+
+Inspect a compilation artifact to list contracts and metadata.
+
+```bash
+ethoko inspect my-project:2026-02-02
+ethoko inspect my-project@b5e41181986a
+```
+
+Output JSON for scripting:
+
+```bash
+ethoko inspect my-project:2026-02-02 --json
+```
+
+### Pull
+
+Pull locally the missing artifacts for a configured project.
+
+To pull all artifacts from a project, run:
+
+```bash
+ethoko pull my-project
+```
+
+Or target a specific artifact using its tag or ID:
+
+```bash
+ethoko pull my-project@b5e41181986a
+ethoko pull my-project:2026-02-02
+```
+
 ### Typings
 
-Once the artifacts have been pulled, run the following command to generate TypeScript typings:
+Generate TypeScript typings for all the pulled artifacts
 
 ```bash
 ethoko typings
@@ -186,21 +201,6 @@ List the pulled compilation artifacts with their project.
 
 ```bash
 ethoko artifacts
-```
-
-### Inspect
-
-Inspect a pulled compilation artifact to list contracts and metadata.
-
-```bash
-ethoko inspect my-project:2026-02-02
-ethoko inspect my-project@b5e41181986a
-```
-
-Output JSON for scripting:
-
-```bash
-ethoko inspect my-project:2026-02-02 --json
 ```
 
 ### Config
@@ -236,7 +236,7 @@ ethoko init --config ./path/to/ethoko.config.json
 
 ### Restore
 
-Original compilation artifacts are never lost and can be restored from a locally pulled artifact to a local directory.
+Original compilation artifacts are never lost and can be restored to a local directory.
 
 ```bash
 ethoko restore my-project@b5e41181986a --output ./restored

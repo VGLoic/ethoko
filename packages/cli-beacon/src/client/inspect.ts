@@ -2,6 +2,9 @@ import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-st
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import type { EthokoInputArtifact } from "@/ethoko-artifacts/v0";
+import { CommandLogger } from "@/ui";
+import { StorageProvider } from "@/storage-provider";
+import { retrieveOrPullArtifact } from "./helpers/retrieve-or-pull-artifact";
 
 export type InspectResult = {
   project: string;
@@ -42,8 +45,9 @@ export async function inspectArtifact(
     project: string;
     search: { type: "tag"; tag: string } | { type: "id"; id: string };
   },
+  storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean },
+  opts: { debug: boolean; logger: CommandLogger },
 ): Promise<InspectResult> {
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifact.project),
@@ -55,24 +59,15 @@ export async function inspectArtifact(
     );
   }
 
-  let artifactId: string;
-  if (artifact.search.type === "id") {
-    artifactId = artifact.search.id;
-  } else {
-    const artifactIdResult = await toAsyncResult(
-      pulledArtifactStore.retrieveArtifactId(
-        artifact.project,
-        artifact.search.tag,
-      ),
-      { debug: opts.debug },
-    );
-    if (!artifactIdResult.success) {
-      throw new CliError(
-        `The artifact ${artifact.project}:${artifact.search.tag} does not have an associated artifact ID. Please pull again. Run with debug mode for more info`,
-      );
-    }
-    artifactId = artifactIdResult.value;
-  }
+  // @dev `retrieveOrPullArtifact` will throw a `CliError` if it fails
+  // so we don't need to handle the error case here
+  const artifactId = await retrieveOrPullArtifact(
+    artifact.project,
+    artifact.search,
+    storageProvider,
+    pulledArtifactStore,
+    { debug: opts.debug, logger: opts.logger },
+  );
 
   const artifactsResult = await toAsyncResult(
     Promise.all([

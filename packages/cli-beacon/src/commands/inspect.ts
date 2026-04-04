@@ -8,6 +8,7 @@ import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-sto
 import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
 import { ArtifactKeySchema } from "./utils/parse-artifact-key.js";
+import { createStorageProvider } from "./utils/storage-provider";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -95,14 +96,21 @@ export function registerInspectCommand(
         config.pulledArtifactsPath,
       );
 
+      const storageProvider = createStorageProvider(
+        projectConfig.storage,
+        optsParsingResult.data.debug,
+      );
+
       await inspectArtifact(
         {
           project: projectConfig.name,
           search: artifactKeyParsingResult.data.search,
         },
+        storageProvider,
         pulledArtifactStore,
         {
           debug: optsParsingResult.data.debug,
+          logger,
         },
       )
         .then((result) => {
