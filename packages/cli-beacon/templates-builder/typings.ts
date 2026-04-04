@@ -21,22 +21,34 @@ export type Tag<TProject> = TProject extends AccurateProject
 
 type AvailableTagForContractAsArray<TProject, TContract> =
   TProject extends AccurateProject
-    ? TContract extends Contract<TProject>
+    ? TContract extends keyof Projects[TProject]["contracts"]
       ? Projects[TProject]["contracts"][TContract]
       : string[]
     : string[];
 
 export type AvailableTagForContract<TProject, TContract> =
-  AvailableTagForContractAsArray<TProject, TContract>[number];
-
+  TProject extends AccurateProject
+    ? TContract extends keyof Projects[TProject]["contracts"]
+      ? Projects[TProject]["contracts"][TContract] extends readonly (infer TTag)[]
+        ? TTag
+        : string
+      : string
+    : string;
 type AvailableContractsForTagAsArray<TProject, TTag> =
   TProject extends AccurateProject
-    ? TTag extends Tag<TProject>
+    ? TTag extends keyof Projects[TProject]["tags"]
       ? Projects[TProject]["tags"][TTag]
       : string[]
     : string[];
+
 export type AvailableContractForTag<TProject, TTag> =
-  AvailableContractsForTagAsArray<TProject, TTag>[number];
+  TProject extends AccurateProject
+    ? TTag extends keyof Projects[TProject]["tags"]
+      ? Projects[TProject]["tags"][TTag] extends readonly (infer TContract)[]
+        ? TContract
+        : string
+      : string
+    : string;
 
 // ##################################################
 // ############## ABIS RELATED TYPINGS ##############
