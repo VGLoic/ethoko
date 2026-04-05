@@ -3,7 +3,7 @@ import { StorageProvider } from "@/storage-provider";
 import { CommandLogger } from "@/ui";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "../error";
-import { pull } from "../pull";
+import { pullArtifact } from "../pull";
 import { ArtifactKey } from "@/utils/artifact-key";
 
 /**
@@ -61,7 +61,7 @@ export async function retrieveOrPullArtifact(
     }
   }
 
-  await pull(artifactKey, storageProvider, pulledArtifactStore, {
+  await pullArtifact(artifactKey, storageProvider, pulledArtifactStore, {
     force: false,
     debug: opts.debug,
     logger: opts.logger,

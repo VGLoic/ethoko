@@ -306,9 +306,8 @@ export function toAsyncResult<T, TError = Error>(
 **Error handling pattern when interacting with CLI methods:**
 
 ```typescript
-await pull(
+await pullProject(
   optsParsingResult.data.project,
-  search,
   storageProvider,
   pulledArtifactStore,
   {
@@ -322,7 +321,7 @@ await pull(
       logger.error(err.message);
     } else {
       logger.error(
-        "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+        "An unexpected error occurred, please file an issue with the error details if the problem persists",
       );
       console.error(err);
     }

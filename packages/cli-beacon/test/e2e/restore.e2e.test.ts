@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect } from "vitest";
-import { pull, push, restore } from "@/client";
+import { pullArtifact, push, restore } from "@/client";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -237,7 +237,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             );
 
             if (!artifactAlreadyPulled) {
-              await pull(
+              await pullArtifact(
                 { project, type: "tag", tag },
                 storageProvider,
                 pulledArtifactStore,
@@ -305,7 +305,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             );
 
             if (!artifactAlreadyPulled) {
-              await pull(
+              await pullArtifact(
                 { project, type: "id", id: artifactId },
                 storageProvider,
                 pulledArtifactStore,

@@ -1,6 +1,11 @@
 import fs from "fs/promises";
 import { describe, expect } from "vitest";
-import { listPulledArtifacts, pull, push } from "@/client/index";
+import {
+  listPulledArtifacts,
+  pullArtifact,
+  pullProject,
+  push,
+} from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -45,7 +50,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         );
         expect(hasArtifact).toBe(true);
 
-        const pullResult = await pull(
+        const pullResult = await pullArtifact(
           { project, type: "id", id: artifactId },
           storageProvider,
           pulledArtifactStore,
@@ -127,7 +132,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(hasTag).toBe(true);
         expect(hasId).toBe(true);
 
-        const pullResult = await pull(
+        const pullResult = await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -182,8 +187,8 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           logger,
         });
 
-        const pullResult = await pull(
-          { project, type: "project" },
+        const pullResult = await pullProject(
+          project,
           storageProvider,
           pulledArtifactStore,
           { force: false, debug: false, logger },
@@ -273,7 +278,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           debug: false,
           logger,
         });
-        await pull(
+        await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -284,7 +289,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           },
         );
 
-        const result1 = await pull(
+        const result1 = await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -296,7 +301,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         );
         expect(result1.pulledTags).toHaveLength(0);
 
-        const result2 = await pull(
+        const result2 = await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -318,7 +323,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await pulledArtifactStore.ensureProjectSetup(project);
 
         await expect(
-          pull(
+          pullArtifact(
             { project, type: "tag", tag: "non-existent-tag" },
             storageProvider,
             pulledArtifactStore,

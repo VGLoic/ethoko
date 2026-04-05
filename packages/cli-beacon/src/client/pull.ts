@@ -15,7 +15,7 @@ export type PullResult = {
 };
 
 /**
- * Run the pull command of the CLI clients, it consists of four steps:
+ * Pull artifacts for a given project, it consists of four steps:
  * 1. Set up the pulled artifact store for the project
  * 2. Fetch the list of remote tags and IDs from the storage provider, and filter them based on the provided tagOrId parameter
  * 3. Check which of the filtered tags and IDs are already present in the pulled artifact store, unless the force option is enabled
@@ -23,8 +23,7 @@ export type PullResult = {
  *
  * The method returns an object containing the list of remote tags and IDs, the list of successfully pulled tags and IDs, and the list of tags and IDs that failed to be pulled.
  * @throws CliError if there is an error setting up the pulled artifact store, fetching the remote artifacts, checking the pulled artifact store, or downloading the artifacts. The error messages are meant to be user-friendly and can be directly shown to the user.
- * @param project The project name
- * @param search An optional object to specify a tag or ID to pull, if not provided all tags and IDs will be pulled
+ * @param project The project to pull artifacts for
  * @param storageProvider The storage provider used to access remote artifacts
  * @param pulledArtifactStore The pulled artifact store used to persist pulled artifacts
  * @param opts Options for the pull command
@@ -33,13 +32,12 @@ export type PullResult = {
  * @param opts.logger The CommandLogger instance to use for logging and prompting the user during the pull process
  * @returns An object with the remote tags and IDs, pulled tags and IDs, and failed tags and IDs
  */
-export async function pull(
-  projectOrArtifactKey: ArtifactKey | { project: string; type: "project" },
+export async function pullProject(
+  project: string,
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { force: boolean; debug: boolean; logger: CommandLogger },
 ): Promise<PullResult> {
-  const project = projectOrArtifactKey.project;
   // Step 1: Set up pulled artifact store
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(project),
@@ -57,102 +55,32 @@ export async function pull(
   }
 
   // Step 2: Fetch remote artifacts
-  let tagsToDownload: string[];
-  let idsToDownload: string[];
-  let remoteTags: string[] = [];
-  let remoteIds: string[] = [];
-  if (
-    projectOrArtifactKey.type === "tag" ||
-    projectOrArtifactKey.type === "id"
-  ) {
-    if (projectOrArtifactKey.type === "tag") {
-      const spinner2 = opts.logger.createSpinner(
-        `Checking existence of artifact "${project}:${projectOrArtifactKey.tag}" remotely...`,
-      );
-      const hasTagResult = await toAsyncResult(
-        storageProvider.hasArtifactByTag(project, projectOrArtifactKey.tag),
-        { debug: opts.debug },
-      );
-      if (!hasTagResult.success) {
-        spinner2.fail("Failed to check tag existence remotely");
-        throw new CliError(
-          "Error interacting with the storage, please check the configuration or run with debug mode for more info",
-        );
-      }
-      if (!hasTagResult.value) {
-        spinner2.fail("The tag does not exist remotely");
-        throw new CliError(
-          `The artifact "${project}:${projectOrArtifactKey.tag}" does not exist remotely`,
-        );
-      }
-      tagsToDownload = [projectOrArtifactKey.tag];
-      idsToDownload = [];
-      remoteTags = [projectOrArtifactKey.tag];
-      remoteIds = [];
-      spinner2.succeed(
-        `Artifact "${project}:${projectOrArtifactKey.tag}" identified remotely`,
-      );
-    } else if (projectOrArtifactKey.type === "id") {
-      const spinner2 = opts.logger.createSpinner(
-        `Checking existence of artifact "${project}@${projectOrArtifactKey.id}" remotely...`,
-      );
-      const hasIdResult = await toAsyncResult(
-        storageProvider.hasArtifactById(project, projectOrArtifactKey.id),
-        { debug: opts.debug },
-      );
-      if (!hasIdResult.success) {
-        spinner2.fail("Failed to check ID existence remotely");
-        throw new CliError(
-          "Error interacting with the storage, please check the configuration or run with debug mode for more info",
-        );
-      }
-      if (!hasIdResult.value) {
-        spinner2.fail("The ID does not exist remotely");
-        throw new CliError(
-          `The ID "${projectOrArtifactKey.id}" does not exist remotely`,
-        );
-      }
-      spinner2.succeed(
-        `Artifact "${project}@${projectOrArtifactKey.id}" identified remotely`,
-      );
-
-      tagsToDownload = [];
-      idsToDownload = [projectOrArtifactKey.id];
-      remoteTags = [];
-      remoteIds = [projectOrArtifactKey.id];
-    } else {
-      throw new CliError(
-        `The tag or ID "${projectOrArtifactKey satisfies never}" does not exist remotely`,
-      );
-    }
-  } else {
-    const spinner2 = opts.logger.createSpinner(
-      "Checking for remote artifacts...",
+  const spinner2 = opts.logger.createSpinner(
+    "Checking for remote artifacts...",
+  );
+  const remoteListingResult = await toAsyncResult(
+    Promise.all([
+      storageProvider.listTags(project),
+      storageProvider.listIds(project),
+    ]),
+    { debug: opts.debug },
+  );
+  if (!remoteListingResult.success) {
+    spinner2.fail("Failed to fetch remote artifacts");
+    throw new CliError(
+      "Error interacting with the storage, please check the configuration or run with debug mode for more info",
     );
-    const remoteListingResult = await toAsyncResult(
-      Promise.all([
-        storageProvider.listTags(project),
-        storageProvider.listIds(project),
-      ]),
-      { debug: opts.debug },
-    );
-    if (!remoteListingResult.success) {
-      spinner2.fail("Failed to fetch remote artifacts");
-      throw new CliError(
-        "Error interacting with the storage, please check the configuration or run with debug mode for more info",
-      );
-    }
-    [remoteTags, remoteIds] = remoteListingResult.value;
-    spinner2.succeed("Remote artifacts checked");
-
-    if (opts.debug) {
-      opts.logger.message(`Remote tags: ${remoteTags.join(", ")}`);
-      opts.logger.message(`Remote IDs: ${remoteIds.join(", ")}`);
-    }
-
-    tagsToDownload = remoteTags;
-    idsToDownload = remoteIds;
   }
+  const [remoteTags, remoteIds] = remoteListingResult.value;
+  spinner2.succeed("Remote artifacts checked");
+
+  if (opts.debug) {
+    opts.logger.message(`Remote tags: ${remoteTags.join(", ")}`);
+    opts.logger.message(`Remote IDs: ${remoteIds.join(", ")}`);
+  }
+
+  const tagsToDownload = remoteTags;
+  const idsToDownload = remoteIds;
 
   if (opts.debug) {
     opts.logger.message(`Tags to download: ${tagsToDownload.join(", ")}`);
@@ -344,6 +272,233 @@ export async function pull(
     pulledIds,
     failedTags,
     failedIds,
+  };
+}
+
+/**
+ * Pull a specific artifact by tag or ID, it consists of the same four steps as pullProject but without the need to fetch and filter the list of remote artifacts, since we already know which artifact we want to pull. The method returns an object containing the list of remote tags and IDs (which will contain only the pulled artifact), the list of successfully pulled tags and IDs, and the list of tags and IDs that failed to be pulled.
+ * @throws CliError if there is an error setting up the pulled artifact store, checking the pulled artifact store, verifying the existence of the artifact remotely, or downloading the artifact. The error messages are meant to be user-friendly and can be directly shown to the user.
+ * @param artifactKey The key of the artifact to pull, which should specify the project and either a tag or an ID
+ * @param storageProvider The storage provider used to access remote artifacts
+ * @param pulledArtifactStore The store used to manage pulled artifacts locally
+ * @param opts Options for the pull command
+ * @param opts.force Force the pull to skip checking existing pulled artifacts
+ * @param opts.debug Enable debug mode
+ * @param opts.logger The CommandLogger instance to use for logging and prompting the user during the pull process
+ * @returns An object with the remote tags and IDs, pulled tags and IDs, and failed tags and IDs
+ */
+export async function pullArtifact(
+  artifactKey: ArtifactKey,
+  storageProvider: StorageProvider,
+  pulledArtifactStore: PulledArtifactStore,
+  opts: { force: boolean; debug: boolean; logger: CommandLogger },
+): Promise<PullResult> {
+  // Step 1: Set up pulled artifact store
+  const ensureResult = await toAsyncResult(
+    pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    { debug: opts.debug },
+  );
+  if (!ensureResult.success) {
+    throw new CliError(
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+    );
+  }
+  if (opts.debug) {
+    opts.logger.message(
+      `Pulled artifact store set up at ${pulledArtifactStore.rootPath}`,
+    );
+  }
+
+  if (artifactKey.type === "tag") {
+    return await pullArtifactByTag(
+      artifactKey.project,
+      artifactKey.tag,
+      storageProvider,
+      pulledArtifactStore,
+      opts,
+    );
+  } else if (artifactKey.type === "id") {
+    return await pullArtifactById(
+      artifactKey.project,
+      artifactKey.id,
+      storageProvider,
+      pulledArtifactStore,
+      opts,
+    );
+  } else {
+    throw new CliError(
+      `The tag or ID "${artifactKey satisfies never}" does not exist remotely`,
+    );
+  }
+}
+
+async function pullArtifactById(
+  project: string,
+  id: string,
+  storageProvider: StorageProvider,
+  pulledArtifactStore: PulledArtifactStore,
+  opts: { force: boolean; debug: boolean; logger: CommandLogger },
+): Promise<PullResult> {
+  // Check if already pulled
+  const hasAlreadyPulledResult = await toAsyncResult(
+    pulledArtifactStore.hasId(project, id),
+    { debug: opts.debug },
+  );
+  if (!hasAlreadyPulledResult.success) {
+    throw new CliError(
+      "Error checking pulled artifacts, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+    );
+  }
+
+  // If already pulled and not force, skip
+  if (hasAlreadyPulledResult.value && !opts.force) {
+    if (opts.debug) {
+      opts.logger.message(
+        `Artifact "${project}@${id}" already pulled, skipping`,
+      );
+    }
+    return {
+      remoteTags: [],
+      remoteIds: [id],
+      pulledTags: [],
+      pulledIds: [],
+      failedTags: [],
+      failedIds: [],
+    };
+  }
+
+  // Verify existence remotely
+  const hasRemoteResult = await toAsyncResult(
+    storageProvider.hasArtifactById(project, id),
+    { debug: opts.debug },
+  );
+  if (!hasRemoteResult.success) {
+    throw new CliError(
+      "Error interacting with the storage, please check the configuration or run with debug mode for more info",
+    );
+  }
+  if (!hasRemoteResult.value) {
+    throw new CliError(
+      `The artifact "${project}@${id}" does not exist remotely`,
+    );
+  }
+
+  // Download artifact
+  const downloadResult = await toAsyncResult(
+    storageProvider.downloadArtifactById(project, id),
+    { debug: opts.debug },
+  );
+  if (!downloadResult.success) {
+    throw new CliError(
+      `Error downloading the artifact "${project}@${id}", please check the configuration or run with debug mode for more info`,
+    );
+  }
+
+  const createResult = await toAsyncResult(
+    pulledArtifactStore.createArtifact(project, id, null, {
+      input: downloadResult.value.input,
+      outputs: downloadResult.value.contractOutputArtifacts,
+    }),
+    { debug: opts.debug },
+  );
+  if (!createResult.success) {
+    throw new CliError(
+      `Error saving the artifact "${project}@${id}" locally, is the script not allowed to write to the filesystem? Run with debug mode for more info`,
+    );
+  }
+
+  return {
+    remoteTags: [],
+    remoteIds: [id],
+    pulledTags: [],
+    pulledIds: [id],
+    failedTags: [],
+    failedIds: [],
+  };
+}
+
+async function pullArtifactByTag(
+  project: string,
+  tag: string,
+  storageProvider: StorageProvider,
+  pulledArtifactStore: PulledArtifactStore,
+  opts: { force: boolean; debug: boolean; logger: CommandLogger },
+): Promise<PullResult> {
+  // Check if already pulled
+  const hasAlreadyPulledResult = await toAsyncResult(
+    pulledArtifactStore.hasTag(project, tag),
+    { debug: opts.debug },
+  );
+  if (!hasAlreadyPulledResult.success) {
+    throw new CliError(
+      "Error checking pulled artifacts, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+    );
+  }
+
+  // If already pulled and not force, skip
+  if (hasAlreadyPulledResult.value && !opts.force) {
+    if (opts.debug) {
+      opts.logger.message(
+        `Artifact "${project}:${tag}" already pulled, skipping`,
+      );
+    }
+    return {
+      remoteTags: [tag],
+      remoteIds: [],
+      pulledTags: [],
+      pulledIds: [],
+      failedTags: [],
+      failedIds: [],
+    };
+  }
+
+  // Verify existence remotely
+  const hasRemoteResult = await toAsyncResult(
+    storageProvider.hasArtifactByTag(project, tag),
+    { debug: opts.debug },
+  );
+  if (!hasRemoteResult.success) {
+    throw new CliError(
+      "Error interacting with the storage, please check the configuration or run with debug mode for more info",
+    );
+  }
+  if (!hasRemoteResult.value) {
+    throw new CliError(
+      `The artifact "${project}:${tag}" does not exist remotely`,
+    );
+  }
+
+  // Download artifact
+  const downloadResult = await toAsyncResult(
+    storageProvider.downloadArtifactByTag(project, tag),
+    { debug: opts.debug },
+  );
+  if (!downloadResult.success) {
+    throw new CliError(
+      `Error downloading the artifact "${project}:${tag}", please check the configuration or run with debug mode for more info`,
+    );
+  }
+
+  const createResult = await toAsyncResult(
+    pulledArtifactStore.createArtifact(project, downloadResult.value.id, tag, {
+      input: downloadResult.value.input,
+      outputs: downloadResult.value.contractOutputArtifacts,
+    }),
+    { debug: opts.debug },
+  );
+  if (!createResult.success) {
+    throw new CliError(
+      `Error saving the artifact "${project}:${tag}" locally, is the script not allowed to write to the filesystem? Run with debug mode for more info`,
+    );
+  }
+
+  return {
+    remoteTags: [tag],
+    remoteIds: [downloadResult.value.id],
+    pulledTags: [tag],
+    pulledIds: [downloadResult.value.id],
+    failedTags: [],
+    failedIds: [],
   };
 }
 

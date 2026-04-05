@@ -4,7 +4,8 @@ import {
   pruneArtifact,
   pruneOrphanedAndUntaggedArtifacts,
   pruneProjectArtifacts,
-  pull,
+  pullArtifact,
+  pullProject,
   push,
 } from "@/client/index";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
@@ -39,7 +40,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -78,7 +79,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -109,7 +110,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "id", id: artifactId },
           storageProvider,
           pulledArtifactStore,
@@ -142,7 +143,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "id", id: artifactId },
           storageProvider,
           pulledArtifactStore,
@@ -199,16 +200,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
-          { project, type: "project" },
-          storageProvider,
-          pulledArtifactStore,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
-        );
+        await pullProject(project, storageProvider, pulledArtifactStore, {
+          force: false,
+          debug: false,
+          logger,
+        });
 
         const result = await pruneProjectArtifacts(
           project,
@@ -245,7 +241,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "id", id: artifactId },
           storageProvider,
           pulledArtifactStore,
@@ -282,7 +278,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "id", id: artifactId },
           storageProvider,
           pulledArtifactStore,
@@ -315,7 +311,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "id", id: artifactId },
           storageProvider,
           pulledArtifactStore,
@@ -369,7 +365,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,
@@ -403,7 +399,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           storageProvider,
           { force: false, debug: false, logger },
         );
-        await pull(
+        await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,
           pulledArtifactStore,

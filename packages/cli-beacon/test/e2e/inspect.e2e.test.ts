@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { inspectArtifact, pull, push } from "@/client/index";
+import { inspectArtifact, pullArtifact, push } from "@/client";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -44,7 +44,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             );
 
             if (!artifactAlreadyPulled) {
-              await pull(
+              await pullArtifact(
                 { project, type: "tag", tag },
                 storageProvider,
                 pulledArtifactStore,
@@ -104,7 +104,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             );
 
             if (!artifactAlreadyPulled) {
-              await pull(
+              await pullArtifact(
                 { project, type: "id", id: artifactId },
                 storageProvider,
                 pulledArtifactStore,

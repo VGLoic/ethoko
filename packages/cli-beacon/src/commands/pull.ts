@@ -2,7 +2,12 @@ import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
 import { CommandLogger, LOG_COLORS } from "@/ui/index.js";
-import { CliError, pull, PullResult } from "@/client/index.js";
+import {
+  CliError,
+  pullProject,
+  pullArtifact,
+  PullResult,
+} from "@/client/index.js";
 import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
 
 import type { EthokoCliConfig } from "../config";
@@ -60,24 +65,6 @@ export function registerPullCommand(
         return;
       }
 
-      if (artifactKeyParsingResult.data.type === "tag") {
-        logger.intro(
-          `Pulling artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.tag}"`,
-        );
-      } else if (artifactKeyParsingResult.data.type === "id") {
-        logger.intro(
-          `Pulling artifact "${artifactKeyParsingResult.data.project}@${artifactKeyParsingResult.data.id}"`,
-        );
-      } else if (artifactKeyParsingResult.data.type === "project") {
-        logger.intro(
-          `Pulling artifacts for project "${artifactKeyParsingResult.data.project}"`,
-        );
-      } else {
-        logger.error(
-          `Unknown artifact key type: ${artifactKeyParsingResult.data satisfies never}`,
-        );
-      }
-
       const optsParsingResult = z
         .object({
           force: z
@@ -103,16 +90,59 @@ export function registerPullCommand(
       const pulledArtifactStore = new PulledArtifactStore(
         config.pulledArtifactsPath,
       );
-      await pull(
-        artifactKeyParsingResult.data,
-        storageProvider,
-        pulledArtifactStore,
-        {
-          force: optsParsingResult.data.force,
-          debug: optsParsingResult.data.debug,
-          logger,
-        },
-      )
+
+      let pullPromise: Promise<PullResult>;
+      if (artifactKeyParsingResult.data.type === "tag") {
+        logger.intro(
+          `Pulling artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.tag}"`,
+        );
+        pullPromise = pullArtifact(
+          artifactKeyParsingResult.data,
+          storageProvider,
+          pulledArtifactStore,
+          {
+            force: optsParsingResult.data.force,
+            debug: optsParsingResult.data.debug,
+            logger,
+          },
+        );
+      } else if (artifactKeyParsingResult.data.type === "id") {
+        logger.intro(
+          `Pulling artifact "${artifactKeyParsingResult.data.project}@${artifactKeyParsingResult.data.id}"`,
+        );
+        pullPromise = pullArtifact(
+          artifactKeyParsingResult.data,
+          storageProvider,
+          pulledArtifactStore,
+          {
+            force: optsParsingResult.data.force,
+            debug: optsParsingResult.data.debug,
+            logger,
+          },
+        );
+      } else if (artifactKeyParsingResult.data.type === "project") {
+        logger.intro(
+          `Pulling artifacts for project "${artifactKeyParsingResult.data.project}"`,
+        );
+        pullPromise = pullProject(
+          artifactKeyParsingResult.data.project,
+          storageProvider,
+          pulledArtifactStore,
+          {
+            force: optsParsingResult.data.force,
+            debug: optsParsingResult.data.debug,
+            logger,
+          },
+        );
+      } else {
+        logger.error(
+          `Unknown artifact key type: ${artifactKeyParsingResult.data satisfies never}`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
+      await pullPromise
         .then((result) => {
           displayPullResults(
             logger,
