@@ -4,15 +4,13 @@ Guidelines for AI coding agents working in the Ethoko monorepo.
 
 ## Project Overview
 
-Ethoko is a warehouse for smart-contract compilation artifacts. It enables teams to version, store, and share smart-contract compilation artifacts, decoupling compilation from deployment.
+Ethoko is a warehouse for smart-contract compilation artifacts. It enables teams to version, store, and share smart-contract compilation artifacts, decoupling compilation from operation.
 **Monorepo Structure:**
 
 - `packages/cli-beacon`: Standalone CLI for Ethoko artifact management (main package)
-- `packages/eslint-config`: Shared ESLint configurations
-- `packages/typescript-config`: Shared TypeScript configurations
 - `apps/*`: Integration examples with different frameworks (e.g., Foundry and Hardhat)
 
-## Link to Documentation
+## Documentation
 
 CLI delivery strategy overview: `docs/CLI_DELIVERY.md`
 Configuration strategy overview: `docs/CONFIG.md`
@@ -286,7 +284,7 @@ packages/cli-beacon/
 1. **Always validate user input with Zod** before processing
 3. **Prefer explicit return types** for public functions
 4. **Use `opts` pattern** for function options (better than multiple params)
-5. **Handle both ScriptError and unexpected errors** in all task handlers
+5. **Handle both CliError and unexpected errors** in all task handlers
 6. **Use descriptive variable names** - clarity over brevity
 7. **Comment complex algorithms** but keep code self-documenting
 8. **Use TypeScript's strict null checks** - avoid `!` assertions
@@ -297,8 +295,6 @@ packages/cli-beacon/
 
 - Commit messages should be concise and descriptive
 - Run the complete validation workflow (see "Validation Workflow" section) before committing
-- Generated files in `.ethoko/` and `.ethoko-typings/` are gitignored
-- Build outputs (`dist/`, `.next/`, etc.) are gitignored
 
 ## Plan Mode
 
