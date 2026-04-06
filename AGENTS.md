@@ -26,15 +26,7 @@ cli-beacon code style guideline: `docs/CLI_BEACON_CODE_STYLE_GUIDELINE.md`
 
 ### E2E Test Pattern for `@ethoko/cli-beacon`
 
-**Test Framework:** Vitest with global setup, 60s timeout, located in `test/**/*.e2e.test.ts`.
-
-**Key Points:**
-
-- All tests automatically run against both filesystem and S3 (LocalStack) providers
-- Fixtures (`storageProvider`, `pulledArtifactStore`) are auto-setup and auto-cleaned
-- No manual `beforeEach`/`afterEach` needed
-- Use `storageProviderTest.for()` instead of `describe.each()` for parameterized tests
-- Always use `as const` on test data arrays for better type inference
+See the skill .opencode/skills/cli-beacon-contributor/SKILL.md for detailed instructions on writing E2E tests for `@ethoko/cli-beacon`.
 
 ### E2E Test Pattern for integration apps in `apps/`
 
