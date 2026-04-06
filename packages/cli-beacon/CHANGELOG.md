@@ -1,5 +1,12 @@
 # @ethoko/cli-beacon
 
+## 0.10.0
+
+### Minor Changes
+
+- e3eb42a: The typings command signature has been changed in order to accept an artifact, or a project as argument. The flags --all and --empty have been added in order to handle the all pulled artifacts or empty cases.
+- c76c099: Enable dynamic pull for inspect, diff, restore and export commands: the artifact is pulled if not found in the cache.
+
 ## 0.9.0
 
 ### Minor Changes
