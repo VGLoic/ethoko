@@ -23,9 +23,11 @@
     "test:e2e:core": "pnpm --filter @ethoko/cli-beacon test:e2e",
     "test:e2e:apps": "turbo run test:e2e:apps",
     "lint": "turbo run lint",
+    "lint:ci": "turbo run lint:ci",
     "format": "turbo run format",
     "check-format": "turbo run check-format",
     "check-types": "turbo run check-types",
+    "check-types:ci": "turbo run check-types:ci",
     "release": "turbo run build && changeset publish"
   },
   "devDependencies": {

@@ -15,8 +15,8 @@ pnpm compile
 
 npx ethoko push dummy-counter:2026-02-04
 
-npx ethoko pull
+npx ethoko pull dummy-counter:2026-02-04
 
-npx ethoko typings
+npx ethoko typings dummy-counter:2026-02-04
 
 npx hardhat deploy --network sepolia --no-compile

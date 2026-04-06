@@ -15,8 +15,8 @@ pnpm compile
 
 npx ethoko push forge-counter:2026-02-04
 
-npx ethoko pull
+npx ethoko pull forge-counter:2026-02-04
 
-npx ethoko typings
+npx ethoko typings forge-counter:2026-02-04
 
 npx hardhat deploy --network sepolia --skip-prompts

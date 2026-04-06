@@ -16,8 +16,8 @@ pnpm compile
 
 npx ethoko push verified-forge-counter:2026-02-02
 
-npx ethoko pull
+npx ethoko pull verified-forge-counter:2026-02-02
 
-npx ethoko typings
+npx ethoko typings verified-forge-counter:2026-02-02
 
 npx hardhat ignition deploy ./ignition/modules/release-2026-02-02.ts --network sepolia

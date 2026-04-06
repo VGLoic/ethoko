@@ -16,11 +16,11 @@ import * as RockethTypes from "rocketh/types";
  * It is assumed that the tag `2026-02-04` exists in the Ethoko registry for this project.
  * It could have been created by running:
  * ```
- * npx ethoko push --tag 2026-02-04 --artifact-path ./out
+ * npx ethoko push forge-counter:2026-02-04 --artifact-path ./out
  * ```
  * The assumed commands that have been run prior to this deployment are:
- *  - `npx ethoko pull` to pull the project from the Ethoko registry,
- *  - `npx ethoko typings` to generate the typings for the project.
+ *  - `npx ethoko pull forge-counter:2026-02-04` to pull the project from the Ethoko registry,
+ *  - `npx ethoko typings forge-counter:2026-02-04` to generate the typings for the project.
  */
 
 const TARGET_RELEASE = "2026-02-04";

@@ -43,7 +43,7 @@ jobs:
       # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
       - run: pnpm build --filter=@ethoko/cli-beacon
       - run: pnpm install
-      - run: pnpm check-types
+      - run: pnpm check-types:ci
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -58,7 +58,7 @@ jobs:
       # Otherwise, the observed behavior is that the apps are not finding the Ethoko CLI binary
       - run: pnpm build --filter=@ethoko/cli-beacon
       - run: pnpm install
-      - run: pnpm lint
+      - run: pnpm lint:ci
   test-unit:
     runs-on: ubuntu-latest
     steps:

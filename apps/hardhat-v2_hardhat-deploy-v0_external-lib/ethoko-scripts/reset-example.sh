@@ -15,8 +15,8 @@ pnpm compile
 
 npx ethoko push doubtful-counter:v1.0.1
 
-npx ethoko pull
+npx ethoko pull doubtful-counter:v1.0.1
 
-npx ethoko typings
+npx ethoko typings doubtful-counter:v1.0.1
 
 npx hardhat deploy --network sepolia --no-compile

@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "ethoko": "ethoko",
-    "ethoko-typings": "ethoko typings",
+    "ethoko-typings": "ethoko typings doubtful-counter:v1.0.1",
     "test": "hardhat test",
     "lint": "pnpm run ethoko-typings && eslint . --max-warnings 0",
+    "lint:ci": "ethoko typings --empty && eslint . --max-warnings 0",
     "check-format": "prettier --check --ignore-unknown --plugin=prettier-plugin-solidity 'src/**/*.sol'",
     "format-contracts": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
     "format": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
@@ -14,6 +15,7 @@
     "deploy-contracts": "hardhat deploy --no-compile",
     "hardhat": "hardhat",
     "check-types": "pnpm run ethoko-typings && tsc --noEmit",
+    "check-types:ci": "ethoko typings --empty && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh"
   },

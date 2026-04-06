@@ -28,7 +28,7 @@ The compilation artifacts will be pushed to `Ethoko`, hence freezing them for la
 
 ```bash
 # The tag v1.0.1 is arbitrary, it can be any string identifying the release
-npx ethoko push --artifact-path ./artifacts --tag v1.0.1
+npx ethoko push --artifact-path ./artifacts doubtful-counter:v1.0.1
 ```
 
 ### Deployment phase
@@ -37,13 +37,13 @@ Later on, the same developper or another one wants to deploy the contracts for t
 It will first pull the compilation artifacts from `Ethoko`:
 
 ```bash
-npx ethoko pull
+npx ethoko pull doubtful-counter:v1.0.1
 ```
 
 Then, generates the typings in order to write a type-safe deployment script:
 
 ```bash
-npx ethoko typings
+npx ethoko typings doubtful-counter:v1.0.1
 ```
 
 Finally, the deployer can write a deployment script, e.g. [00-deploy-counter-v1.0.1.ts](./deploy/00-deploy-counter-v1.0.1.ts), that will retrieve the compilation artifacts from `Ethoko` and deploy the contracts accordingly.

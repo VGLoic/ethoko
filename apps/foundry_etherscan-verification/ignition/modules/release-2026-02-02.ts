@@ -17,11 +17,11 @@ import { project } from "../../.ethoko-typings/index.js";
  * It is assumed that the tag `2026-02-02` exists in the Ethoko registry for this project.
  * It could have been created by running:
  * ```
- * npx ethoko push --tag 2026-02-02
+ * npx ethoko push verified-forge-counter:2026-02-02
  * ```
  * The assumed commands that have been run prior to this deployment are:
- *  - `npx ethoko pull` to pull the project from the Ethoko registry,
- *  - `npx ethoko typings` to generate the typings for the project.
+ *  - `npx ethoko pull verified-forge-counter:2026-02-02` to pull the project from the Ethoko registry,
+ *  - `npx ethoko typings verified-forge-counter:2026-02-02` to generate the typings for the project.
  */
 
 const TARGET_RELEASE_TAG = "2026-02-02";

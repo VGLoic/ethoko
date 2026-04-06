@@ -6,11 +6,13 @@
   "scripts": {
     "ethoko": "ethoko",
     "hardhat": "hardhat",
-    "lint": "ethoko typings && eslint . --max-warnings 0",
+    "lint": "ethoko typings ignited-counter:2026-02-02 && eslint . --max-warnings 0",
+    "lint:ci": "ethoko typings --empty && eslint . --max-warnings 0",
     "check-format": "prettier --check --ignore-unknown --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
     "format-contracts": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
     "format": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
-    "check-types": "ethoko typings && tsc --noEmit",
+    "check-types": "ethoko typings ignited-counter:2026-02-02 && tsc --noEmit",
+    "check-types:ci": "ethoko typings --empty && tsc --noEmit",
     "compile": "pnpm format-contracts && hardhat compile --build-profile production",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh"

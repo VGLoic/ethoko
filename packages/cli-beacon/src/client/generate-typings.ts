@@ -7,6 +7,9 @@ import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-st
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import { AbsolutePath } from "@/utils/path";
+import { StorageProvider } from "@/storage-provider";
+import { pullArtifact, pullProject } from "./pull";
+import { CommandLogger } from "@/ui";
 
 /**
  * Based from the Ethoko releases folder content, generate in the Ethoko typings folder
@@ -48,10 +51,10 @@ import { AbsolutePath } from "@/utils/path";
  *
  * @throws CliError if there is an error while reading pulled artifact store or writing typings files.
  */
-export async function generateArtifactsSummariesAndTypings(
+export async function generateAllPulledArtifactsTypings(
   ethokoTypingsPath: AbsolutePath,
   pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean; silent?: boolean },
+  opts: { debug: boolean; logger: CommandLogger },
 ): Promise<void> {
   const ensurePulledArtifactStoreResult = await toAsyncResult(
     pulledArtifactStore.ensureSetup(),
@@ -121,86 +124,21 @@ export async function generateArtifactsSummariesAndTypings(
   > = {};
 
   for (const project of projects) {
-    const tagsResult = await toAsyncResult(
-      pulledArtifactStore.listTags(project),
-      {
-        debug: opts.debug,
-      },
+    const projectSummaryResult = await toAsyncResult(
+      retrieveProjectSummary(project, pulledArtifactStore),
+      { debug: opts.debug },
     );
-    if (!tagsResult.success) {
+    if (!projectSummaryResult.success) {
       throw new CliError(
-        `Error listing the tags for project "${project}". Run with debug mode for more info`,
+        `Error retrieving the summary for project "${project}". Run with debug mode for more info`,
       );
-    }
-    const tagsPerContract: Record<string, string[]> = {};
-    const contractsPerTag: Record<string, string[]> = {};
-    const projectAbisPerContractPerTag: Record<
-      string,
-      Record<string, unknown[]>
-    > = {};
-    for (const { tag } of tagsResult.value) {
-      if (!contractsPerTag[tag]) {
-        contractsPerTag[tag] = [];
-      }
-      if (!projectAbisPerContractPerTag[tag]) {
-        projectAbisPerContractPerTag[tag] = {};
-      }
-      const artifactIdResult = await toAsyncResult(
-        pulledArtifactStore.retrieveArtifactId(project, tag),
-        { debug: opts.debug },
-      );
-      if (!artifactIdResult.success) {
-        throw new CliError(
-          `The artifact ${project}:${tag} does not have an associated artifact ID. Please pull again. Run with debug mode for more info`,
-        );
-      }
-      const contractArtifactsResult = await toAsyncResult(
-        pulledArtifactStore.listContractArtifacts(
-          project,
-          artifactIdResult.value,
-        ),
-        { debug: opts.debug },
-      );
-      if (!contractArtifactsResult.success) {
-        throw new CliError(
-          `Error listing the artifacts for project "${project}" and tag "${tag}". Run with debug mode for more info`,
-        );
-      }
-      for (const {
-        sourceName,
-        contractName,
-      } of contractArtifactsResult.value) {
-        const artifactResult = await toAsyncResult(
-          pulledArtifactStore.retrieveContractOutputArtifact(
-            project,
-            artifactIdResult.value,
-            sourceName,
-            contractName,
-          ),
-          { debug: opts.debug },
-        );
-        if (!artifactResult.success) {
-          throw new CliError(
-            `Error retrieving the artifact for project "${project}:${tag}" and contract "${sourceName}:${contractName}". Run with debug mode for more info`,
-          );
-        }
-        const contractKey = `${sourceName}:${contractName}`;
-        contractsPerTag[tag].push(contractKey);
-        if (!tagsPerContract[contractKey]) {
-          tagsPerContract[contractKey] = [];
-        }
-        tagsPerContract[contractKey].push(tag);
-        if (!projectAbisPerContractPerTag[tag][contractKey]) {
-          projectAbisPerContractPerTag[tag][contractKey] =
-            artifactResult.value.output.contract.abi;
-        }
-      }
     }
     summary[project] = {
-      tagsPerContract,
-      contractsPerTag,
+      tagsPerContract: projectSummaryResult.value.tagsPerContract,
+      contractsPerTag: projectSummaryResult.value.contractsPerTag,
     };
-    abisPerContractPerTag[project] = projectAbisPerContractPerTag;
+    abisPerContractPerTag[project] =
+      projectSummaryResult.value.abisPerContractPerTag;
   }
 
   const generatedSummaryResult = await toAsyncResult(
@@ -225,6 +163,318 @@ export async function generateArtifactsSummariesAndTypings(
       "Unexpected error while writing the ABI typings files. Run with debug mode for more info",
     );
   }
+}
+
+export async function generateProjectTypings(
+  project: string,
+  storageProvider: StorageProvider,
+  pulledArtifactStore: PulledArtifactStore,
+  ethokoTypingsPath: AbsolutePath,
+  opts: { debug: boolean; logger: CommandLogger },
+): Promise<void> {
+  const ensurePulledArtifactStoreResult = await toAsyncResult(
+    pulledArtifactStore.ensureSetup(),
+    { debug: opts.debug },
+  );
+  if (!ensurePulledArtifactStoreResult.success) {
+    throw new CliError(
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+    );
+  }
+
+  const typingsFolderStatResult = await toAsyncResult(
+    fs.stat(ethokoTypingsPath.resolvedPath),
+    { debug: opts.debug },
+  );
+  if (!typingsFolderStatResult.success) {
+    const typingsDirCreationResult = await toAsyncResult(
+      fs.mkdir(ethokoTypingsPath.resolvedPath, { recursive: true }),
+      { debug: opts.debug },
+    );
+    if (!typingsDirCreationResult.success) {
+      throw new CliError(
+        `Error creating the local Ethoko typings directory ${ethokoTypingsPath}. Is the script not allowed to write to the filesystem? Run with debug mode for more info`,
+      );
+    }
+  }
+
+  const hasProjectResult = await toAsyncResult(
+    pulledArtifactStore
+      .listProjects()
+      .then((projects) => projects.includes(project)),
+    { debug: opts.debug },
+  );
+  if (!hasProjectResult.success) {
+    throw new CliError(
+      `Error checking the existence of the project "${project}". Is the script not allowed to read from the filesystem? Run with debug mode for more info`,
+    );
+  }
+  if (!hasProjectResult.value) {
+    await pullProject(project, storageProvider, pulledArtifactStore, {
+      debug: opts.debug,
+      force: false,
+      logger: opts.logger,
+    });
+  }
+
+  const projectSummaryResult = await toAsyncResult(
+    retrieveProjectSummary(project, pulledArtifactStore),
+    { debug: opts.debug },
+  );
+  if (!projectSummaryResult.success) {
+    throw new CliError(
+      `Error retrieving the summary for project "${project}". Run with debug mode for more info`,
+    );
+  }
+
+  const generatedSummaryResult = await toAsyncResult(
+    writeGeneratedSummaries(
+      {
+        [project]: {
+          tagsPerContract: projectSummaryResult.value.tagsPerContract,
+          contractsPerTag: projectSummaryResult.value.contractsPerTag,
+        },
+      },
+      pulledArtifactStore.rootPath,
+      ethokoTypingsPath,
+    ),
+    { debug: opts.debug },
+  );
+  if (!generatedSummaryResult.success) {
+    throw new CliError(
+      "Unexpected error while generating the typings content. Run with debug mode for more info",
+    );
+  }
+  const writeAbisResult = await toAsyncResult(
+    writeAbiTypings(
+      { [project]: projectSummaryResult.value.abisPerContractPerTag },
+      ethokoTypingsPath,
+    ),
+    { debug: opts.debug },
+  );
+  if (!writeAbisResult.success) {
+    throw new CliError(
+      "Unexpected error while writing the ABI typings files. Run with debug mode for more info",
+    );
+  }
+}
+
+export async function generateTagTypings(
+  project: string,
+  tag: string,
+  storageProvider: StorageProvider,
+  pulledArtifactStore: PulledArtifactStore,
+  ethokoTypingsPath: AbsolutePath,
+  opts: { debug: boolean; logger: CommandLogger },
+): Promise<void> {
+  const ensurePulledArtifactStoreResult = await toAsyncResult(
+    pulledArtifactStore.ensureSetup(),
+    { debug: opts.debug },
+  );
+  if (!ensurePulledArtifactStoreResult.success) {
+    throw new CliError(
+      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+    );
+  }
+
+  const typingsFolderStatResult = await toAsyncResult(
+    fs.stat(ethokoTypingsPath.resolvedPath),
+    { debug: opts.debug },
+  );
+  if (!typingsFolderStatResult.success) {
+    const typingsDirCreationResult = await toAsyncResult(
+      fs.mkdir(ethokoTypingsPath.resolvedPath, { recursive: true }),
+      { debug: opts.debug },
+    );
+    if (!typingsDirCreationResult.success) {
+      throw new CliError(
+        `Error creating the local Ethoko typings directory ${ethokoTypingsPath}. Is the script not allowed to write to the filesystem? Run with debug mode for more info`,
+      );
+    }
+  }
+
+  const hasTagResult = await toAsyncResult(
+    pulledArtifactStore.hasTag(project, tag),
+    { debug: opts.debug },
+  );
+  if (!hasTagResult.success) {
+    throw new CliError(
+      `Error checking the existence of the tag "${tag}" for project "${project}". Is the script not allowed to read from the filesystem? Run with debug mode for more info`,
+    );
+  }
+  if (!hasTagResult.value) {
+    await pullArtifact(
+      { project, type: "tag", tag },
+      storageProvider,
+      pulledArtifactStore,
+      { force: false, debug: opts.debug, logger: opts.logger },
+    );
+  }
+
+  const projectSummaryResult = await toAsyncResult(
+    retrieveProjectSummary(project, pulledArtifactStore),
+    { debug: opts.debug },
+  );
+  if (!projectSummaryResult.success) {
+    throw new CliError(
+      `Error retrieving the summary for project "${project}". Run with debug mode for more info`,
+    );
+  }
+
+  const filteredTagsPerContract: Record<string, string[]> = {};
+  for (const [contract, tags] of Object.entries(
+    projectSummaryResult.value.tagsPerContract,
+  )) {
+    if (tags.includes(tag)) {
+      filteredTagsPerContract[contract] = [tag];
+    }
+  }
+  const filteredContractsPerTag: Record<string, string[]> = {};
+  if (projectSummaryResult.value.contractsPerTag[tag]) {
+    filteredContractsPerTag[tag] =
+      projectSummaryResult.value.contractsPerTag[tag];
+  }
+  const filteredAbisPerContractPerTag: Record<
+    string,
+    Record<string, unknown[]>
+  > = {};
+  if (projectSummaryResult.value.abisPerContractPerTag[tag]) {
+    filteredAbisPerContractPerTag[tag] =
+      projectSummaryResult.value.abisPerContractPerTag[tag];
+  }
+
+  const generatedSummaryResult = await toAsyncResult(
+    writeGeneratedSummaries(
+      {
+        [project]: {
+          tagsPerContract: filteredTagsPerContract,
+          contractsPerTag: filteredContractsPerTag,
+        },
+      },
+      pulledArtifactStore.rootPath,
+      ethokoTypingsPath,
+    ),
+    { debug: opts.debug },
+  );
+  if (!generatedSummaryResult.success) {
+    throw new CliError(
+      "Unexpected error while generating the typings content. Run with debug mode for more info",
+    );
+  }
+  const writeAbisResult = await toAsyncResult(
+    writeAbiTypings(
+      { [project]: filteredAbisPerContractPerTag },
+      ethokoTypingsPath,
+    ),
+    { debug: opts.debug },
+  );
+  if (!writeAbisResult.success) {
+    throw new CliError(
+      "Unexpected error while writing the ABI typings files. Run with debug mode for more info",
+    );
+  }
+}
+
+async function retrieveProjectSummary(
+  project: string,
+  pulledArtifactStore: PulledArtifactStore,
+): Promise<{
+  tagsPerContract: Record<string, string[]>;
+  contractsPerTag: Record<string, string[]>;
+  abisPerContractPerTag: Record<string, Record<string, unknown[]>>;
+}> {
+  const tags = await pulledArtifactStore.listTags(project);
+
+  const tagsPerContract: Record<string, string[]> = {};
+  const contractsPerTag: Record<string, string[]> = {};
+  const abisPerContractPerTag: Record<string, Record<string, unknown[]>> = {};
+  for (const { tag } of tags) {
+    const abis = await retrieveTagAbis(project, tag, pulledArtifactStore);
+    for (const [contractKey, abi] of Object.entries(abis.abis)) {
+      if (!contractsPerTag[tag]) {
+        contractsPerTag[tag] = [];
+      }
+      contractsPerTag[tag].push(contractKey);
+      if (!tagsPerContract[contractKey]) {
+        tagsPerContract[contractKey] = [];
+      }
+      tagsPerContract[contractKey].push(tag);
+      if (!abisPerContractPerTag[tag]) {
+        abisPerContractPerTag[tag] = {};
+      }
+      abisPerContractPerTag[tag][contractKey] = abi;
+    }
+  }
+
+  return {
+    tagsPerContract,
+    contractsPerTag,
+    abisPerContractPerTag,
+  };
+}
+
+async function retrieveTagAbis(
+  project: string,
+  tag: string,
+  pulledArtifactStore: PulledArtifactStore,
+): Promise<{
+  abis: Record<string, unknown[]>;
+}> {
+  const artifactId = await pulledArtifactStore.retrieveArtifactId(project, tag);
+
+  const contractArtifacts = pulledArtifactStore.listContractArtifacts(
+    project,
+    artifactId,
+  );
+
+  const abis: Record<string, unknown[]> = {};
+
+  for (const { sourceName, contractName } of await contractArtifacts) {
+    const artifact = await pulledArtifactStore.retrieveContractOutputArtifact(
+      project,
+      artifactId,
+      sourceName,
+      contractName,
+    );
+    const contractKey = `${sourceName}:${contractName}`;
+    const abi = artifact.output.contract.abi;
+    abis[contractKey] = abi;
+  }
+  return { abis };
+}
+
+export async function generateEmptyTypings(
+  pulledArtifactStore: PulledArtifactStore,
+  ethokoTypingsPath: AbsolutePath,
+  opts: { debug: boolean; logger: CommandLogger },
+): Promise<void> {
+  const typingsFolderStatResult = await toAsyncResult(
+    fs.stat(ethokoTypingsPath.resolvedPath),
+    { debug: opts.debug },
+  );
+  if (!typingsFolderStatResult.success) {
+    const typingsDirCreationResult = await toAsyncResult(
+      fs.mkdir(ethokoTypingsPath.resolvedPath, { recursive: true }),
+      { debug: opts.debug },
+    );
+    if (!typingsDirCreationResult.success) {
+      throw new CliError(
+        `Error creating the local Ethoko typings directory ${ethokoTypingsPath}. Is the script not allowed to write to the filesystem? Run with debug mode for more info`,
+      );
+    }
+  }
+
+  const emptySummariesResult = await toAsyncResult(
+    writeEmptySummaries(pulledArtifactStore.rootPath, ethokoTypingsPath),
+    { debug: opts.debug },
+  );
+  if (!emptySummariesResult.success) {
+    throw new CliError(
+      "Error writing the empty summaries. Is the script not allowed to write to the filesystem? Run with debug mode for more info",
+    );
+  }
+
+  return;
 }
 
 async function writeAbiTypings(

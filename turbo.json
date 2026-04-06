@@ -24,11 +24,21 @@
       "dependsOn": ["build", "^lint"],
       "env": ["NPM_TOKEN"]
     },
+    "lint:ci": {
+      "dependsOn": ["build", "^lint:ci"],
+      "env": ["NPM_TOKEN"]
+    },
     "format": {
       "dependsOn": ["^format"]
     },
     "check-types": {
       "dependsOn": ["build", "^check-types"]
+    },
+    "check-types": {
+      "dependsOn": ["build", "^check-types"]
+    },
+    "check-types:ci": {
+      "dependsOn": ["build", "^check-types:ci"]
     },
     "check-format": {
       "dependsOn": ["^check-format"]

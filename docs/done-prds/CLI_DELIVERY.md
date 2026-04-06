@@ -1186,7 +1186,7 @@ describe("[App] Push/pull/deploy - CLI", async () => {
 
   test("it pulls the tag", () => asyncExec(`${ethokoCommand} pull`));
 
-  test("it generates the typings", () => asyncExec(`${ethokoCommand} typings`));
+  test("it generates the typings", () => asyncExec(`${ethokoCommand} typings ${PROJECT_NAME}:${payload.tag}`));
 
   test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
 
@@ -1293,7 +1293,7 @@ export function foundryDescribe(
 
     test("it pulls the tag", () => asyncExec(`${ethokoCmd} pull`));
 
-    test("it generates the typings", () => asyncExec(`${ethokoCmd} typings`));
+    test("it generates the typings", () => asyncExec(`${ethokoCmd} typings ${PROJECT_NAME}:${payload.tag}`));
 
     test("it checks types", () => asyncExec("pnpm tsc --noEmit"));
 

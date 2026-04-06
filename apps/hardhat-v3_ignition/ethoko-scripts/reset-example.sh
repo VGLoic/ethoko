@@ -16,8 +16,8 @@ pnpm compile
 
 npx ethoko push ignited-counter:2026-02-02
 
-npx ethoko pull
+npx ethoko pull ignited-counter:2026-02-02
 
-npx ethoko typings
+npx ethoko typings ignited-counter:2026-02-02
 
 npx hardhat ignition deploy ./ignition/modules/counter-2026-02-02.ts --network sepolia

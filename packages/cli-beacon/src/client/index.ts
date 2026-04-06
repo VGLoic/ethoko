@@ -1,6 +1,11 @@
 export { CliError } from "./error";
 export { generateDiffWithTargetRelease, type Difference } from "./diff";
-export { generateArtifactsSummariesAndTypings } from "./generate-typings";
+export {
+  generateEmptyTypings,
+  generateProjectTypings,
+  generateTagTypings,
+  generateAllPulledArtifactsTypings,
+} from "./generate-typings";
 export { inspectArtifact, type InspectResult } from "./inspect";
 export { pullProject, pullArtifact, type PullResult } from "./pull";
 export { push } from "./push";

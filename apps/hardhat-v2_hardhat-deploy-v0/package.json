@@ -5,14 +5,16 @@
   "scripts": {
     "ethoko": "ethoko",
     "test": "hardhat test",
-    "lint": "ethoko typings && eslint . --max-warnings 0",
+    "lint": "ethoko typings dummy-counter:2026-02-04 && eslint . --max-warnings 0",
+    "lint:ci": "ethoko typings --empty && eslint . --max-warnings 0",
     "check-format": "prettier --check --ignore-unknown --plugin=prettier-plugin-solidity 'src/**/*.sol'",
     "format-contracts": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
     "format": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
     "compile": "pnpm run format-contracts && hardhat compile --force --no-typechain",
     "deploy-contracts": "hardhat deploy --no-compile",
     "hardhat": "hardhat",
-    "check-types": "ethoko typings && tsc --noEmit",
+    "check-types": "ethoko typings dummy-counter:2026-02-04 && tsc --noEmit",
+    "check-types:ci": "ethoko typings --empty && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh"
   },

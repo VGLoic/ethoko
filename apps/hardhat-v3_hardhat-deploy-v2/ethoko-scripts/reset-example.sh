@@ -16,8 +16,8 @@ pnpm compile
 
 npx ethoko push curious-counter:2026-02-02
 
-npx ethoko pull
+npx ethoko pull curious-counter:2026-02-02
 
-npx ethoko typings
+npx ethoko typings curious-counter:2026-02-02
 
 npx hardhat deploy --network sepolia --skip-prompts

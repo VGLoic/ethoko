@@ -5,14 +5,16 @@
   "private": true,
   "scripts": {
     "ethoko": "ethoko",
-    "lint": "ethoko typings && eslint . --max-warnings 0",
+    "lint": "ethoko typings forge-counter:2026-02-04 && eslint . --max-warnings 0",
+    "lint:ci": "ethoko typings --empty && eslint . --max-warnings 0",
     "check-format": "forge fmt --check",
     "format-contracts": "forge fmt",
     "format": "forge fmt",
     "deploy-contracts": "hardhat deploy --no-compile",
     "hardhat": "hardhat",
     "compile": "forge build --skip test --skip script --use-literal-content --force",
-    "check-types": "ethoko typings && tsc --noEmit",
+    "check-types": "ethoko typings forge-counter:2026-02-04 && tsc --noEmit",
+    "check-types:ci": "ethoko typings --empty && tsc --noEmit",
     "test:e2e:apps": "vitest run e2e-test",
     "reset-example": "./ethoko-scripts/reset-example.sh"
   },
