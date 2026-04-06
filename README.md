@@ -186,14 +186,27 @@ ethoko pull my-project:2026-02-02
 
 ### Typings
 
-Generate TypeScript typings for all the pulled artifacts
+Generate TypeScript typings for a specific artifact
 
 ```bash
-ethoko typings
+ethoko typings my-project:2026-02-02
 ```
 
-> [!NOTE]  
-> If no projects have been pulled, you can still generate the default typings. This is useful if you don't need Ethoko scripts but want to avoid missing-file errors.
+Or for a specific project
+```bash
+ethoko typings my-project
+```
+
+Or for all pulled projects and artifacts
+```bash
+ethoko typings --all
+```
+
+If no project has been pulled or configured, you can generate the default (empty) typings to avoid missing-file errors in your TypeScript environment:
+
+```bash
+ethoko typings --empty
+```
 
 ### Artifacts
 
