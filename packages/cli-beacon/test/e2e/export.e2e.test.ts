@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import { describe, expect } from "vitest";
-import { pullArtifact, push, exportContractArtifact } from "@/client/index";
+import { pullArtifact, exportContractArtifact } from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@test/helpers/storage-provider-test";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { CommandLogger } from "@/ui";
+import { runPushCommand } from "@/commands/push";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Export E2E Tests (%s)",
@@ -32,15 +33,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
             await pulledArtifactStore.ensureProjectSetup(project);
 
-            const artifactId = await push(
+            const artifactId = await runPushCommand(
               artifactFixture.folderPath,
-              project,
-              tag,
-              storageProvider,
+              {
+                project,
+                tag,
+              },
+              {
+                storageProvider,
+                logger,
+              },
               {
                 force: false,
                 debug: false,
-                logger,
               },
             );
 
@@ -109,15 +114,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
             await pulledArtifactStore.ensureProjectSetup(project);
 
-            const artifactId = await push(
+            const artifactId = await runPushCommand(
               artifactFixture.folderPath,
-              project,
-              undefined,
-              storageProvider,
+              {
+                project,
+                tag: undefined,
+              },
+              {
+                storageProvider,
+                logger,
+              },
               {
                 force: false,
                 debug: false,
-                logger,
               },
             );
 
@@ -206,15 +215,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const artifactFixture =
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
+          {
+            project,
+            tag: undefined,
+          },
+          {
+            storageProvider,
+            logger,
+          },
           {
             force: false,
             debug: false,
-            logger,
           },
         );
 

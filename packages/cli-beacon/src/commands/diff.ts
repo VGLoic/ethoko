@@ -14,6 +14,10 @@ import { toAsyncResult } from "@/utils/result.js";
 import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key.js";
 import { AbsolutePath, generateAbsolutePathSchema } from "@/utils/path.js";
 import { createStorageProvider } from "./utils/storage-provider";
+import { parseCandidateArtifact } from "@/client/parse-candidate-artifact";
+import { EthokoInputArtifact } from "@/ethoko-artifacts/v0";
+import { StorageProvider } from "@/storage-provider";
+import { ArtifactKey } from "@/utils/artifact-key";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -115,43 +119,79 @@ export function registerDiffCommand(
         return;
       }
 
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
-      );
-      const storageProvider = createStorageProvider(
-        projectConfig.storage,
-        paramParsingResult.data.debug,
-      );
-
-      await generateDiffWithTargetRelease(
+      await runDiffCommand(
         finalArtifactPath,
         artifactKeyParsingResult.data,
-        storageProvider,
-        pulledArtifactStore,
+        {
+          logger,
+          pulledArtifactStore: new PulledArtifactStore(
+            config.pulledArtifactsPath,
+          ),
+          storageProvider: createStorageProvider(
+            projectConfig.storage,
+            paramParsingResult.data.debug,
+          ),
+        },
         {
           debug: paramParsingResult.data.debug,
-          isCI: process.env.CI === "true" || process.env.CI === "1",
-          logger,
         },
-      )
-        .then((result) => {
-          displayDifferences(logger, result);
-        })
-        .catch((err) => {
-          if (err instanceof CliError) {
-            logger.error(err.message);
-          } else {
-            logger.error(
-              "An unexpected error occurred, please fill an issue with the error details if the problem persists",
-            );
-            console.error(err);
-          }
-          process.exitCode = 1;
-        });
+      ).catch((err) => {
+        if (err instanceof CliError) {
+          logger.error(err.message);
+        } else {
+          logger.error(
+            "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+          );
+          console.error(err);
+        }
+        process.exitCode = 1;
+      });
     });
 }
 
-export function displayDifferences(
+async function runDiffCommand(
+  artifactPath: AbsolutePath,
+  artifactKey: ArtifactKey,
+  dependencies: {
+    pulledArtifactStore: PulledArtifactStore;
+    storageProvider: StorageProvider;
+    logger: CommandLogger;
+  },
+  opts: {
+    debug: boolean;
+  },
+): Promise<void> {
+  const spinner1 = dependencies.logger.createSpinner(
+    "Looking for compilation artifacts...",
+  );
+  const candidateArtifact = await parseCandidateArtifact(artifactPath, {
+    debug: opts.debug,
+    logger: dependencies.logger,
+    isCI: process.env.CI === "true" || process.env.CI === "1",
+  }).catch((err) => {
+    spinner1.fail("Fail to parse compilation artifacts");
+    throw err;
+  });
+  spinner1.succeed(
+    artifactOriginToSuccessText(candidateArtifact.inputArtifact.origin.type),
+  );
+
+  const diffResult = await generateDiffWithTargetRelease(
+    artifactKey,
+    candidateArtifact,
+    dependencies.storageProvider,
+    dependencies.pulledArtifactStore,
+    {
+      debug: opts.debug,
+      isCI: process.env.CI === "true" || process.env.CI === "1",
+      logger: dependencies.logger,
+    },
+  );
+
+  displayDifferences(dependencies.logger, diffResult);
+}
+
+function displayDifferences(
   logger: CommandLogger,
   differences: Difference[],
 ): void {
@@ -197,4 +237,27 @@ export function displayDifferences(
 
   logger.note("Differences Found", summaryLines.join("\n"));
   logger.outro(undefined);
+}
+
+function artifactOriginToSuccessText(
+  origin: EthokoInputArtifact["origin"]["type"],
+): string {
+  if (origin === "hardhat-v3") {
+    return `Hardhat v3 compilation artifact found`;
+  }
+  if (origin === "hardhat-v3-non-isolated-build") {
+    return `Hardhat v3 compilation artifact found (non isolated build)`;
+  }
+  if (origin === "hardhat-v2") {
+    return `Hardhat v2 compilation artifact found`;
+  }
+  if (
+    origin === "forge-v1-default" ||
+    origin === "forge-v1-with-build-info-option"
+  ) {
+    return `Forge compilation artifact found`;
+  }
+  throw new CliError(
+    `Unsupported build info format: ${origin satisfies never}`,
+  );
 }

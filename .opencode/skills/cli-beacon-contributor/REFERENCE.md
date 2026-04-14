@@ -14,11 +14,11 @@ src/
 │   ├── diff.ts                     # generateDiffWithTargetRelease()
 │   ├── inspect.ts                  # inspectArtifact()
 │   ├── prune.ts                    # pruneArtifact(), pruneProjectArtifacts(), pruneOrphanedAndUntaggedArtifacts()
+│   ├── parse-candidate-artifact.ts # parseCandidateArtifact() 
 │   ├── export-contract-artifact.ts # exportContractArtifact()
 │   ├── list-pulled-artifacts.ts    # listPulledArtifacts()
 │   ├── restore.ts                  # restore()
-│   ├── generate-typings.ts         # generateProjectTypings(), generateTagTypings()
-│   └── helpers/                    # Internal helpers (not re-exported)
+│   └── generate-typings.ts         # generateProjectTypings(), generateTagTypings()
 ├── commands/                       # Commander command definitions (register + handle)
 │   ├── utils/
 │   │   ├── parse-project-or-artifact-key.ts  # Zod schema for PROJECT[:TAG|@ID]

@@ -1,11 +1,6 @@
 import fs from "fs/promises";
 import { describe, expect } from "vitest";
-import {
-  listPulledArtifacts,
-  pullArtifact,
-  pullProject,
-  push,
-} from "@/client/index";
+import { listPulledArtifacts, pullArtifact, pullProject } from "@/client/index";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -15,6 +10,7 @@ import {
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { deriveAllAbsolutePathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 import { CommandLogger } from "@/ui";
+import { runPushCommand } from "@/commands/push";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Push-Pull E2E Tests (%s)",
@@ -29,16 +25,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         await pulledArtifactStore.ensureProjectSetup(project);
 
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
 
         expect(artifactId).toBeTruthy();
@@ -112,16 +103,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         await pulledArtifactStore.ensureProjectSetup(project);
 
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
+          { project, tag },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
 
         const hasTag = await storageProvider.hasArtifactByTag(project, tag);
@@ -176,16 +162,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const tag1 = TEST_CONSTANTS.TAGS.V1;
         const tag2 = TEST_CONSTANTS.TAGS.V2;
 
-        await push(artifactFixture.folderPath, project, tag1, storageProvider, {
-          force: false,
-          debug: false,
-          logger,
-        });
-        await push(artifactFixture.folderPath, project, tag2, storageProvider, {
-          force: true,
-          debug: false,
-          logger,
-        });
+        await runPushCommand(
+          artifactFixture.folderPath,
+          { project, tag: tag1 },
+          { storageProvider, logger },
+          { force: false, debug: false },
+        );
+
+        await runPushCommand(
+          artifactFixture.folderPath,
+          { project, tag: tag2 },
+          { storageProvider, logger },
+          { force: true, debug: false },
+        );
 
         const pullResult = await pullProject(
           project,
@@ -224,36 +213,27 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         await pulledArtifactStore.ensureProjectSetup(project);
 
-        const id1 = await push(
+        const id1 = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          {
-            force: false,
-            debug: false,
-            logger,
-          },
+          { project, tag },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
 
         await expect(
-          push(artifactFixture.folderPath, project, tag, storageProvider, {
-            force: false,
-            debug: false,
-            logger,
-          }),
+          runPushCommand(
+            artifactFixture.folderPath,
+            { project, tag },
+            { storageProvider, logger },
+            { force: false, debug: false },
+          ),
         ).rejects.toThrow(/already exists/);
 
-        const id2 = await push(
+        const id2 = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          {
-            force: true,
-            debug: false,
-            logger,
-          },
+          { project, tag },
+          { storageProvider, logger },
+          { force: true, debug: false },
         );
 
         expect(id1).toBe(id2);
@@ -273,11 +253,12 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         await pulledArtifactStore.ensureProjectSetup(project);
 
-        await push(artifactFixture.folderPath, project, tag, storageProvider, {
-          force: false,
-          debug: false,
-          logger,
-        });
+        await runPushCommand(
+          artifactFixture.folderPath,
+          { project, tag },
+          { storageProvider, logger },
+          { force: false, debug: false },
+        );
         await pullArtifact(
           { project, type: "tag", tag },
           storageProvider,

@@ -34,7 +34,6 @@ export function registerTypingsCommand(
     .option("--debug", "Enable debug logging", false)
     .option("--silent", "Suppress output", false)
     .action(async (projectArg, options) => {
-      console.log("################# PROJECT ARG:", projectArg);
       const logger = new CommandLogger(options.silent);
 
       const configResult = await toAsyncResult(getConfig());

@@ -1,13 +1,112 @@
 import fs from "fs/promises";
 import { toAsyncResult } from "@/utils/result";
-import { CliError } from "../error";
+import { CliError } from "./error";
 import {
   inferOriginalArtifactFormat,
   InferredArtifact,
 } from "@/supported-origins/infer-original-artifact-format";
-import { OriginalBuildInfoPaths } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import {
+  mapOriginalArtifactToEthokoArtifact,
+  OriginalBuildInfoPaths,
+} from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
 import { CommandLogger } from "@/ui";
-import { AbsolutePath } from "@/utils/path";
+import { AbsolutePath, RelativePath } from "@/utils/path";
+import {
+  EthokoContractOutputArtifact,
+  EthokoInputArtifact,
+} from "@/ethoko-artifacts/v0";
+
+/**
+ * Parse the candidate artifact(s) in the provided path, prompting the user to select one if multiple candidates are found, and map it to the Ethoko format.
+ * @param artifactPath The absolute path to the artifact or directory containing artifacts.
+ * @param opts Options for parsing, including debug mode, logger, and CI mode.
+ * @returns An object containing the input artifact, output contract artifacts, and original content paths.
+ * @throws CliError in case of errors
+ */
+export async function parseCandidateArtifact(
+  artifactPath: AbsolutePath,
+  opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
+): Promise<{
+  inputArtifact: EthokoInputArtifact;
+  outputContractArtifacts: EthokoContractOutputArtifact[];
+  originalContent: {
+    rootPath: AbsolutePath;
+    paths: RelativePath[];
+  };
+}> {
+  const candidateArtifactsResult = await toAsyncResult(
+    lookForCandidateArtifacts(artifactPath, {
+      debug: opts.debug,
+    }),
+  );
+  if (!candidateArtifactsResult.success) {
+    // @dev the lookForBuildInfoJsonFile function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
+    throw candidateArtifactsResult.error;
+  }
+
+  const firstBuildInfoCandidate =
+    candidateArtifactsResult.value.candidateBuildInfoOptions[0];
+  if (!firstBuildInfoCandidate) {
+    throw new CliError(
+      "No valid compilation artifacts were found in the provided path. Please provide a valid path to a compilation artifact (build info) or a directory containing it.",
+    );
+  }
+
+  let selectedBuildInfoPaths: OriginalBuildInfoPaths;
+  if (candidateArtifactsResult.value.candidateBuildInfoOptions.length === 1) {
+    selectedBuildInfoPaths = firstBuildInfoCandidate.value;
+  } else {
+    if (opts.isCI) {
+      throw new CliError(
+        "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
+      );
+    }
+    const userSelectionResult = await toAsyncResult(
+      promptUserSelection(
+        opts.logger,
+        `Multiple JSON files found in "${candidateArtifactsResult.value.finalFolderPath}" (${candidateArtifactsResult.value.ignoredFilesCount} ignored). Please select which build info file to use:`,
+        candidateArtifactsResult.value.candidateBuildInfoOptions,
+        30_000,
+      ),
+      { debug: opts.debug },
+    );
+    if (!userSelectionResult.success) {
+      // @dev the promptUserSelection function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
+      throw userSelectionResult.error;
+    }
+    selectedBuildInfoPaths = userSelectionResult.value;
+  }
+
+  // Parse the compilation artifact, mapping it to the Ethoko format
+  const ethokoArtifactParsingResult = await toAsyncResult(
+    mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
+    { debug: opts.debug },
+  );
+  if (!ethokoArtifactParsingResult.success) {
+    throw new CliError(
+      FORMAT_TO_ERROR_MESSAGE[selectedBuildInfoPaths.format] ||
+        `An error occurred while mapping the build info to Ethoko artifacts. Please provide valid build info JSON files or contact us. Run with debug mode for more info.`,
+    );
+  }
+
+  return ethokoArtifactParsingResult.value;
+}
+
+const FORMAT_TO_ERROR_MESSAGE: Record<
+  OriginalBuildInfoPaths["format"],
+  string
+> = {
+  "hardhat-v3":
+    "Hardhat v3 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
+  "hardhat-v3-non-isolated-build":
+    "Hardhat v3 (non isolated build) compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
+  "hardhat-v2":
+    "Hardhat v2 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Hardhat v2 build info JSON file or contact us. Run with debug mode for more info.",
+  "forge-v1-with-build-info-option":
+    "Forge v1 compilation artifacts with the build info option have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 build info JSON file or contact us. Run with debug mode for more info.",
+  "forge-v1-default":
+    "Forge v1 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 build info JSON file or contact us. Run with debug mode for more info.",
+};
 
 type CandidateBuildInfoOption = {
   display: string;
@@ -50,7 +149,7 @@ type CandidateBuildInfoOption = {
  * @returns An object containing the candidate artifact options, the count of ignored files, and the final folder path
  * @throws A CliError
  */
-export async function lookForCandidateArtifacts(
+async function lookForCandidateArtifacts(
   inputPath: AbsolutePath,
   opts: { debug: boolean },
 ): Promise<{
@@ -464,7 +563,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
  * @returns The selected option
  * @throws CliError when timeout is reached or user cancels
  */
-export async function promptUserSelection(
+async function promptUserSelection(
   logger: CommandLogger,
   message: string,
   options: CandidateBuildInfoOption[],

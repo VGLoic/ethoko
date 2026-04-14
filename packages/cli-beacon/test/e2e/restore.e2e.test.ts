@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect } from "vitest";
-import { pullArtifact, push, restore } from "@/client";
+import { pullArtifact, restore } from "@/client";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -13,6 +13,7 @@ import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { deriveAllAbsolutePathsInDirectory } from "@test/helpers/derive-all-paths-in-directory";
 import { CommandLogger } from "@/ui";
 import { AbsolutePath } from "@/utils/path";
+import { runPushCommand } from "@/commands/push";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Restore E2E Tests (%s)",
@@ -49,16 +50,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
           await pulledArtifactStore.ensureProjectSetup(project);
 
-          await push(
+          await runPushCommand(
             artifactFixture.folderPath,
-            project,
-            tag,
-            storageProvider,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
+            { project, tag },
+            { storageProvider, logger },
+            { force: false, debug: false },
           );
 
           const outputPath = tempOutputDir.join("absolute-path-test");
@@ -90,16 +86,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
           await pulledArtifactStore.ensureProjectSetup(project);
 
-          await push(
+          await runPushCommand(
             artifactFixture.folderPath,
-            project,
-            tag,
-            storageProvider,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
+            { project, tag },
+            { storageProvider, logger },
+            { force: false, debug: false },
           );
 
           const outputPath = tempOutputDir.join("existing-dir-test");
@@ -133,16 +124,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
           await pulledArtifactStore.ensureProjectSetup(project);
 
-          await push(
+          await runPushCommand(
             artifactFixture.folderPath,
-            project,
-            tag,
-            storageProvider,
-            {
-              force: false,
-              debug: false,
-              logger,
-            },
+            { project, tag },
+            { storageProvider, logger },
+            { force: false, debug: false },
           );
 
           const outputPath = tempOutputDir.join("force-overwrite-test");
@@ -224,16 +210,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
             await pulledArtifactStore.ensureProjectSetup(project);
 
-            await push(
+            await runPushCommand(
               artifactFixture.folderPath,
-              project,
-              tag,
-              storageProvider,
-              {
-                force: false,
-                debug: false,
-                logger,
-              },
+              { project, tag },
+              { storageProvider, logger },
+              { force: false, debug: false },
             );
 
             if (!artifactAlreadyPulled) {
@@ -292,16 +273,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
             await pulledArtifactStore.ensureProjectSetup(project);
 
-            const artifactId = await push(
+            const artifactId = await runPushCommand(
               artifactFixture.folderPath,
-              project,
-              undefined,
-              storageProvider,
-              {
-                force: false,
-                debug: false,
-                logger,
-              },
+              { project, tag: undefined },
+              { storageProvider, logger },
+              { force: false, debug: false },
             );
 
             if (!artifactAlreadyPulled) {

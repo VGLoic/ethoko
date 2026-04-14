@@ -6,7 +6,6 @@ import {
   pruneProjectArtifacts,
   pullArtifact,
   pullProject,
-  push,
 } from "@/client/index";
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import {
@@ -15,6 +14,7 @@ import {
 } from "@test/helpers/storage-provider-test";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import { CommandLogger } from "@/ui";
+import { runPushCommand } from "@/commands/push";
 
 const logger = new CommandLogger(true);
 const [, artifactFixture] = ARTIFACTS_STRATEGIES[0];
@@ -33,12 +33,20 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName("prune-orphaned");
         await pulledArtifactStore.ensureProjectSetup(project);
         const tag = "orphaned-tag";
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          { force: false, debug: false, logger },
+          {
+            project,
+            tag,
+          },
+          {
+            storageProvider,
+            logger,
+          },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "tag", tag },
@@ -72,12 +80,20 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName("prune-configured-tagged");
         await pulledArtifactStore.ensureProjectSetup(project);
         const tag = "v1.0.0";
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          { force: false, debug: false, logger },
+          {
+            project,
+            tag,
+          },
+          {
+            storageProvider,
+            logger,
+          },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "tag", tag },
@@ -103,12 +119,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       async ({ storageProvider, pulledArtifactStore }) => {
         const project = createTestProjectName("prune-configured-untagged");
         await pulledArtifactStore.ensureProjectSetup(project);
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "id", id: artifactId },
@@ -136,12 +154,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       async ({ storageProvider, pulledArtifactStore }) => {
         const project = createTestProjectName("prune-ota-dry");
         await pulledArtifactStore.ensureProjectSetup(project);
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "id", id: artifactId },
@@ -184,21 +204,19 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const tag = "v1.0.0";
 
         // tagged artifact
-        const taggedId = await push(
+        const taggedId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
 
         // untagged artifact (different content to produce a different ID)
-        const untaggedId = await push(
+        const untaggedId = await runPushCommand(
           artifactFixture2.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
         await pullProject(project, storageProvider, pulledArtifactStore, {
           force: false,
@@ -234,12 +252,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       async ({ storageProvider, pulledArtifactStore }) => {
         const project = createTestProjectName("prune-project-dry");
         await pulledArtifactStore.ensureProjectSetup(project);
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "id", id: artifactId },
@@ -271,12 +291,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       async ({ storageProvider, pulledArtifactStore }) => {
         const project = createTestProjectName("prune-by-id");
         await pulledArtifactStore.ensureProjectSetup(project);
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "id", id: artifactId },
@@ -304,12 +326,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
       async ({ storageProvider, pulledArtifactStore }) => {
         const project = createTestProjectName("prune-by-id-dry");
         await pulledArtifactStore.ensureProjectSetup(project);
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          undefined,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag: undefined },
+          { storageProvider, logger },
+          {
+            force: false,
+            debug: false,
+          },
         );
         await pullArtifact(
           { project, type: "id", id: artifactId },
@@ -358,12 +382,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName("prune-by-tag");
         await pulledArtifactStore.ensureProjectSetup(project);
         const tag = "v1.0.0";
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
         await pullArtifact(
           { project, type: "tag", tag },
@@ -392,12 +415,11 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const project = createTestProjectName("prune-by-tag-dry");
         await pulledArtifactStore.ensureProjectSetup(project);
         const tag = "v1.0.0";
-        const artifactId = await push(
+        const artifactId = await runPushCommand(
           artifactFixture.folderPath,
-          project,
-          tag,
-          storageProvider,
-          { force: false, debug: false, logger },
+          { project, tag },
+          { storageProvider, logger },
+          { force: false, debug: false },
         );
         await pullArtifact(
           { project, type: "tag", tag },

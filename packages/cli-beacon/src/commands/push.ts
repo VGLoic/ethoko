@@ -8,6 +8,9 @@ import { createStorageProvider } from "./utils/storage-provider.js";
 import { toAsyncResult } from "@/utils/result.js";
 import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key.js";
 import { generateAbsolutePathSchema, AbsolutePath } from "@/utils/path.js";
+import { parseCandidateArtifact } from "@/client/parse-candidate-artifact";
+import { EthokoInputArtifact } from "@/ethoko-artifacts/v0";
+import { StorageProvider } from "@/storage-provider";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -120,43 +123,109 @@ export function registerPushCommand(
         return;
       }
 
-      const storageProvider = createStorageProvider(
-        projectConfig.storage,
-        optsParsingResult.data.debug,
-      );
-
-      await push(
+      await runPushCommand(
         finalArtifactPath,
-        artifactKeyParsingResult.data.project,
-        artifactKeyParsingResult.data.tag,
-        storageProvider,
+        {
+          project: artifactKeyParsingResult.data.project,
+          tag: artifactKeyParsingResult.data.tag,
+        },
+        {
+          storageProvider: createStorageProvider(
+            projectConfig.storage,
+            optsParsingResult.data.debug,
+          ),
+          logger,
+        },
         {
           force: optsParsingResult.data.force,
           debug: optsParsingResult.data.debug,
-          isCI: process.env.CI === "true" || process.env.CI === "1",
-          logger,
         },
-      )
-        .then((result) => {
-          displayPushResult(
-            logger,
-            artifactKeyParsingResult.data.project,
-            artifactKeyParsingResult.data.tag,
-            result,
+      ).catch((err) => {
+        if (err instanceof CliError) {
+          logger.error(err.message);
+        } else {
+          logger.error(
+            "An unexpected error occurred, please fill an issue with the error details if the problem persists",
           );
-        })
-        .catch((err) => {
-          if (err instanceof CliError) {
-            logger.error(err.message);
-          } else {
-            logger.error(
-              "An unexpected error occurred, please fill an issue with the error details if the problem persists",
-            );
-            console.error(err);
-          }
-          process.exitCode = 1;
-        });
+          console.error(err);
+        }
+        process.exitCode = 1;
+      });
     });
+}
+
+export async function runPushCommand(
+  artifactPath: AbsolutePath,
+  artifact: {
+    project: string;
+    tag: string | undefined;
+  },
+  dependencies: {
+    storageProvider: StorageProvider;
+    logger: CommandLogger;
+  },
+  opts: {
+    force: boolean;
+    debug: boolean;
+  },
+): Promise<string> {
+  const spinner1 = dependencies.logger.createSpinner(
+    "Looking for compilation artifacts...",
+  );
+  const candidateArtifact = await parseCandidateArtifact(artifactPath, {
+    debug: opts.debug,
+    logger: dependencies.logger,
+    isCI: process.env.CI === "true" || process.env.CI === "1",
+  }).catch((err) => {
+    spinner1.fail("Fail to parse compilation artifacts");
+    throw err;
+  });
+  spinner1.succeed(
+    artifactOriginToSuccessText(candidateArtifact.inputArtifact.origin.type),
+  );
+
+  // We verify that the input sources contain the `content` field.
+  // It is not required for Ethoko but may ensure an easy verification later on.
+  const missingContentInSource = Object.values(
+    candidateArtifact.inputArtifact.input.sources,
+  ).some((source) => !("content" in source));
+  if (missingContentInSource) {
+    // For Forge, we encourage users to use the `--use-literal-content` option to ensure the content is included in the artifact, which can help with later verification and debugging
+    if (
+      candidateArtifact.inputArtifact.origin.type ===
+        "forge-v1-with-build-info-option" ||
+      candidateArtifact.inputArtifact.origin.type === "forge-v1-default"
+    ) {
+      dependencies.logger.warn(
+        `The provided Forge compilation artifacts do not include the literal content of the sources. We recommend using the "--use-literal-content" option when generating the build info files with Forge to include the content in the artifact, which can help with later verification and debugging.`,
+      );
+    } else {
+      dependencies.logger.warn(
+        `The provided compilation artifact does not include the literal content of the sources. This may make later verification and debugging more difficult. If possible, please provide artifacts that include the source content.`,
+      );
+    }
+  }
+
+  const artifactId = await push(
+    artifact.project,
+    artifact.tag,
+    candidateArtifact,
+    dependencies.storageProvider,
+    {
+      force: opts.force,
+      debug: opts.debug,
+      logger: dependencies.logger,
+    },
+  );
+
+  displayPushResult(
+    dependencies.logger,
+    artifact.project,
+    artifact.tag,
+    artifactId,
+  );
+
+  return artifactId;
 }
 
 function displayPushResult(
@@ -172,4 +241,27 @@ function displayPushResult(
   } else {
     logger.success(`Artifact "${project}@${artifactId}" pushed successfully`);
   }
+}
+
+function artifactOriginToSuccessText(
+  origin: EthokoInputArtifact["origin"]["type"],
+): string {
+  if (origin === "hardhat-v3") {
+    return `Hardhat v3 compilation artifact found`;
+  }
+  if (origin === "hardhat-v3-non-isolated-build") {
+    return `Hardhat v3 compilation artifact found (non isolated build)`;
+  }
+  if (origin === "hardhat-v2") {
+    return `Hardhat v2 compilation artifact found`;
+  }
+  if (
+    origin === "forge-v1-default" ||
+    origin === "forge-v1-with-build-info-option"
+  ) {
+    return `Forge compilation artifact found`;
+  }
+  throw new CliError(
+    `Unsupported build info format: ${origin satisfies never}`,
+  );
 }
