@@ -1,13 +1,17 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import { CommandLogger, LOG_COLORS } from "@/ui/index.js";
+import { CommandLogger, LOG_COLORS } from "@/ui";
 import {
   CliError,
   Difference,
   generateDiffWithTargetRelease,
-} from "@/client/index.js";
-import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
+  resolvePulledArtifact,
+  lookForCandidateArtifacts,
+  mapCandidateArtifactToEthokoArtifact,
+  pullArtifact,
+} from "@/client";
+import { PulledArtifactStore } from "@/pulled-artifact-store";
 
 import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
@@ -18,10 +22,6 @@ import {
   RelativePath,
 } from "@/utils/path.js";
 import { createStorageProvider } from "./utils/storage-provider";
-import {
-  lookForCandidateArtifacts,
-  mapCandidateArtifactToEthokoArtifact,
-} from "@/client/candidate-artifact";
 import {
   EthokoContractOutputArtifact,
   EthokoInputArtifact,
@@ -188,10 +188,38 @@ async function runDiffCommand(
     artifactOriginToSuccessText(candidateArtifact.inputArtifact.origin.type),
   );
 
-  const diffResult = await generateDiffWithTargetRelease(
+  let resolvedArtifactKey = await resolvePulledArtifact(
     artifactKey,
+    dependencies.pulledArtifactStore,
+    { debug: opts.debug },
+  );
+  if (!resolvedArtifactKey) {
+    const artifactLabel = `${artifactKey.project}${
+      artifactKey.type === "id" ? `@${artifactKey.id}` : `:${artifactKey.tag}`
+    }`;
+    const pullSpinner = dependencies.logger.createSpinner(
+      `Artifact "${artifactLabel}" not found locally, pulling...`,
+    );
+    const pulledArtifact = await pullArtifact(
+      artifactKey,
+      dependencies.storageProvider,
+      dependencies.pulledArtifactStore,
+      {
+        force: false,
+        debug: opts.debug,
+        logger: dependencies.logger,
+      },
+    );
+    pullSpinner.succeed(`Artifact "${artifactLabel}" pulled successfully`);
+    resolvedArtifactKey = {
+      project: artifactKey.project,
+      id: pulledArtifact.id,
+    };
+  }
+
+  const diffResult = await generateDiffWithTargetRelease(
+    resolvedArtifactKey,
     candidateArtifact,
-    dependencies.storageProvider,
     dependencies.pulledArtifactStore,
     {
       debug: opts.debug,

@@ -52,8 +52,8 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           },
         );
 
-        expect(pullResult.pulledIds).toContain(artifactId);
-        expect(pullResult.failedIds).toHaveLength(0);
+        expect(pullResult.id).toEqual(artifactId);
+        expect(pullResult.pulled).toBe(true);
 
         const listArtifactsResult = await listPulledArtifacts(
           pulledArtifactStore,
@@ -129,8 +129,9 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           },
         );
 
-        expect(pullResult.pulledTags).toContain(tag);
-        expect(pullResult.failedTags).toHaveLength(0);
+        expect(pullResult.tag).toEqual(tag);
+        expect(pullResult.id).toEqual(artifactId);
+        expect(pullResult.pulled).toBe(true);
 
         const listArtifactsResult = await listPulledArtifacts(
           pulledArtifactStore,
@@ -280,7 +281,8 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             logger,
           },
         );
-        expect(result1.pulledTags).toHaveLength(0);
+        expect(result1.tag).toEqual(tag);
+        expect(result1.pulled).toBe(false);
 
         const result2 = await pullArtifact(
           { project, type: "tag", tag },
@@ -292,7 +294,8 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             logger,
           },
         );
-        expect(result2.pulledTags).toContain(tag);
+        expect(result2.tag).toEqual(tag);
+        expect(result2.pulled).toBe(true);
       },
     );
 

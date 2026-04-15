@@ -93,8 +93,9 @@ export function registerPullCommand(
 
       let pullPromise: Promise<PullResult>;
       if (artifactKeyParsingResult.data.type === "tag") {
+        const tag = artifactKeyParsingResult.data.tag;
         logger.intro(
-          `Pulling artifact "${artifactKeyParsingResult.data.project}:${artifactKeyParsingResult.data.tag}"`,
+          `Pulling artifact "${artifactKeyParsingResult.data.project}:${tag}"`,
         );
         pullPromise = pullArtifact(
           artifactKeyParsingResult.data,
@@ -105,10 +106,18 @@ export function registerPullCommand(
             debug: optsParsingResult.data.debug,
             logger,
           },
-        );
+        ).then((result) => ({
+          remoteTags: [tag],
+          remoteIds: [result.id],
+          pulledTags: result.pulled ? [tag] : [],
+          pulledIds: result.pulled ? [result.id] : [],
+          failedTags: [],
+          failedIds: [],
+        }));
       } else if (artifactKeyParsingResult.data.type === "id") {
+        const id = artifactKeyParsingResult.data.id;
         logger.intro(
-          `Pulling artifact "${artifactKeyParsingResult.data.project}@${artifactKeyParsingResult.data.id}"`,
+          `Pulling artifact "${artifactKeyParsingResult.data.project}@${id}"`,
         );
         pullPromise = pullArtifact(
           artifactKeyParsingResult.data,
@@ -119,7 +128,14 @@ export function registerPullCommand(
             debug: optsParsingResult.data.debug,
             logger,
           },
-        );
+        ).then((result) => ({
+          remoteTags: [],
+          remoteIds: [id],
+          pulledTags: [],
+          pulledIds: result.pulled ? [id] : [],
+          failedTags: [],
+          failedIds: [],
+        }));
       } else if (artifactKeyParsingResult.data.type === "project") {
         logger.intro(
           `Pulling artifacts for project "${artifactKeyParsingResult.data.project}"`,

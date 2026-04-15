@@ -292,7 +292,11 @@ export async function pullArtifact(
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { force: boolean; debug: boolean; logger: CommandLogger },
-): Promise<PullResult> {
+): Promise<{
+  tag: string | null;
+  id: string;
+  pulled: boolean;
+}> {
   // Step 1: Set up pulled artifact store
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifactKey.project),
@@ -338,7 +342,7 @@ async function pullArtifactById(
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { force: boolean; debug: boolean; logger: CommandLogger },
-): Promise<PullResult> {
+): Promise<{ tag: null; id: string; pulled: boolean }> {
   // Check if already pulled
   const hasAlreadyPulledResult = await toAsyncResult(
     pulledArtifactStore.hasId(project, id),
@@ -357,14 +361,7 @@ async function pullArtifactById(
         `Artifact "${project}@${id}" already pulled, skipping`,
       );
     }
-    return {
-      remoteTags: [],
-      remoteIds: [id],
-      pulledTags: [],
-      pulledIds: [],
-      failedTags: [],
-      failedIds: [],
-    };
+    return { tag: null, id, pulled: false };
   }
 
   // Verify existence remotely
@@ -408,12 +405,9 @@ async function pullArtifactById(
   }
 
   return {
-    remoteTags: [],
-    remoteIds: [id],
-    pulledTags: [],
-    pulledIds: [id],
-    failedTags: [],
-    failedIds: [],
+    tag: null,
+    id,
+    pulled: true,
   };
 }
 
@@ -423,7 +417,7 @@ async function pullArtifactByTag(
   storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { force: boolean; debug: boolean; logger: CommandLogger },
-): Promise<PullResult> {
+): Promise<{ tag: string; id: string; pulled: boolean }> {
   // Check if already pulled
   const hasAlreadyPulledResult = await toAsyncResult(
     pulledArtifactStore.hasTag(project, tag),
@@ -437,19 +431,28 @@ async function pullArtifactByTag(
 
   // If already pulled and not force, skip
   if (hasAlreadyPulledResult.value && !opts.force) {
-    if (opts.debug) {
-      opts.logger.message(
-        `Artifact "${project}:${tag}" already pulled, skipping`,
-      );
+    const artifactIdResult = await toAsyncResult(
+      pulledArtifactStore.retrieveArtifactId(project, tag),
+      { debug: opts.debug },
+    );
+    if (artifactIdResult.success) {
+      if (opts.debug) {
+        opts.logger.message(
+          `Artifact "${project}:${tag}" already pulled, skipping`,
+        );
+      }
+      return {
+        tag,
+        id: artifactIdResult.value,
+        pulled: false,
+      };
+    } else {
+      if (opts.debug) {
+        opts.logger.message(
+          `Artifact "${project}:${tag}" already pulled but failed to retrieve the associated ID, pulling again. Run with debug mode for more info`,
+        );
+      }
     }
-    return {
-      remoteTags: [tag],
-      remoteIds: [],
-      pulledTags: [],
-      pulledIds: [],
-      failedTags: [],
-      failedIds: [],
-    };
   }
 
   // Verify existence remotely
@@ -493,12 +496,9 @@ async function pullArtifactByTag(
   }
 
   return {
-    remoteTags: [tag],
-    remoteIds: [downloadResult.value.id],
-    pulledTags: [tag],
-    pulledIds: [downloadResult.value.id],
-    failedTags: [],
-    failedIds: [],
+    tag,
+    id: downloadResult.value.id,
+    pulled: true,
   };
 }
 

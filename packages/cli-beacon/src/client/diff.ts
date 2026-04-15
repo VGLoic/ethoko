@@ -1,13 +1,10 @@
 import { createHash } from "node:crypto";
-import { CommandLogger } from "../ui";
-import { PulledArtifactStore } from "../pulled-artifact-store/pulled-artifact-store";
-import { toAsyncResult, toResult } from "../utils/result";
-import { CliError } from "./error";
-
-import { retrieveOrPullArtifact } from "./retrieve-or-pull-artifact";
-import { StorageProvider } from "@/storage-provider";
-import { ArtifactKey } from "@/utils/artifact-key";
+import { CommandLogger } from "@/ui";
+import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { toAsyncResult, toResult } from "@/utils/result";
+import { ResolvedArtifactKey } from "@/utils/artifact-key";
 import { EthokoContractOutputArtifact } from "@/ethoko-artifacts/v0";
+import { CliError } from "./error";
 
 /**
  * This script generates the differences between the given artifact and an already pushed artifact.
@@ -85,7 +82,7 @@ export type Difference = {
  * 4. Compare the two maps and generate the differences array
  *
  * @throws CliError if there is an error during the execution of the steps, with user-friendly messages that can be directly shown to the user
- * @param artifactKey The key to the target artifact, containing the project and the tag or id of the target artifact
+ * @param artifactKey The key to the target artifact, containing the project and the id of the target artifact
  * @param artifact The fresh compilation artifact to compare with the target artifact
  * @param storageProvider The StorageProvider instance to use for retrieving the target artifact if it's not available locally
  * @param pulledArtifactStore The store used to persist pulled artifacts
@@ -96,40 +93,22 @@ export type Difference = {
  * @returns The array of differences between the fresh compilation artifact and the target artifact
  */
 export async function generateDiffWithTargetRelease(
-  artifactKey: ArtifactKey,
+  artifactKey: ResolvedArtifactKey,
   artifact: {
     outputContractArtifacts: EthokoContractOutputArtifact[];
   },
-  storageProvider: StorageProvider,
   pulledArtifactStore: PulledArtifactStore,
   opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
 ): Promise<Difference[]> {
-  // Step 1: Check if target artifact exists locally
-
-  const spinner1 = opts.logger.createSpinner(
-    "Checking artifact existence locally...",
-  );
   const ensureResult = await toAsyncResult(
     pulledArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
-    spinner1.fail("Failed to setup pulled artifact store");
     throw new CliError(
       "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
-
-  const artifactId = await retrieveOrPullArtifact(
-    artifactKey,
-    storageProvider,
-    pulledArtifactStore,
-    { debug: opts.debug, logger: opts.logger },
-  ).catch((err) => {
-    spinner1.fail("Failed to retrieve or pull the target artifact");
-    throw err;
-  });
-  spinner1.succeed("Artifact found");
 
   const virtualReleaseContractHashesResult = toResult(
     () => generateContractHashes(artifact.outputContractArtifacts),
@@ -143,7 +122,10 @@ export async function generateDiffWithTargetRelease(
 
   const spinner4 = opts.logger.createSpinner("Reading target artifact...");
   const contractListResult = await toAsyncResult(
-    pulledArtifactStore.listContractArtifacts(artifactKey.project, artifactId),
+    pulledArtifactStore.listContractArtifacts(
+      artifactKey.project,
+      artifactKey.id,
+    ),
     { debug: opts.debug },
   );
   if (!contractListResult.success) {
@@ -164,7 +146,7 @@ export async function generateDiffWithTargetRelease(
       commonContracts.map((contract) =>
         pulledArtifactStore.retrieveContractOutputArtifact(
           artifactKey.project,
-          artifactId,
+          artifactKey.id,
           contract.sourceName,
           contract.contractName,
         ),

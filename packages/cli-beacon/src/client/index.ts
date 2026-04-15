@@ -25,3 +25,8 @@ export {
   pruneOrphanedAndUntaggedArtifacts,
   type PruneResult,
 } from "./prune";
+export { resolvePulledArtifact } from "./resolve-pulled-artifact";
+export {
+  lookForCandidateArtifacts,
+  mapCandidateArtifactToEthokoArtifact,
+} from "./candidate-artifact";

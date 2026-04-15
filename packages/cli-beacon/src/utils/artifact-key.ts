@@ -9,3 +9,8 @@ export type ArtifactKey =
       type: "id";
       id: string;
     };
+
+export type ResolvedArtifactKey = {
+  project: string;
+  id: string;
+};
