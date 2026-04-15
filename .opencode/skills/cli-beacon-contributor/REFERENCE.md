@@ -14,7 +14,7 @@ src/
 │   ├── diff.ts                     # generateDiffWithTargetRelease()
 │   ├── inspect.ts                  # inspectArtifact()
 │   ├── prune.ts                    # pruneArtifact(), pruneProjectArtifacts(), pruneOrphanedAndUntaggedArtifacts()
-│   ├── parse-candidate-artifact.ts # parseCandidateArtifact() 
+│   ├── candidate-artifact.ts       # mapCandidateArtifactToEthokoArtifact(), lookForCandidateArtifacts()
 │   ├── export-contract-artifact.ts # exportContractArtifact()
 │   ├── list-pulled-artifacts.ts    # listPulledArtifacts()
 │   ├── restore.ts                  # restore()

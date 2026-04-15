@@ -7,10 +7,22 @@ import type { EthokoCliConfig } from "../config";
 import { createStorageProvider } from "./utils/storage-provider.js";
 import { toAsyncResult } from "@/utils/result.js";
 import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key.js";
-import { generateAbsolutePathSchema, AbsolutePath } from "@/utils/path.js";
-import { parseCandidateArtifact } from "@/client/parse-candidate-artifact";
-import { EthokoInputArtifact } from "@/ethoko-artifacts/v0";
+import {
+  generateAbsolutePathSchema,
+  AbsolutePath,
+  RelativePath,
+} from "@/utils/path.js";
+import {
+  lookForCandidateArtifacts,
+  mapCandidateArtifactToEthokoArtifact,
+} from "@/client/candidate-artifact";
+import {
+  EthokoContractOutputArtifact,
+  EthokoInputArtifact,
+} from "@/ethoko-artifacts/v0";
 import { StorageProvider } from "@/storage-provider";
+import { OriginalBuildInfoPaths } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import { promptUserSelection } from "./utils/prompt-select";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -264,4 +276,46 @@ function artifactOriginToSuccessText(
   throw new CliError(
     `Unsupported build info format: ${origin satisfies never}`,
   );
+}
+
+async function parseCandidateArtifact(
+  artifactPath: AbsolutePath,
+  opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
+): Promise<{
+  inputArtifact: EthokoInputArtifact;
+  outputContractArtifacts: EthokoContractOutputArtifact[];
+  originalContent: {
+    rootPath: AbsolutePath;
+    paths: RelativePath[];
+  };
+}> {
+  const candidateArtifacts = await lookForCandidateArtifacts(artifactPath, {
+    debug: opts.debug,
+  });
+
+  let selectedBuildInfoPaths: OriginalBuildInfoPaths;
+  if (candidateArtifacts.candidateBuildInfo.type === "single") {
+    selectedBuildInfoPaths =
+      candidateArtifacts.candidateBuildInfo.buildInfoPaths;
+  } else {
+    if (opts.isCI) {
+      throw new CliError(
+        "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
+      );
+    }
+    const selectedOption = await promptUserSelection(
+      opts.logger,
+      `Multiple JSON files found in "${candidateArtifacts.finalFolderPath}" (${candidateArtifacts.ignoredFilesCount} ignored). Please select which build info file to use:`,
+      candidateArtifacts.candidateBuildInfo.options,
+      30_000,
+    );
+    selectedBuildInfoPaths = selectedOption;
+  }
+
+  const ethokoArtifact = await mapCandidateArtifactToEthokoArtifact(
+    selectedBuildInfoPaths,
+    { debug: opts.debug },
+  );
+
+  return ethokoArtifact;
 }

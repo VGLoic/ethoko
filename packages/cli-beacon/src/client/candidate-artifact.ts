@@ -9,7 +9,6 @@ import {
   mapOriginalArtifactToEthokoArtifact,
   OriginalBuildInfoPaths,
 } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
-import { CommandLogger } from "@/ui";
 import { AbsolutePath, RelativePath } from "@/utils/path";
 import {
   EthokoContractOutputArtifact,
@@ -17,15 +16,15 @@ import {
 } from "@/ethoko-artifacts/v0";
 
 /**
- * Parse the candidate artifact(s) in the provided path, prompting the user to select one if multiple candidates are found, and map it to the Ethoko format.
- * @param artifactPath The absolute path to the artifact or directory containing artifacts.
- * @param opts Options for parsing, including debug mode, logger, and CI mode.
- * @returns An object containing the input artifact, output contract artifacts, and original content paths.
- * @throws CliError in case of errors
+ * Map a candidate artifact (build info) to the Ethoko format, based on its format.
+ * This function is a wrapper around the `mapOriginalArtifactToEthokoArtifact` function with CliError handling.
+ * @param buildInfoPaths The paths to the candidate artifact
+ * @param opts Options for mapping, including debug mode
+ * @returns The mapped Ethoko artifact
  */
-export async function parseCandidateArtifact(
-  artifactPath: AbsolutePath,
-  opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
+export async function mapCandidateArtifactToEthokoArtifact(
+  buildInfoPaths: OriginalBuildInfoPaths,
+  opts: { debug: boolean },
 ): Promise<{
   inputArtifact: EthokoInputArtifact;
   outputContractArtifacts: EthokoContractOutputArtifact[];
@@ -34,61 +33,16 @@ export async function parseCandidateArtifact(
     paths: RelativePath[];
   };
 }> {
-  const candidateArtifactsResult = await toAsyncResult(
-    lookForCandidateArtifacts(artifactPath, {
-      debug: opts.debug,
-    }),
-  );
-  if (!candidateArtifactsResult.success) {
-    // @dev the lookForBuildInfoJsonFile function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
-    throw candidateArtifactsResult.error;
-  }
-
-  const firstBuildInfoCandidate =
-    candidateArtifactsResult.value.candidateBuildInfoOptions[0];
-  if (!firstBuildInfoCandidate) {
-    throw new CliError(
-      "No valid compilation artifacts were found in the provided path. Please provide a valid path to a compilation artifact (build info) or a directory containing it.",
-    );
-  }
-
-  let selectedBuildInfoPaths: OriginalBuildInfoPaths;
-  if (candidateArtifactsResult.value.candidateBuildInfoOptions.length === 1) {
-    selectedBuildInfoPaths = firstBuildInfoCandidate.value;
-  } else {
-    if (opts.isCI) {
-      throw new CliError(
-        "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
-      );
-    }
-    const userSelectionResult = await toAsyncResult(
-      promptUserSelection(
-        opts.logger,
-        `Multiple JSON files found in "${candidateArtifactsResult.value.finalFolderPath}" (${candidateArtifactsResult.value.ignoredFilesCount} ignored). Please select which build info file to use:`,
-        candidateArtifactsResult.value.candidateBuildInfoOptions,
-        30_000,
-      ),
-      { debug: opts.debug },
-    );
-    if (!userSelectionResult.success) {
-      // @dev the promptUserSelection function throws a CliError with a user-friendly message, so we can directly re-throw it here without wrapping it in another error or modifying the message
-      throw userSelectionResult.error;
-    }
-    selectedBuildInfoPaths = userSelectionResult.value;
-  }
-
-  // Parse the compilation artifact, mapping it to the Ethoko format
   const ethokoArtifactParsingResult = await toAsyncResult(
-    mapOriginalArtifactToEthokoArtifact(selectedBuildInfoPaths, opts.debug),
+    mapOriginalArtifactToEthokoArtifact(buildInfoPaths, opts.debug),
     { debug: opts.debug },
   );
   if (!ethokoArtifactParsingResult.success) {
     throw new CliError(
-      FORMAT_TO_ERROR_MESSAGE[selectedBuildInfoPaths.format] ||
+      FORMAT_TO_ERROR_MESSAGE[buildInfoPaths.format] ||
         `An error occurred while mapping the build info to Ethoko artifacts. Please provide valid build info JSON files or contact us. Run with debug mode for more info.`,
     );
   }
-
   return ethokoArtifactParsingResult.value;
 }
 
@@ -109,7 +63,7 @@ const FORMAT_TO_ERROR_MESSAGE: Record<
 };
 
 type CandidateBuildInfoOption = {
-  display: string;
+  label: string;
   value: OriginalBuildInfoPaths;
 };
 
@@ -149,11 +103,16 @@ type CandidateBuildInfoOption = {
  * @returns An object containing the candidate artifact options, the count of ignored files, and the final folder path
  * @throws A CliError
  */
-async function lookForCandidateArtifacts(
+export async function lookForCandidateArtifacts(
   inputPath: AbsolutePath,
   opts: { debug: boolean },
 ): Promise<{
-  candidateBuildInfoOptions: CandidateBuildInfoOption[];
+  candidateBuildInfo:
+    | { type: "multiple"; options: CandidateBuildInfoOption[] }
+    | {
+        type: "single";
+        buildInfoPaths: OriginalBuildInfoPaths;
+      };
   ignoredFilesCount: number;
   finalFolderPath: AbsolutePath;
 }> {
@@ -224,17 +183,13 @@ async function lookForCandidateArtifacts(
       return {
         finalFolderPath: inputPath.dirname(),
         ignoredFilesCount: 0,
-        candidateBuildInfoOptions: [
-          {
-            display: "Input build info",
-            value: {
-              format: "hardhat-v3",
-              buildInfoPaths: [
-                { input: inputPath, output: matchingOutputPath },
-              ],
-            },
+        candidateBuildInfo: {
+          type: "single",
+          buildInfoPaths: {
+            format: "hardhat-v3",
+            buildInfoPaths: [{ input: inputPath, output: matchingOutputPath }],
           },
-        ],
+        },
       };
     }
     if (format.artifact.format === "hardhat-v3-output") {
@@ -271,30 +226,26 @@ async function lookForCandidateArtifacts(
       return {
         finalFolderPath: inputPath.dirname(),
         ignoredFilesCount: 0,
-        candidateBuildInfoOptions: [
-          {
-            display: "Input build info",
-            value: {
-              format: "hardhat-v3",
-              buildInfoPaths: [{ input: matchingInputPath, output: inputPath }],
-            },
+        candidateBuildInfo: {
+          type: "single",
+          buildInfoPaths: {
+            format: "hardhat-v3",
+            buildInfoPaths: [{ input: matchingInputPath, output: inputPath }],
           },
-        ],
+        },
       };
     }
 
     return {
       finalFolderPath: inputPath.dirname(),
       ignoredFilesCount: 0,
-      candidateBuildInfoOptions: [
-        {
-          display: "Input build info",
-          value: {
-            buildInfoPath: inputPath,
-            format: format.artifact.format,
-          },
+      candidateBuildInfo: {
+        type: "single",
+        buildInfoPaths: {
+          buildInfoPath: inputPath,
+          format: format.artifact.format,
         },
-      ],
+      },
     };
   }
 
@@ -421,8 +372,31 @@ async function lookForCandidateArtifacts(
 
   files.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
+  const options = filesToOptions(files);
+
+  const firstOption = options[0];
+  if (!firstOption) {
+    throw new CliError(
+      "No valid compilation artifacts were found in the provided path. Please provide a valid path to a compilation artifact (build info) or a directory containing it.",
+    );
+  }
+
+  if (options.length === 1) {
+    return {
+      candidateBuildInfo: {
+        type: "single",
+        buildInfoPaths: firstOption.value,
+      },
+      ignoredFilesCount,
+      finalFolderPath,
+    };
+  }
+
   return {
-    candidateBuildInfoOptions: filesToOptions(files),
+    candidateBuildInfo: {
+      type: "multiple",
+      options,
+    },
     ignoredFilesCount,
     finalFolderPath,
   };
@@ -463,7 +437,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
         continue;
       }
       options.push({
-        display: `${truncateFilename(file.name)} (Hardhat v3, Solc ${file.artifact.data.solcLongVersion}, ${formatTimeAgo(file.mtime)})`,
+        label: `${truncateFilename(file.name)} (Hardhat v3, Solc ${file.artifact.data.solcLongVersion}, ${formatTimeAgo(file.mtime)})`,
         value: {
           format: "hardhat-v3-non-isolated-build",
           buildInfoPaths: {
@@ -500,7 +474,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
       // Hardhat V3 output files are ignored as they will be handled together with their corresponding input file
     } else {
       options.push({
-        display: `${truncateFilename(file.name)} (${BUILD_INFO_FORMAT_TO_HUMAN_READABLE[file.artifact.format]}, ${formatTimeAgo(file.mtime)}, ${formatFileSize(file.size)})`,
+        label: `${truncateFilename(file.name)} (${BUILD_INFO_FORMAT_TO_HUMAN_READABLE[file.artifact.format]}, ${formatTimeAgo(file.mtime)}, ${formatFileSize(file.size)})`,
         value: {
           buildInfoPath: file.filePath,
           format: file.artifact.format,
@@ -535,7 +509,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
   }
   const hardhatV3OptionGroups: CandidateBuildInfoOption[] =
     hardhatV3PairsGroups.map((group) => {
-      const display = `${BUILD_INFO_FORMAT_TO_HUMAN_READABLE["hardhat-v3"]} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
+      const label = `${BUILD_INFO_FORMAT_TO_HUMAN_READABLE["hardhat-v3"]} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
       const value: OriginalBuildInfoPaths = {
         format: "hardhat-v3",
         buildInfoPaths: group.pairs.map((pair) => ({
@@ -544,7 +518,7 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
         })),
       };
       return {
-        display,
+        label,
         value,
       };
     });
@@ -552,62 +526,6 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
   options.push(...hardhatV3OptionGroups);
 
   return options;
-}
-
-/**
- * Prompts the user to select one option from a list
- * @param logger The CommandLogger instance to use for prompting the user
- * @param message The message to display to the user
- * @param options The list of options to choose from
- * @param timeoutMs Optional timeout in milliseconds (default: 30000ms = 30s). Set to 0 to disable timeout.
- * @returns The selected option
- * @throws CliError when timeout is reached or user cancels
- */
-async function promptUserSelection(
-  logger: CommandLogger,
-  message: string,
-  options: CandidateBuildInfoOption[],
-  timeoutMs: number = 30_000,
-): Promise<OriginalBuildInfoPaths> {
-  // Use Promise.race for timeout if enabled
-  let timeoutHandle: NodeJS.Timeout | null = null;
-  const timeoutPromise =
-    timeoutMs > 0
-      ? new Promise<never>((_, reject) => {
-          timeoutHandle = setTimeout(() => {
-            reject(
-              new CliError(
-                `User selection timed out after ${timeoutMs / 1_000}s.`,
-              ),
-            );
-          }, timeoutMs);
-        })
-      : new Promise<never>(() => {}); // Never resolves if timeout is disabled
-
-  const selectionPromise = logger.prompts
-    .select<OriginalBuildInfoPaths>({
-      message,
-      options: options.map((opt) => ({
-        value: opt.value,
-        label: opt.display,
-        // We cast as any because `clack` expects to break the discriminated union of the options to include the label
-        // I did not succeed in making that smoothly with typescript
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      })) as any,
-    })
-    .then((result) => {
-      if (logger.prompts.isCancel(result)) {
-        throw new CliError("Selection cancelled by user");
-      }
-      return result;
-    })
-    .finally(() => {
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-    });
-
-  return await Promise.race([selectionPromise, timeoutPromise]);
 }
 
 function formatTimeAgo(date: Date): string {
