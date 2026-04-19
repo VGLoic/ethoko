@@ -3,9 +3,7 @@ import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import type { EthokoInputArtifact } from "@/ethoko-artifacts/v0";
 import { CommandLogger } from "@/ui";
-import { StorageProvider } from "@/storage-provider";
-import { retrieveOrPullArtifact } from "./retrieve-or-pull-artifact";
-import { ArtifactKey } from "@/utils/artifact-key";
+import { ResolvedArtifactKey } from "@/utils/artifact-key";
 
 export type InspectResult = {
   project: string;
@@ -42,8 +40,7 @@ export type InspectResult = {
  * @throws CliError if the artifact cannot be found or read.
  */
 export async function inspectArtifact(
-  artifactKey: ArtifactKey,
-  storageProvider: StorageProvider,
+  artifactKey: ResolvedArtifactKey,
   pulledArtifactStore: PulledArtifactStore,
   opts: { debug: boolean; logger: CommandLogger },
 ): Promise<InspectResult> {
@@ -57,24 +54,15 @@ export async function inspectArtifact(
     );
   }
 
-  // @dev `retrieveOrPullArtifact` will throw a `CliError` if it fails
-  // so we don't need to handle the error case here
-  const artifactId = await retrieveOrPullArtifact(
-    artifactKey,
-    storageProvider,
-    pulledArtifactStore,
-    { debug: opts.debug, logger: opts.logger },
-  );
-
   const artifactsResult = await toAsyncResult(
     Promise.all([
       pulledArtifactStore.retrieveInputArtifact(
         artifactKey.project,
-        artifactId,
+        artifactKey.id,
       ),
       pulledArtifactStore.listContractArtifacts(
         artifactKey.project,
-        artifactId,
+        artifactKey.id,
       ),
     ]),
     { debug: opts.debug },
@@ -109,7 +97,7 @@ export async function inspectArtifact(
 
   return {
     project: artifactKey.project,
-    tag: artifactKey.type === "tag" ? artifactKey.tag : null,
+    tag: artifactKey.tag,
     id: inputArtifact.id,
     origin,
     compiler: compilerSettings,

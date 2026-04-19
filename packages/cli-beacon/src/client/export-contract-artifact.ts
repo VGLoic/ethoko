@@ -53,6 +53,14 @@ export type ExportContractArtifactResult = {
   expandedMetadata: z.infer<typeof ContractMetadataSchema>;
 };
 
+/**
+ * Export a locally pulled contract artifact
+ * @param artifactKey Project, ID and optionally tag of the artifact
+ * @param shortOrFullyQualifiedContractName either contract name, either fully qualified path of the contract, e.g. `counter` or `src/Counter.sol:Counter`
+ * @param pulledArtifactStore Pulled artifact store
+ * @param opts Options including debug mode and logger
+ * @throws CliError in case of error
+ */
 export async function exportContractArtifact(
   artifactKey: ResolvedArtifactKey,
   shortOrFullyQualifiedContractName: string,

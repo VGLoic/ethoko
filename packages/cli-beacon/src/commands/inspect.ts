@@ -1,14 +1,21 @@
 import { styleText } from "node:util";
 import { Command } from "commander";
 import { z } from "zod";
-import { LOG_COLORS, CommandLogger } from "@/ui/index.js";
-import { CliError, inspectArtifact, InspectResult } from "@/client/index.js";
-import { PulledArtifactStore } from "@/pulled-artifact-store/pulled-artifact-store.js";
-
-import type { EthokoCliConfig } from "../config";
-import { toAsyncResult } from "@/utils/result.js";
-import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key.js";
+import { LOG_COLORS, CommandLogger } from "@/ui";
+import {
+  CliError,
+  inspectArtifact,
+  InspectResult,
+  pullArtifact,
+  resolvePulledArtifact,
+} from "@/client";
+import { PulledArtifactStore } from "@/pulled-artifact-store";
+import type { EthokoCliConfig } from "@/config";
+import { toAsyncResult } from "@/utils/result";
+import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key";
 import { createStorageProvider } from "./utils/storage-provider";
+import { ArtifactKey } from "@/utils/artifact-key";
+import { StorageProvider } from "@/storage-provider";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
 
@@ -98,34 +105,85 @@ export function registerInspectCommand(
         optsParsingResult.data.debug,
       );
 
-      await inspectArtifact(
+      await runInspectCommand(
         artifactKeyParsingResult.data,
-        storageProvider,
-        pulledArtifactStore,
         {
-          debug: optsParsingResult.data.debug,
+          storageProvider,
+          pulledArtifactStore,
           logger,
         },
-      )
-        .then((result) => {
-          if (optsParsingResult.data.json && !logger.silent) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            displayInspectResult(logger, result);
-          }
-        })
-        .catch((err) => {
-          if (err instanceof CliError) {
-            logger.error(err.message);
-          } else {
-            logger.error(
-              "An unexpected error occurred, please fill an issue with the error details if the problem persists",
-            );
-            console.error(err);
-          }
-          process.exitCode = 1;
-        });
+        {
+          debug: optsParsingResult.data.debug,
+        },
+      ).catch((err) => {
+        if (err instanceof CliError) {
+          logger.error(err.message);
+        } else {
+          logger.error(
+            "An unexpected error occurred, please fill an issue with the error details if the problem persists",
+          );
+          console.error(err);
+        }
+        process.exitCode = 1;
+      });
     });
+}
+
+export async function runInspectCommand(
+  artifactKey: ArtifactKey,
+  dependencies: {
+    storageProvider: StorageProvider;
+    pulledArtifactStore: PulledArtifactStore;
+    logger: CommandLogger;
+  },
+  opts: { debug: boolean; json?: boolean },
+): Promise<InspectResult> {
+  let resolvedArtifactKey = await resolvePulledArtifact(
+    artifactKey,
+    dependencies.pulledArtifactStore,
+    { debug: opts.debug },
+  );
+  if (!resolvedArtifactKey) {
+    const artifactLabel = `${artifactKey.project}${
+      artifactKey.type === "id" ? `@${artifactKey.id}` : `:${artifactKey.tag}`
+    }`;
+    const pullSpinner = dependencies.logger.createSpinner(
+      `Artifact "${artifactLabel}" not found locally, pulling...`,
+    );
+    const pulledArtifact = await pullArtifact(
+      artifactKey,
+      dependencies.storageProvider,
+      dependencies.pulledArtifactStore,
+      {
+        force: false,
+        debug: opts.debug,
+        logger: dependencies.logger,
+      },
+    );
+    pullSpinner.succeed(`Artifact "${artifactLabel}" pulled successfully`);
+    resolvedArtifactKey = {
+      project: artifactKey.project,
+      id: pulledArtifact.id,
+      tag: artifactKey.type === "tag" ? artifactKey.tag : null,
+    };
+  }
+
+  const inspectResult = await inspectArtifact(
+    resolvedArtifactKey,
+    dependencies.pulledArtifactStore,
+    {
+      debug: opts.debug,
+      logger: dependencies.logger,
+    },
+  );
+
+  if (opts.json && !dependencies.logger.silent) {
+    console.log(JSON.stringify(inspectResult, null, 2));
+  } else {
+    displayInspectResult(dependencies.logger, inspectResult);
+  }
+
+  return inspectResult;
 }
 
 function displayInspectResult(

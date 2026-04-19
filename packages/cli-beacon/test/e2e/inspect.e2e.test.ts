@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { inspectArtifact, pullArtifact } from "@/client";
+import { pullArtifact } from "@/client";
 import { TEST_CONSTANTS } from "@test/helpers/test-constants";
 import { createTestProjectName } from "@test/helpers/test-utils";
 import {
@@ -9,6 +9,7 @@ import {
 import { ARTIFACTS_STRATEGIES } from "@test/helpers/artifacts-strategy";
 import { CommandLogger } from "@/ui";
 import { runPushCommand } from "@/commands/push";
+import { runInspectCommand } from "@/commands/inspect";
 
 describe.for(STORAGE_PROVIDER_STRATEGIES)(
   "Inspect E2E Tests (%s)",
@@ -61,11 +62,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               );
             }
 
-            const inspectResult = await inspectArtifact(
+            const inspectResult = await runInspectCommand(
               { project, type: "tag", tag },
-              storageProvider,
-              pulledArtifactStore,
-              { debug: false, logger },
+              {
+                storageProvider,
+                pulledArtifactStore,
+                logger,
+              },
+              { debug: false },
             );
 
             expect(inspectResult.project).toBe(project);
@@ -125,11 +129,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               );
             }
 
-            const inspectResult = await inspectArtifact(
+            const inspectResult = await runInspectCommand(
               { project, type: "id", id: artifactId },
-              storageProvider,
-              pulledArtifactStore,
-              { debug: false, logger },
+              {
+                storageProvider,
+                pulledArtifactStore,
+                logger,
+              },
+              { debug: false },
             );
 
             expect(inspectResult.project).toBe(project);
@@ -158,14 +165,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         await pulledArtifactStore.ensureProjectSetup(project);
 
         await expect(
-          inspectArtifact(
+          runInspectCommand(
             { project, type: "tag", tag: "non-existent-tag" },
-            storageProvider,
-            pulledArtifactStore,
             {
-              debug: false,
+              storageProvider,
+              pulledArtifactStore,
               logger,
             },
+            { debug: false },
           ),
         ).rejects.toThrow();
       },
