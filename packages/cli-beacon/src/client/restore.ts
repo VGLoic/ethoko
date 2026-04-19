@@ -19,23 +19,26 @@ export type RestoreResult = {
  * Restore original compilation artifacts to an input local destination
  * @param artifactKey Project, ID and optionally tag of the artifact
  * @param outputPath The local path where the artifacts will be restored
- * @param storageProvider The storage provider
- * @param pulledArtifactStore Pulled artifact store
+ * @param dependencies.storageProvider The storage provider
+ * @param dependencies.pulledArtifactStore Pulled artifact store
+ * @param dependencies.logger Command logger
  * @param opts Options
  * @param opts.force Whether or not the method should overwrite the output dir if existing
  * @param opts.debug Debug mode
- * @param opts.logger Command logger
  * @throws CliError in case of error
  */
 export async function restore(
   artifactKey: ResolvedArtifactKey,
   outputPath: AbsolutePath,
-  storageProvider: StorageProvider,
-  pulledArtifactStore: PulledArtifactStore,
-  opts: { force: boolean; debug: boolean; logger: CommandLogger },
+  dependencies: {
+    storageProvider: StorageProvider;
+    pulledArtifactStore: PulledArtifactStore;
+    logger: CommandLogger;
+  },
+  opts: { force: boolean; debug: boolean },
 ): Promise<RestoreResult> {
   const ensureResult = await toAsyncResult(
-    pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    dependencies.pulledArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
@@ -44,7 +47,6 @@ export async function restore(
     );
   }
 
-  const spinner2 = opts.logger.createSpinner("Checking output directory...");
   const outputStatResult = await toAsyncResult(
     fs.stat(outputPath.resolvedPath),
     {
@@ -53,7 +55,6 @@ export async function restore(
   );
   if (outputStatResult.success) {
     if (!outputStatResult.value.isDirectory()) {
-      spinner2.fail("Output path is not a directory");
       throw new CliError(
         `Output path "${outputPath}" exists but is not a directory`,
       );
@@ -65,16 +66,17 @@ export async function restore(
       },
     );
     if (!outputEntriesResult.success) {
-      spinner2.fail("Failed to read output directory");
       throw new CliError(
         `Unable to read output directory "${outputPath}". Run with debug mode for more info`,
       );
     }
     if (outputEntriesResult.value.length > 0 && !opts.force) {
-      spinner2.fail("Output directory is not empty");
       throw new CliError(
         `Output directory "${outputPath}" is not empty. Use the --force flag to overwrite`,
       );
+    }
+    if (opts.debug) {
+      // REMIND ME: ADD DEBUG LOG
     }
     if (outputEntriesResult.value.length > 0 && opts.force) {
       const removeResult = await toAsyncResult(
@@ -82,7 +84,6 @@ export async function restore(
         { debug: opts.debug },
       );
       if (!removeResult.success) {
-        spinner2.fail("Failed to clear output directory");
         throw new CliError(
           `Unable to clear output directory "${outputPath}". Run with debug mode for more info`,
         );
@@ -96,50 +97,53 @@ export async function restore(
       outputStatResult.error.code === "ENOENT"
     )
   ) {
-    spinner2.fail("Failed to access output directory");
     throw new CliError(
       `Unable to access output directory "${outputPath}". Run with debug mode for more info`,
     );
+  }
+  if (opts.debug) {
+    // REMIND ME: ADD DEBUG LOG
   }
   const mkdirOutputResult = await toAsyncResult(
     fs.mkdir(outputPath.resolvedPath, { recursive: true }),
     { debug: opts.debug },
   );
   if (!mkdirOutputResult.success) {
-    spinner2.fail("Failed to create output directory");
     throw new CliError(
       `Unable to create output directory "${outputPath}". Run with debug mode for more info`,
     );
   }
-  spinner2.succeed("Output directory ready");
 
-  const spinner3 = opts.logger.createSpinner("Listing original content...");
+  if (opts.debug) {
+    // REMIND ME: ADD DEBUG LOG
+  }
+
   const originalContentResult = await toAsyncResult(
-    storageProvider.listOriginalContent(artifactKey.project, artifactKey.id),
+    dependencies.storageProvider.listOriginalContent(
+      artifactKey.project,
+      artifactKey.id,
+    ),
     { debug: opts.debug },
   );
   if (!originalContentResult.success) {
-    spinner3.fail("Failed to list original content");
     throw new CliError(
       "Unable to list original content files from the storage. Run with debug mode for more info",
     );
   }
   const originalContentPaths = originalContentResult.value;
   if (originalContentPaths.length === 0) {
-    spinner3.fail("No original content files found");
     throw new CliError(
       "No original content files were found for this artifact. Run with debug mode for more info",
     );
   }
-  spinner3.succeed(`Found ${originalContentPaths.length} files`);
+  if (opts.debug) {
+    // REMIND ME: ADD DEBUG LOG
+  }
 
-  const spinner4 = opts.logger.createSpinner(
-    `Downloading ${originalContentPaths.length} file${originalContentPaths.length > 1 ? "s" : ""}...`,
-  );
   const downloadResults = await Promise.all(
     originalContentPaths.map(async (relativePath) => {
       const downloadResult = await toAsyncResult(
-        storageProvider.downloadOriginalContent(
+        dependencies.storageProvider.downloadOriginalContent(
           artifactKey.project,
           artifactKey.id,
           relativePath,
@@ -173,13 +177,17 @@ export async function restore(
         );
       }
 
+      if (opts.debug) {
+        // REMIND ME: ADD DEBUG LOG
+      }
+
       return relativePath;
     }),
   );
 
-  spinner4.succeed(
-    `Downloaded ${downloadResults.length} file${downloadResults.length > 1 ? "s" : ""}`,
-  );
+  if (opts.debug) {
+    // REMIND ME: ADD DEBUG LOG
+  }
 
   return {
     project: artifactKey.project,

@@ -193,12 +193,14 @@ export async function runRestoreCommand(
   const restoreResult = await restore(
     resolvedArtifactKey,
     outputPath,
-    dependencies.storageProvider,
-    dependencies.pulledArtifactStore,
+    {
+      pulledArtifactStore: dependencies.pulledArtifactStore,
+      storageProvider: dependencies.storageProvider,
+      logger: dependencies.logger,
+    },
     {
       force: opts.force,
       debug: opts.debug,
-      logger: dependencies.logger,
     },
   );
 
