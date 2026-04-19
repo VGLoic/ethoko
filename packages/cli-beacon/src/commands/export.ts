@@ -198,12 +198,18 @@ export async function runExportCommand(
   const exportResult = await exportContractArtifact(
     resolvedArtifactKey,
     shortOrFullyQualifiedContractName,
-    dependencies.pulledArtifactStore,
     {
-      debug: opts.debug,
+      pulledArtifactStore: dependencies.pulledArtifactStore,
       logger: dependencies.logger,
     },
+    { debug: opts.debug },
   );
+
+  if (exportResult.sourcesWithMissingContent.length > 0) {
+    dependencies.logger.warn(
+      `Some sources are missing "content", it may cause issues when trying to verify a contract on Etherscan or else.\nSources are: ${exportResult.sourcesWithMissingContent.map((s) => `* ${s}`).join("\n")}`,
+    );
+  }
 
   if (opts.output) {
     const artifactJson = JSON.stringify(exportResult, null, 2);

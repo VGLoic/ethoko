@@ -51,24 +51,28 @@ export type ExportContractArtifactResult = {
     methodIdentifiers?: Record<string, string>;
   };
   expandedMetadata: z.infer<typeof ContractMetadataSchema>;
+  sourcesWithMissingContent: string[];
 };
 
 /**
  * Read a locally pulled contract artifact and export its content
  * @param artifactKey Project, ID and optionally tag of the artifact
  * @param shortOrFullyQualifiedContractName either contract name, either fully qualified path of the contract, e.g. `counter` or `src/Counter.sol:Counter`
- * @param pulledArtifactStore Pulled artifact store
- * @param opts Options including debug mode and logger
+ * @param dependencies Dependencies
+ * @param opts Options including debug mode
  * @throws CliError in case of error
  */
 export async function exportContractArtifact(
   artifactKey: ResolvedArtifactKey,
   shortOrFullyQualifiedContractName: string,
-  pulledArtifactStore: PulledArtifactStore,
-  opts: { debug: boolean; logger: CommandLogger },
+  dependencies: {
+    pulledArtifactStore: PulledArtifactStore;
+    logger: CommandLogger;
+  },
+  opts: { debug: boolean },
 ): Promise<ExportContractArtifactResult> {
   const ensureResult = await toAsyncResult(
-    pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    dependencies.pulledArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
@@ -78,7 +82,7 @@ export async function exportContractArtifact(
   }
 
   const contractListResult = await toAsyncResult(
-    pulledArtifactStore.listContractArtifacts(
+    dependencies.pulledArtifactStore.listContractArtifacts(
       artifactKey.project,
       artifactKey.id,
     ),
@@ -88,6 +92,9 @@ export async function exportContractArtifact(
     throw new CliError(
       `Unable to find any contracts for artifact ${deriveDisplayArtifactName(artifactKey)}, please ensure it exists locally. Run with debug mode for more info`,
     );
+  }
+  if (opts.debug) {
+    // REMIND ME TO ADD LOGGER
   }
 
   const contracts = contractListResult.value;
@@ -138,9 +145,12 @@ export async function exportContractArtifact(
     }
     targetContract = matchingContract;
   }
+  if (opts.debug) {
+    // REMIND ME TO ADD LOGGER
+  }
 
   const contractArtifactResult = await toAsyncResult(
-    pulledArtifactStore.retrieveContractOutputArtifact(
+    dependencies.pulledArtifactStore.retrieveContractOutputArtifact(
       artifactKey.project,
       artifactKey.id,
       targetContract.sourceName,
@@ -152,6 +162,9 @@ export async function exportContractArtifact(
     throw new CliError(
       `Unable to retrieve the contract artifact content for contract ${targetContract.contractName} in source path ${targetContract.sourceName} for artifact ${deriveDisplayArtifactName(artifactKey)}, please ensure it exists locally. Run with debug mode for more info`,
     );
+  }
+  if (opts.debug) {
+    // REMIND ME TO ADD LOGGER
   }
 
   const contractArtifact = contractArtifactResult.value;
@@ -165,6 +178,9 @@ export async function exportContractArtifact(
       `Failed to parse the contract metadata for contract ${targetContract.sourceName}:${targetContract.contractName} for artifact ${deriveDisplayArtifactName(artifactKey)}, the metadata field is expected to be a JSON string in the format output by solc. Run with debug mode for more info.`,
     );
   }
+  if (opts.debug) {
+    // REMIND ME TO ADD LOGGER
+  }
 
   const sourcesWithMissingContent = Object.entries(
     metadataParsingResult.value.sources,
@@ -172,9 +188,10 @@ export async function exportContractArtifact(
     .filter(([, source]) => !source.content)
     .map(([sourcePath]) => sourcePath);
 
+  const finalSourcesWithMissingContent = [];
   if (sourcesWithMissingContent.length > 0) {
     const inputArtifactResult = await toAsyncResult(
-      pulledArtifactStore.retrieveInputArtifact(
+      dependencies.pulledArtifactStore.retrieveInputArtifact(
         artifactKey.project,
         artifactKey.id,
       ),
@@ -190,11 +207,7 @@ export async function exportContractArtifact(
     for (const sourcePath of sourcesWithMissingContent) {
       const inputSource = inputArtifact.input.sources[sourcePath];
       if (!inputSource || !("content" in inputSource) || !inputSource.content) {
-        if (opts.debug) {
-          opts.logger.warn(
-            `Source ${sourcePath} is missing content in the contract metadata and could not be found in the artifact input sources for artifact ${deriveDisplayArtifactName(artifactKey)}. This source will have empty content in the exported artifact.`,
-          );
-        }
+        finalSourcesWithMissingContent.push(sourcePath);
       } else {
         if (!metadataParsingResult.value.sources[sourcePath]) {
           throw new CliError(
@@ -236,6 +249,7 @@ export async function exportContractArtifact(
     storageLayout: contractArtifact.output.contract.storageLayout,
     evm: contractArtifact.output.contract.evm,
     expandedMetadata: metadataParsingResult.value,
+    sourcesWithMissingContent: finalSourcesWithMissingContent,
   };
 }
 

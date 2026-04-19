@@ -221,12 +221,11 @@ async function runDiffCommand(
   const diffResult = await generateDiffWithTargetRelease(
     resolvedArtifactKey,
     candidateArtifact,
-    dependencies.pulledArtifactStore,
     {
-      debug: opts.debug,
-      isCI: process.env.CI === "true" || process.env.CI === "1",
+      pulledArtifactStore: dependencies.pulledArtifactStore,
       logger: dependencies.logger,
     },
+    { debug: opts.debug },
   );
 
   displayDifferences(dependencies.logger, diffResult);
