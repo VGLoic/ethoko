@@ -1,5 +1,11 @@
 # @ethoko/cli-beacon
 
+## 0.11.0
+
+### Minor Changes
+
+- 8f39c87: A console.log used for debugging purpose has been removed. Logging in commands have been revisited and include less steps. Logs are shown when there is a dynamic pull from a specific command.
+
 ## 0.10.0
 
 ### Minor Changes

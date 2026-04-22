@@ -1,6 +1,6 @@
 {
   "name": "@ethoko/cli-beacon",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": false,
   "description": "Standalone CLI for Ethoko artifact management.",
   "author": "Loïc Vincent-Genod",
