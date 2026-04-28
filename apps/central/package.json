@@ -1,0 +1,16 @@
+{
+  "name": "central",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "cargo run --bin central-server",
+    "build": "cargo build ",
+    "check-types": "cargo check",
+    "check-format": "cargo fmt --check",
+    "format": "cargo fmt",
+    "lint": "cargo clippy -- -Dwarnings",
+    "test:unit": "cargo test --lib",
+    "test:integration": "./scripts/integration-test.sh"
+  }
+}

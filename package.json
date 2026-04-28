@@ -22,6 +22,7 @@
     "test:unit": "turbo run test:unit",
     "test:e2e:core": "pnpm --filter @ethoko/cli-beacon test:e2e",
     "test:e2e:apps": "turbo run test:e2e:apps",
+    "test:integration": "pnpm --filter central test:integration",
     "lint": "turbo run lint",
     "lint:ci": "turbo run lint:ci",
     "format": "turbo run format",

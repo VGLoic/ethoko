@@ -1,0 +1,27 @@
+[package]
+name = "central"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "central-server"
+path = "src/bin/server.rs"
+
+[lib]
+name = "ethoko_central"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0.102"
+async-trait = "0.1.89"
+axum = { version = "0.8.9", features = ["macros"] }
+dotenvy = "0.15.7"
+reqwest = { version = "0.13.3", features = ["json", "blocking"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tokio = { version = "1.52.1", features = ["full"] }
+tower-http = { version = "0.6.8", features = ["trace", "timeout", "request-id"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+uuid = { version = "1.23.1", features = ["v4", "serde"] }
