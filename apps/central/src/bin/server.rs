@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use ethoko_central::httpserver::serve_http_server;
+use ethoko_central::{config::Config, httpserver::serve_http_server};
 use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
 use tracing::{info, level_filters::LevelFilter};
@@ -13,17 +13,32 @@ async fn main() -> Result<(), anyhow::Error> {
         return Err(anyhow::Error::new(err).context("Error while loading .env file"));
     }
 
+    let config = match Config::parse_from_env() {
+        Ok(c) => c,
+        Err(errors) => {
+            return Err(anyhow::anyhow!(
+                "Failed to parse environment variables for configuration with errors: {}",
+                errors
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ));
+        }
+    };
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
-                .with_filter(Into::<LevelFilter>::into(LevelFilter::TRACE)),
+                .with_filter(Into::<LevelFilter>::into(config.log_level)),
         )
         .init();
+    
 
     let pool = match PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(5))
-        .connect("postgresql://admin:admin@localhost:5432/central")
+        .connect(&config.database_url)
         .await
     {
         Ok(c) => c,
@@ -38,7 +53,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Successfully ran migrations");
 
-    let addr = format!("0.0.0.0:{}", 3000);
+    let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|err| {
         anyhow::Error::new(err).context(format!(
             "Error while binding the TCP listener to address {addr}"

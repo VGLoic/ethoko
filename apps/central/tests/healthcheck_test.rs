@@ -1,12 +1,11 @@
 use axum::http::StatusCode;
 use ethoko_central::routes::GetHealthcheckResponse;
-
 mod common;
-use common::setup_instance;
+use common::{setup_instance, default_test_config};
 
 #[tokio::test]
 async fn test_healthcheck() {
-    let instance_state = setup_instance().await.unwrap();
+    let instance_state = setup_instance(&default_test_config()).await.unwrap();
 
     let response = reqwest::get(format!("{}/health", &instance_state.server_url))
         .await
