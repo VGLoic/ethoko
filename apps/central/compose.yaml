@@ -1,0 +1,31 @@
+# Comments are provided throughout this file to help you get started.
+# If you need more help, visit the Docker Compose reference guide at
+# https://docs.docker.com/go/compose-spec-reference/
+
+services:
+  db:
+    image: postgres
+    restart: always
+    user: postgres
+    volumes:
+      - ethoko-db-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=central
+      - POSTGRES_HOST=localhost
+      - POSTGRES_PORT=5432
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "admin", "-d", "central" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ethoko-central
+volumes:
+  ethoko-db-data:
+networks:
+  ethoko-central:
+

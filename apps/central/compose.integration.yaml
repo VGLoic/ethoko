@@ -1,0 +1,29 @@
+services:
+  db:
+    container_name: integration-db
+    image: postgres
+    restart: always
+    user: postgres
+    volumes:
+      - integration-db-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=central
+      - POSTGRES_HOST=localhost
+      - POSTGRES_PORT=5432
+    ports:
+      - 5433:5432
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "admin", "-d", "central" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - central-integration
+volumes:
+  integration-db-data:
+networks:
+  central-integration:
+    
+

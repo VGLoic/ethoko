@@ -5,7 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "templates/**"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "templates/**", "target/**"],
       "env": [
         /* hardhat-v2_hardhat-deploy-v0_external-lib */
         "AWS_REGION",
@@ -21,24 +21,21 @@
       ]
     },
     "lint": {
-      "dependsOn": ["build", "^lint"],
+      "dependsOn": ["@ethoko/cli-beacon#build", "^lint"],
       "env": ["NPM_TOKEN"]
     },
     "lint:ci": {
-      "dependsOn": ["build", "^lint:ci"],
+      "dependsOn": ["@ethoko/cli-beacon#build", "^lint:ci"],
       "env": ["NPM_TOKEN"]
     },
     "format": {
       "dependsOn": ["^format"]
     },
     "check-types": {
-      "dependsOn": ["build", "^check-types"]
-    },
-    "check-types": {
-      "dependsOn": ["build", "^check-types"]
+      "dependsOn": ["@ethoko/cli-beacon#build", "^check-types"]
     },
     "check-types:ci": {
-      "dependsOn": ["build", "^check-types:ci"]
+      "dependsOn": ["@ethoko/cli-beacon#build", "^check-types:ci"]
     },
     "check-format": {
       "dependsOn": ["^check-format"]
@@ -51,7 +48,7 @@
       "dependsOn": ["^test:unit"]
     },
     "test:e2e:apps": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["@ethoko/cli-beacon#build"]
     }
   }
 }
