@@ -20,7 +20,9 @@ pub fn default_test_config() -> Config {
 
 pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Error> {
     let _ = tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(LevelFilter::from_level(config.log_level)))
+        .with(
+            tracing_subscriber::fmt::layer().with_filter(LevelFilter::from_level(config.log_level)),
+        )
         .try_init();
 
     let pool = match PgPoolOptions::new()

@@ -33,7 +33,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 .with_filter(Into::<LevelFilter>::into(config.log_level)),
         )
         .init();
-    
 
     let pool = match PgPoolOptions::new()
         .max_connections(5)

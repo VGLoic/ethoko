@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use ethoko_central::routes::GetHealthcheckResponse;
 mod common;
-use common::{setup_instance, default_test_config};
+use common::{default_test_config, setup_instance};
 
 #[tokio::test]
 async fn test_healthcheck() {

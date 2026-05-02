@@ -47,7 +47,11 @@ impl Config {
             return Err(errors);
         }
 
-        Ok(Config { port, database_url, log_level })
+        Ok(Config {
+            port,
+            database_url,
+            log_level,
+        })
     }
 }
 
@@ -57,9 +61,7 @@ where
     <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
 {
     parse_env_variable(key)?.ok_or_else(|| {
-        anyhow::anyhow!(
-            "Required environment variable {key} is not set or is empty"
-        )
+        anyhow::anyhow!("Required environment variable {key} is not set or is empty")
     })
 }
 

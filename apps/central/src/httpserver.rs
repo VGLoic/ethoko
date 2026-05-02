@@ -14,6 +14,7 @@ use tower_http::{
 use tracing::{Span, error, info, info_span};
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
+const TIMEOUT_SECONDS: u64 = 10;
 
 pub async fn serve_http_server(tcp_listener: TcpListener) -> Result<(), anyhow::Error> {
     let x_request_id = HeaderName::from_static(REQUEST_ID_HEADER);
@@ -57,8 +58,11 @@ pub async fn serve_http_server(tcp_listener: TcpListener) -> Result<(), anyhow::
                     }
                 },
             ),
-        // Timeout requests at 10 seconds
-        TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(10)),
+        // Timeout requests at constant duration
+        TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(TIMEOUT_SECONDS),
+        ),
         // Propagate the `x-request-id` header to responses
         PropagateRequestIdLayer::new(x_request_id),
     ));
