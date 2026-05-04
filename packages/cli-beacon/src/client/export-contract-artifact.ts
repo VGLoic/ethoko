@@ -1,4 +1,4 @@
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { toAsyncResult, toResult } from "@/utils/result";
 import { CliError } from "./error";
 import { ContractMetadataSchema } from "@/solc-artifacts/v0.8.33/contract-metadata-json";
@@ -66,23 +66,23 @@ export async function exportContractArtifact(
   artifactKey: ResolvedArtifactKey,
   shortOrFullyQualifiedContractName: string,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { debug: boolean },
 ): Promise<ExportContractArtifactResult> {
   const ensureResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    dependencies.localArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
   const contractListResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.listContractArtifacts(
+    dependencies.localArtifactStore.listContractArtifacts(
       artifactKey.project,
       artifactKey.id,
     ),
@@ -154,7 +154,7 @@ export async function exportContractArtifact(
   }
 
   const contractArtifactResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.retrieveContractOutputArtifact(
+    dependencies.localArtifactStore.retrieveContractOutputArtifact(
       artifactKey.project,
       artifactKey.id,
       targetContract.sourceName,
@@ -199,7 +199,7 @@ export async function exportContractArtifact(
   const finalSourcesWithMissingContent = [];
   if (sourcesWithMissingContent.length > 0) {
     const inputArtifactResult = await toAsyncResult(
-      dependencies.pulledArtifactStore.retrieveInputArtifact(
+      dependencies.localArtifactStore.retrieveInputArtifact(
         artifactKey.project,
         artifactKey.id,
       ),

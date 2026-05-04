@@ -9,7 +9,7 @@ import {
   pullArtifact,
   resolvePulledArtifact,
 } from "@/client";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import type { EthokoCliConfig } from "@/config";
 import { toAsyncResult } from "@/utils/result";
 import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key";
@@ -96,8 +96,8 @@ export function registerInspectCommand(
         );
       }
 
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
+      const localArtifactStore = new LocalArtifactStore(
+        config.localArtifactStorePath,
       );
 
       const storageProvider = createStorageProvider(
@@ -110,7 +110,7 @@ export function registerInspectCommand(
         artifactKeyParsingResult.data,
         {
           storageProvider,
-          pulledArtifactStore,
+          localArtifactStore,
           logger,
         },
         {
@@ -134,14 +134,14 @@ export async function runInspectCommand(
   artifactKey: ArtifactKey,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: { debug: boolean; json?: boolean },
 ): Promise<InspectResult> {
   let resolvedArtifactKey = await resolvePulledArtifact(
     artifactKey,
-    dependencies.pulledArtifactStore,
+    dependencies.localArtifactStore,
     { debug: opts.debug },
   );
   if (!resolvedArtifactKey) {
@@ -155,7 +155,7 @@ export async function runInspectCommand(
       artifactKey,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: dependencies.logger.toDebugLogger(),
       },
       {
@@ -177,7 +177,7 @@ export async function runInspectCommand(
   const inspectResult = await inspectArtifact(
     resolvedArtifactKey,
     {
-      pulledArtifactStore: dependencies.pulledArtifactStore,
+      localArtifactStore: dependencies.localArtifactStore,
       logger: dependencies.logger.toDebugLogger(),
     },
     { debug: opts.debug },

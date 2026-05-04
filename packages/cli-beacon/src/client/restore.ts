@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { StorageProvider } from "@/storage-provider";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
@@ -20,7 +20,7 @@ export type RestoreResult = {
  * @param artifactKey Project, ID and optionally tag of the artifact
  * @param outputPath The local path where the artifacts will be restored
  * @param dependencies.storageProvider The storage provider
- * @param dependencies.pulledArtifactStore Pulled artifact store
+ * @param dependencies.localArtifactStore Pulled artifact store
  * @param dependencies.logger Debug logger
  * @param opts Options
  * @param opts.force Whether or not the method should overwrite the output dir if existing
@@ -32,18 +32,18 @@ export async function restore(
   outputPath: AbsolutePath,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { force: boolean; debug: boolean },
 ): Promise<RestoreResult> {
   const ensureResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    dependencies.localArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 

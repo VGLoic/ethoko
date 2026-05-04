@@ -14,11 +14,11 @@ const EthokoLocalConfigSchema = z
       )
       .default(".ethoko-typings")
       .pipe(generateAbsolutePathSchema(() => new AbsolutePath(process.cwd()))),
-    pulledArtifactsPath: z
-      .string('"pulledArtifactsPath" field must be a string or left empty')
+    localArtifactStorePath: z
+      .string('"localArtifactStorePath" field must be a string or left empty')
       .min(
         1,
-        "'pulledArtifactsPath' cannot be an empty string. Provide a valid path or set it to '.' to use the current directory or leave it empty to use the global pulled artifacts path",
+        "'localArtifactStorePath' cannot be an empty string. Provide a valid path or set it to '.' to use the current directory or leave it empty to use the global local artifact store path",
       )
       .pipe(generateAbsolutePathSchema(() => new AbsolutePath(process.cwd())))
       .optional(),
@@ -55,23 +55,23 @@ const EthokoLocalConfigSchema = z
   })
   .refine(
     (data) => {
-      // Typings path and pulled artifacts path must not be a parent-child relationship
-      if (!data.pulledArtifactsPath) {
+      // Typings path and local artifact store path must not be a parent-child relationship
+      if (!data.localArtifactStorePath) {
         return true;
       }
       return !(
-        data.typingsPath.eq(data.pulledArtifactsPath) ||
-        data.pulledArtifactsPath.isChildOf(data.typingsPath) ||
-        data.typingsPath.isChildOf(data.pulledArtifactsPath)
+        data.typingsPath.eq(data.localArtifactStorePath) ||
+        data.localArtifactStorePath.isChildOf(data.typingsPath) ||
+        data.typingsPath.isChildOf(data.localArtifactStorePath)
       );
     },
     {
       message:
-        '"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship',
+        '"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship',
     },
   )
   .superRefine((data, ctx) => {
-    // In case of storage type "filesystem", the storage path must not be a child or parent of typings path or pulled artifacts path
+    // In case of storage type "filesystem", the storage path must not be a child or parent of typings path or local artifact store path
     for (const project of data.projects) {
       if (project.storage.type === "filesystem") {
         if (
@@ -86,14 +86,14 @@ const EthokoLocalConfigSchema = z
           });
         }
         if (
-          data.pulledArtifactsPath &&
-          (project.storage.path.isChildOf(data.pulledArtifactsPath) ||
-            data.pulledArtifactsPath.isChildOf(project.storage.path) ||
-            project.storage.path.eq(data.pulledArtifactsPath))
+          data.localArtifactStorePath &&
+          (project.storage.path.isChildOf(data.localArtifactStorePath) ||
+            data.localArtifactStorePath.isChildOf(project.storage.path) ||
+            project.storage.path.eq(data.localArtifactStorePath))
         ) {
           ctx.addIssue({
             code: "custom",
-            message: `For project "${project.name}", the "storage.path" cannot be a child or parent of "pulledArtifactsPath".`,
+            message: `For project "${project.name}", the "storage.path" cannot be a child or parent of "localArtifactStorePath".`,
             input: data,
           });
         }

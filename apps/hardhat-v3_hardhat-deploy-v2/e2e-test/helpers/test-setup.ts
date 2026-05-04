@@ -7,21 +7,21 @@ export class ConfigSetup {
   public testId: string;
   public testPath: string;
   public storagePath: string;
-  public pulledArtifactsPath: string;
+  public localArtifactStorePath: string;
   public typingsPath: string;
 
   constructor(testId: string) {
     this.testId = testId;
     this.testPath = `${GlobalFolder.path}/test-${testId}`;
     this.storagePath = `${this.testPath}/storage`;
-    this.pulledArtifactsPath = `${this.testPath}/pulled-artifacts`;
+    this.localArtifactStorePath = `${this.testPath}/pulled-artifacts`;
     this.typingsPath = `${this.testPath}/typings`;
   }
 
   async setup(): Promise<() => Promise<void>> {
     await fs.mkdir(this.testPath, { recursive: true });
     await fs.mkdir(this.storagePath, { recursive: true });
-    await fs.mkdir(this.pulledArtifactsPath, { recursive: true });
+    await fs.mkdir(this.localArtifactStorePath, { recursive: true });
     await fs.mkdir(this.typingsPath, { recursive: true });
 
     return async () => {
@@ -47,7 +47,7 @@ export class CliConfigSetup {
     );
     const cliConfigContent = cliConfigTemplate
       .replace("PROJECT_NAME", PROJECT_NAME)
-      .replace("PULLED_ARTIFACTS_PATH", this.config.pulledArtifactsPath)
+      .replace("PULLED_ARTIFACTS_PATH", this.config.localArtifactStorePath)
       .replace("TYPINGS_PATH", this.config.typingsPath)
       .replace("STORAGE_PATH", this.config.storagePath);
     await fs.writeFile(this.cliConfigPath, cliConfigContent);
@@ -68,14 +68,14 @@ export class DeployScriptSetup {
   }
 
   async setup(): Promise<() => Promise<void>> {
-    const pulledArtifactsPath = `${this.config.testPath}/pulled-artifacts`;
+    const localArtifactStorePath = `${this.config.testPath}/pulled-artifacts`;
     const hardhatConfigTemplate = await fs.readFile(
       "e2e-test/helpers/templates/hardhat.config.e2e.template.ts",
       "utf-8",
     );
     const hardhatConfigContent = hardhatConfigTemplate
       .replace("PROJECT_NAME", PROJECT_NAME)
-      .replace("PULLED_ARTIFACTS_PATH", pulledArtifactsPath)
+      .replace("PULLED_ARTIFACTS_PATH", localArtifactStorePath)
       .replace("TYPINGS_PATH", this.config.typingsPath)
       .replace("STORAGE_PATH", `${this.config.storagePath}`);
     const deploymentScriptContent = await fs.readFile(

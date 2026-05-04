@@ -15,11 +15,11 @@ Priority (high → low):
 
 ### Global config — `~/.ethoko/config.json`
 
-User-level configuration. Shared across all repositories on the machine. Typically holds project storage credentials and the pulled artifacts cache path.
+User-level configuration. Shared across all repositories on the machine. Typically holds project storage credentials and the Local Artifact Store path.
 
 ```json
 {
-  "pulledArtifactsPath": "~/.ethoko/pulled-artifacts",
+  "localArtifactStorePath": "~/.ethoko/local-artifact-store",
   "projects": [
     {
       "name": "company-contracts",
@@ -57,7 +57,7 @@ Repository-level configuration. Discovered by walking up from `process.cwd()` to
 
 | Field | Scope | Description |
 |-------|-------|-------------|
-| `pulledArtifactsPath` | global or local | Where pulled artifacts are cached locally. Default: `~/.ethoko/pulled-artifacts` |
+| `localArtifactStorePath` | global or local | Path to the Local Artifact Store on disk. Default: `~/.ethoko/local-artifact-store` |
 | `typingsPath` | local only | Where TypeScript typings are generated. Default: `./.ethoko-typings` |
 | `compilationOutputPath` | local only | Where compiled artifacts live (e.g. `./artifacts`, `./out`). Optional |
 | `projects` | global and local | List of named projects with storage configs |
@@ -67,7 +67,7 @@ Repository-level configuration. Discovered by walking up from `process.cwd()` to
 
 The two configs are combined into a single `EthokoCliConfig` instance:
 
-- **`pulledArtifactsPath`** — local overrides global; global overrides built-in default
+- **`localArtifactStorePath`** — local overrides global; global overrides built-in default
 - **`typingsPath`** / **`compilationOutputPath`** — local only, no global equivalent
 - **`projects`** — merged by name; a local project with the same name as a global one takes precedence
 - **`debug`** — `local || global || false`
@@ -90,7 +90,7 @@ config.globalProjectNames; // Set<string> of names defined in global config
 
 ```typescript
 // Internally, all paths are wrapped in AbsolutePath after resolution
-config.pulledArtifactsPath; // AbsolutePath instance, always absolute
+config.localArtifactStorePath; // AbsolutePath instance, always absolute
 ```
 
 ## Storage Providers
@@ -113,7 +113,7 @@ Commands load configuration via `loadConfig()` and receive an `EthokoCliConfig` 
 import { loadConfig } from "@/config";
 
 const config = await loadConfig(); // merges global + local automatically
-const store = new PulledArtifactStore(config.pulledArtifactsPath);
+const store = new LocalArtifactStore(config.localArtifactStorePath);
 const storageProvider = buildStorageProvider(config.getProjectConfig("my-project"));
 ```
 
@@ -121,8 +121,8 @@ For testing, construct `EthokoCliConfig` directly:
 
 ```typescript
 new EthokoCliConfig({
-  pulledArtifactsPath: new AbsolutePath("/tmp/test-artifacts"),
-  pulledArtifactsSource: "local",
+  localArtifactStorePath: new AbsolutePath("/tmp/test-artifacts"),
+  localArtifactStorePathSource: "local",
   typingsPath: new AbsolutePath("/tmp/test-typings"),
   compilationOutputPath: undefined,
   projects: [],
@@ -136,7 +136,7 @@ new EthokoCliConfig({
 
 ## Cache Management
 
-Pulled artifacts accumulate over time. The `ethoko prune` command cleans them up:
+Artifacts in the Local Artifact Store accumulate over time. The `ethoko prune` command cleans them up:
 
 ```bash
 ethoko prune                  # Remove orphaned projects + untagged artifacts

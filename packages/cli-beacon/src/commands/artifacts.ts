@@ -7,7 +7,7 @@ import {
   ListArtifactsResult,
   listPulledArtifacts,
 } from "@/client/index.js";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 
 import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
@@ -63,12 +63,12 @@ export function registerArtifactsCommand(
         logger.intro("Listing artifacts");
       }
 
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
+      const localArtifactStore = new LocalArtifactStore(
+        config.localArtifactStorePath,
       );
 
       await listPulledArtifacts(
-        { pulledArtifactStore, logger: logger.toDebugLogger() },
+        { localArtifactStore, logger: logger.toDebugLogger() },
         {
           debug: parsingResult.data.debug,
         },

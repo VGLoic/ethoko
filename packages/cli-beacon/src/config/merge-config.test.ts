@@ -59,7 +59,7 @@ describe("loadConfig", () => {
         },
         {
           typingsPath: "/tmp/ethoko-test-typings",
-          pulledArtifactsPath: "/tmp/ethoko-test-artifacts",
+          localArtifactStorePath: "/tmp/ethoko-test-artifacts",
           projects: [
             {
               name: "local-project",
@@ -95,7 +95,7 @@ describe("loadConfig", () => {
         },
         {
           typingsPath: "/tmp/ethoko-typings-priority",
-          pulledArtifactsPath: "/tmp/ethoko-artifacts-priority",
+          localArtifactStorePath: "/tmp/ethoko-artifacts-priority",
           projects: [
             {
               name: "shared",
@@ -135,7 +135,7 @@ describe("loadConfig", () => {
         },
         {
           typingsPath: "/tmp/ethoko-typings-global",
-          pulledArtifactsPath: "/tmp/ethoko-artifacts-global",
+          localArtifactStorePath: "/tmp/ethoko-artifacts-global",
           projects: [
             {
               name: "local-only",
@@ -167,7 +167,7 @@ describe("loadConfig", () => {
         },
         {
           typingsPath: "/tmp/ethoko-typings-order",
-          pulledArtifactsPath: "/tmp/ethoko-artifacts-order",
+          localArtifactStorePath: "/tmp/ethoko-artifacts-order",
           projects: [
             {
               name: "l1",
@@ -182,59 +182,59 @@ describe("loadConfig", () => {
     });
   });
 
-  describe("pulledArtifactsPath precedence", () => {
-    test("local pulledArtifactsPath overrides global", async () => {
+  describe("localArtifactStorePath precedence", () => {
+    test("local localArtifactStorePath overrides global", async () => {
       const { globalConfigPath, localConfigPath } = await writeConfigs(
         "artifacts-local-override",
-        { pulledArtifactsPath: "/tmp/ethoko-global-artifacts" },
+        { localArtifactStorePath: "/tmp/ethoko-global-artifacts" },
         {
           typingsPath: "/tmp/ethoko-typings-artifacts",
-          pulledArtifactsPath: "/tmp/ethoko-local-artifacts",
+          localArtifactStorePath: "/tmp/ethoko-local-artifacts",
         },
       );
       const config = await loadConfig({ globalConfigPath, localConfigPath });
-      expect(config.pulledArtifactsPath.resolvedPath).toBe(
+      expect(config.localArtifactStorePath.resolvedPath).toBe(
         "/tmp/ethoko-local-artifacts",
       );
     });
 
-    test("falls back to global pulledArtifactsPath when local omits it", async () => {
+    test("falls back to global localArtifactStorePath when local omits it", async () => {
       const { globalConfigPath, localConfigPath } = await writeConfigs(
         "artifacts-global-fallback",
-        { pulledArtifactsPath: "/tmp/ethoko-global-fallback-artifacts" },
+        { localArtifactStorePath: "/tmp/ethoko-global-fallback-artifacts" },
         { typingsPath: "/tmp/ethoko-typings-fallback" },
       );
       const config = await loadConfig({ globalConfigPath, localConfigPath });
-      expect(config.pulledArtifactsPath.resolvedPath).toBe(
+      expect(config.localArtifactStorePath.resolvedPath).toBe(
         "/tmp/ethoko-global-fallback-artifacts",
       );
     });
   });
 
   describe("cross-config validation", () => {
-    test("throws when global pulledArtifactsPath equals local typingsPath", async () => {
+    test("throws when global localArtifactStorePath equals local typingsPath", async () => {
       const { globalConfigPath, localConfigPath } = await writeConfigs(
         "validation-equal-paths",
-        { pulledArtifactsPath: "/tmp/ethoko-shared-conflict-path" },
+        { localArtifactStorePath: "/tmp/ethoko-shared-conflict-path" },
         { typingsPath: "/tmp/ethoko-shared-conflict-path" },
       );
       await expect(
         loadConfig({ globalConfigPath, localConfigPath }),
       ).rejects.toThrow(
-        /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
+        /"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship/,
       );
     });
 
-    test("throws when global pulledArtifactsPath is parent of local typingsPath", async () => {
+    test("throws when global localArtifactStorePath is parent of local typingsPath", async () => {
       const { globalConfigPath, localConfigPath } = await writeConfigs(
         "validation-parent-path",
-        { pulledArtifactsPath: "/tmp/ethoko-parent-dir" },
+        { localArtifactStorePath: "/tmp/ethoko-parent-dir" },
         { typingsPath: "/tmp/ethoko-parent-dir/typings-child" },
       );
       await expect(
         loadConfig({ globalConfigPath, localConfigPath }),
       ).rejects.toThrow(
-        /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
+        /"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship/,
       );
     });
 
@@ -254,7 +254,7 @@ describe("loadConfig", () => {
         },
         {
           typingsPath: "/tmp/ethoko-typings-base",
-          pulledArtifactsPath: "/tmp/ethoko-artifacts-base",
+          localArtifactStorePath: "/tmp/ethoko-artifacts-base",
         },
       );
       await expect(
@@ -264,12 +264,12 @@ describe("loadConfig", () => {
       );
     });
 
-    test("throws when a local project storage path is child of global pulledArtifactsPath (fallback)", async () => {
-      // Local project has no pulledArtifactsPath so it passes local validation,
-      // but mergeConfigs uses global pulledArtifactsPath, which then conflicts.
+    test("throws when a local project storage path is child of global localArtifactStorePath (fallback)", async () => {
+      // Local project has no localArtifactStorePath so it passes local validation,
+      // but mergeConfigs uses global localArtifactStorePath, which then conflicts.
       const { globalConfigPath, localConfigPath } = await writeConfigs(
         "validation-project-storage-artifacts",
-        { pulledArtifactsPath: "/tmp/ethoko-artifacts-conflict-base" },
+        { localArtifactStorePath: "/tmp/ethoko-artifacts-conflict-base" },
         {
           typingsPath: "/tmp/ethoko-typings-artifacts-conflict",
           projects: [
@@ -286,7 +286,7 @@ describe("loadConfig", () => {
       await expect(
         loadConfig({ globalConfigPath, localConfigPath }),
       ).rejects.toThrow(
-        /For project "artifacts-conflict-project", the "storage.path" cannot be a child or parent of "pulledArtifactsPath"/,
+        /For project "artifacts-conflict-project", the "storage.path" cannot be a child or parent of "localArtifactStorePath"/,
       );
     });
   });

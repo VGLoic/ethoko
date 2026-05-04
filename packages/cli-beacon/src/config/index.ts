@@ -7,8 +7,8 @@ import { toAsyncResult } from "@/utils/result";
 export type EthokoStorageConfig = ProjectConfig["storage"];
 
 export class EthokoCliConfig {
-  public pulledArtifactsPath: AbsolutePath;
-  public pulledArtifactsSource: "local" | "global";
+  public localArtifactStorePath: AbsolutePath;
+  public localArtifactStorePathSource: "local" | "global";
   public typingsPath: AbsolutePath;
   public compilationOutputPath: AbsolutePath | undefined;
   public projects: ProjectConfig[];
@@ -19,8 +19,8 @@ export class EthokoCliConfig {
   public globalProjectNames: ReadonlySet<string>;
 
   constructor(config: EthokoConfig) {
-    this.pulledArtifactsPath = config.pulledArtifactsPath;
-    this.pulledArtifactsSource = config.pulledArtifactsSource;
+    this.localArtifactStorePath = config.localArtifactStorePath;
+    this.localArtifactStorePathSource = config.localArtifactStorePathSource;
     this.typingsPath = config.typingsPath;
     this.compilationOutputPath = config.compilationOutputPath;
     this.debug = config.debug;
@@ -36,8 +36,8 @@ export class EthokoCliConfig {
   }
 }
 interface EthokoConfig {
-  pulledArtifactsPath: AbsolutePath;
-  pulledArtifactsSource: "local" | "global";
+  localArtifactStorePath: AbsolutePath;
+  localArtifactStorePathSource: "local" | "global";
   typingsPath: AbsolutePath;
   compilationOutputPath: AbsolutePath | undefined;
   projects: ProjectConfig[];
@@ -92,9 +92,11 @@ function mergeConfigs(
     }
   }
   return {
-    pulledArtifactsPath:
-      localConfig.pulledArtifactsPath || globalConfig.pulledArtifactsPath,
-    pulledArtifactsSource: localConfig.pulledArtifactsPath ? "local" : "global",
+    localArtifactStorePath:
+      localConfig.localArtifactStorePath || globalConfig.localArtifactStorePath,
+    localArtifactStorePathSource: localConfig.localArtifactStorePath
+      ? "local"
+      : "global",
     typingsPath: localConfig.typingsPath,
     compilationOutputPath: localConfig.compilationOutputPath,
     projects: mergedProjects,
@@ -109,14 +111,14 @@ function mergeConfigs(
 function validateMergedConfig(config: EthokoConfig) {
   const errors: string[] = [];
 
-  // Validate pulledArtifactsPath and typingsPath relationship
+  // Validate localArtifactStorePath and typingsPath relationship
   if (
-    config.pulledArtifactsPath.eq(config.typingsPath) ||
-    config.pulledArtifactsPath.isChildOf(config.typingsPath) ||
-    config.typingsPath.isChildOf(config.pulledArtifactsPath)
+    config.localArtifactStorePath.eq(config.typingsPath) ||
+    config.localArtifactStorePath.isChildOf(config.typingsPath) ||
+    config.typingsPath.isChildOf(config.localArtifactStorePath)
   ) {
     errors.push(
-      '"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship',
+      '"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship',
     );
   }
 
@@ -133,13 +135,13 @@ function validateMergedConfig(config: EthokoConfig) {
         );
       }
       if (
-        config.pulledArtifactsPath &&
-        (project.storage.path.isChildOf(config.pulledArtifactsPath) ||
-          config.pulledArtifactsPath.isChildOf(project.storage.path) ||
-          project.storage.path.eq(config.pulledArtifactsPath))
+        config.localArtifactStorePath &&
+        (project.storage.path.isChildOf(config.localArtifactStorePath) ||
+          config.localArtifactStorePath.isChildOf(project.storage.path) ||
+          project.storage.path.eq(config.localArtifactStorePath))
       ) {
         errors.push(
-          `For project "${project.name}", the "storage.path" cannot be a child or parent of "pulledArtifactsPath".`,
+          `For project "${project.name}", the "storage.path" cannot be a child or parent of "localArtifactStorePath".`,
         );
       }
     }

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { S3BucketProvider } from "@/storage-provider/s3-bucket-provider";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { TestSession } from "./test-session";
 
 export function createTestProjectName(baseName: string): string {
@@ -29,16 +29,16 @@ export async function inspectS3Bucket(
   console.log("=========================\n");
 }
 
-export async function inspectPulledArtifactStore(
-  pulledArtifactStore: PulledArtifactStore,
+export async function inspectLocalArtifactStore(
+  localArtifactStore: LocalArtifactStore,
   project?: string,
 ): Promise<void> {
   console.log("\n=== Pulled Artifact Store Contents ===");
 
   try {
     if (project) {
-      const tags = await pulledArtifactStore.listTags(project);
-      const ids = await pulledArtifactStore.listIds(project);
+      const tags = await localArtifactStore.listTags(project);
+      const ids = await localArtifactStore.listIds(project);
 
       console.log(`Project: ${project}`);
       console.log(
@@ -52,13 +52,13 @@ export async function inspectPulledArtifactStore(
         }`,
       );
     } else {
-      const projects = await pulledArtifactStore.listProjects();
+      const projects = await localArtifactStore.listProjects();
       console.log(
         `Projects: ${projects.length > 0 ? projects.join(", ") : "(none)"}`,
       );
     }
   } catch (error) {
-    console.log(`Error inspecting pulled artifact store: ${String(error)}`);
+    console.log(`Error inspecting Local Artifact Store: ${String(error)}`);
   }
 
   console.log("==============================\n");

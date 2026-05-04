@@ -41,7 +41,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
     describe("generic restore functionality", () => {
       storageProviderTest(
         "restore to absolute path",
-        async ({ storageProvider, pulledArtifactStore }) => {
+        async ({ storageProvider, localArtifactStore }) => {
           const project = createTestProjectName(
             TEST_CONSTANTS.PROJECTS.DEFAULT,
           );
@@ -49,7 +49,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           const artifactFixture =
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-          await pulledArtifactStore.ensureProjectSetup(project);
+          await localArtifactStore.ensureProjectSetup(project);
 
           await runPushCommand(
             artifactFixture.folderPath,
@@ -64,7 +64,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             outputPath,
             {
               storageProvider,
-              pulledArtifactStore,
+              localArtifactStore,
               logger,
             },
             { force: false, debug: false },
@@ -80,7 +80,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
       storageProviderTest(
         "error: output directory exists without --force",
-        async ({ storageProvider, pulledArtifactStore }) => {
+        async ({ storageProvider, localArtifactStore }) => {
           const project = createTestProjectName(
             TEST_CONSTANTS.PROJECTS.DEFAULT,
           );
@@ -88,7 +88,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           const artifactFixture =
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-          await pulledArtifactStore.ensureProjectSetup(project);
+          await localArtifactStore.ensureProjectSetup(project);
 
           await runPushCommand(
             artifactFixture.folderPath,
@@ -110,7 +110,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { force: false, debug: false },
@@ -121,7 +121,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
       storageProviderTest(
         "success: output directory exists with --force",
-        async ({ storageProvider, pulledArtifactStore }) => {
+        async ({ storageProvider, localArtifactStore }) => {
           const project = createTestProjectName(
             TEST_CONSTANTS.PROJECTS.DEFAULT,
           );
@@ -129,7 +129,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           const artifactFixture =
             TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-          await pulledArtifactStore.ensureProjectSetup(project);
+          await localArtifactStore.ensureProjectSetup(project);
 
           await runPushCommand(
             artifactFixture.folderPath,
@@ -150,7 +150,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             outputPath,
             {
               storageProvider,
-              pulledArtifactStore,
+              localArtifactStore,
               logger,
             },
             { force: true, debug: false },
@@ -162,13 +162,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
       storageProviderTest(
         "error: artifact not existing",
-        async ({ storageProvider, pulledArtifactStore }) => {
+        async ({ storageProvider, localArtifactStore }) => {
           const project = createTestProjectName(
             TEST_CONSTANTS.PROJECTS.DEFAULT,
           );
           const outputPath = tempOutputDir.join("not-existing-tag-test");
 
-          await pulledArtifactStore.ensureProjectSetup(project);
+          await localArtifactStore.ensureProjectSetup(project);
 
           await expect(
             runRestoreCommand(
@@ -176,7 +176,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { force: false, debug: false },
@@ -187,7 +187,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
       storageProviderTest(
         "error: invalid project",
-        async ({ storageProvider, pulledArtifactStore }) => {
+        async ({ storageProvider, localArtifactStore }) => {
           const outputPath = tempOutputDir.join("invalid-project-test");
 
           await expect(
@@ -200,7 +200,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { force: false, debug: false },
@@ -217,14 +217,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           "%s artifacts - restore by tag",
           async (
             [, artifactFixture],
-            { storageProvider, pulledArtifactStore },
+            { storageProvider, localArtifactStore },
           ) => {
             const project = createTestProjectName(
               TEST_CONSTANTS.PROJECTS.DEFAULT,
             );
             const tag = TEST_CONSTANTS.TAGS.V1;
 
-            await pulledArtifactStore.ensureProjectSetup(project);
+            await localArtifactStore.ensureProjectSetup(project);
 
             await runPushCommand(
               artifactFixture.folderPath,
@@ -236,7 +236,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             if (!artifactAlreadyPulled) {
               await runPullCommand(
                 { project, type: "tag", tag },
-                { storageProvider, pulledArtifactStore, logger },
+                { storageProvider, localArtifactStore, logger },
                 {
                   force: false,
                   debug: false,
@@ -250,7 +250,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { force: false, debug: false },
@@ -282,13 +282,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           "%s artifacts - restore by ID",
           async (
             [, artifactFixture],
-            { storageProvider, pulledArtifactStore },
+            { storageProvider, localArtifactStore },
           ) => {
             const project = createTestProjectName(
               TEST_CONSTANTS.PROJECTS.DEFAULT,
             );
 
-            await pulledArtifactStore.ensureProjectSetup(project);
+            await localArtifactStore.ensureProjectSetup(project);
 
             const artifactId = await runPushCommand(
               artifactFixture.folderPath,
@@ -300,7 +300,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             if (!artifactAlreadyPulled) {
               await runPullCommand(
                 { project, type: "id", id: artifactId },
-                { storageProvider, pulledArtifactStore, logger },
+                { storageProvider, localArtifactStore, logger },
                 {
                   force: false,
                   debug: false,
@@ -314,7 +314,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               outputPath,
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { force: false, debug: false },

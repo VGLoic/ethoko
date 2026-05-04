@@ -118,7 +118,7 @@ export function registerUninstallCommand(program: Command): void {
       const shouldProceed = logger.prompts.confirm({
         message: `This will remove:
 - ~/.ethoko/bin/ethoko (binary)
-- ~/.ethoko/ (all data and pulled artifacts)
+- ~/.ethoko/ (all data and local artifact store)
 - PATH entries in ~/.bashrc and ~/.zshrc
 
 Proceed with uninstallation?`,

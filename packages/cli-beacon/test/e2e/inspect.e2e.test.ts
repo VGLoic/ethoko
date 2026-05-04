@@ -24,14 +24,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           "%s artifacts - inspect pulled artifact by tag",
           async (
             [, artifactFixture],
-            { storageProvider, pulledArtifactStore },
+            { storageProvider, localArtifactStore },
           ) => {
             const project = createTestProjectName(
               TEST_CONSTANTS.PROJECTS.DEFAULT,
             );
             const tag = TEST_CONSTANTS.TAGS.V1;
 
-            await pulledArtifactStore.ensureProjectSetup(project);
+            await localArtifactStore.ensureProjectSetup(project);
 
             const artifactId = await runPushCommand(
               artifactFixture.folderPath,
@@ -52,7 +52,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             if (!artifactAlreadyPulled) {
               await runPullCommand(
                 { project, type: "tag", tag },
-                { storageProvider, pulledArtifactStore, logger },
+                { storageProvider, localArtifactStore, logger },
                 {
                   force: false,
                   debug: false,
@@ -64,7 +64,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               { project, type: "tag", tag },
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { debug: false },
@@ -90,13 +90,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           "%s artifacts - inspect pulled artifact by ID",
           async (
             [, artifactFixture],
-            { storageProvider, pulledArtifactStore },
+            { storageProvider, localArtifactStore },
           ) => {
             const project = createTestProjectName(
               TEST_CONSTANTS.PROJECTS.DEFAULT,
             );
 
-            await pulledArtifactStore.ensureProjectSetup(project);
+            await localArtifactStore.ensureProjectSetup(project);
 
             const artifactId = await runPushCommand(
               artifactFixture.folderPath,
@@ -117,7 +117,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
             if (!artifactAlreadyPulled) {
               await runPullCommand(
                 { project, type: "id", id: artifactId },
-                { storageProvider, pulledArtifactStore, logger },
+                { storageProvider, localArtifactStore, logger },
                 {
                   force: false,
                   debug: false,
@@ -129,7 +129,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
               { project, type: "id", id: artifactId },
               {
                 storageProvider,
-                pulledArtifactStore,
+                localArtifactStore,
                 logger,
               },
               { debug: false },
@@ -155,17 +155,17 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest(
       "inspect non-existent artifact returns error",
-      async ({ pulledArtifactStore, storageProvider }) => {
+      async ({ localArtifactStore, storageProvider }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         await expect(
           runInspectCommand(
             { project, type: "tag", tag: "non-existent-tag" },
             {
               storageProvider,
-              pulledArtifactStore,
+              localArtifactStore,
               logger,
             },
             { debug: false },

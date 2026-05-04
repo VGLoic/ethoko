@@ -5,8 +5,8 @@ import {
   TestS3StorageProviderFactory,
 } from "./storage-provider-factory";
 import { StorageProvider } from "@/storage-provider/storage-provider.interface";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
-import { createTestPulledArtifactStore } from "./local-storage-factory";
+import { LocalArtifactStore } from "@/local-artifact-store";
+import { createTestLocalArtifactStore } from "./local-storage-factory";
 
 /**
  * Available storage provider strategies for E2E testing.
@@ -22,17 +22,17 @@ export const STORAGE_PROVIDER_STRATEGIES = [
 ] as const;
 
 /**
- * Vitest test helper that provides storage provider and pulled artifact store fixtures.
+ * Vitest test helper that provides storage provider and local artifact store fixtures.
  *
  * This extends the base `test` function with automatic setup/cleanup for:
  * - `storageProvider`: Storage backend (Filesystem or S3) for remote artifact storage
- * - `pulledArtifactStore`: Local filesystem storage for pulled artifacts
+ * - `localArtifactStore`: Local Artifact Store on the local filesystem
  * - `storageProviderFactory`: Factory for creating storage providers (can be scoped)
  *
  * @example Basic usage
  * ```typescript
- * storageProviderTest("my test", async ({ storageProvider, pulledArtifactStore }) => {
- *   // storageProvider and pulledArtifactStore are automatically set up and cleaned up
+ * storageProviderTest("my test", async ({ storageProvider, localArtifactStore }) => {
+ *   // storageProvider and localArtifactStore are automatically set up and cleaned up
  *   await push(artifactPath, project, tag, storageProvider, { ... });
  * });
  * ```
@@ -44,7 +44,7 @@ export const STORAGE_PROVIDER_STRATEGIES = [
  *   ([, storageProviderFactory]) => {
  *     storageProviderTest.scoped({ storageProviderFactory });
  *
- *     storageProviderTest("test name", async ({ storageProvider, pulledArtifactStore }) => {
+ *     storageProviderTest("test name", async ({ storageProvider, localArtifactStore }) => {
  *       // Test runs once for Filesystem Storage, once for S3
  *     });
  *   }
@@ -58,7 +58,7 @@ export const STORAGE_PROVIDER_STRATEGIES = [
  *   ["Test Case 2", someData2],
  * ] as const)(
  *   "test: %s",
- *   async ([name, data], { storageProvider, pulledArtifactStore }) => {
+ *   async ([name, data], { storageProvider, localArtifactStore }) => {
  *     // Test runs for each data item
  *   }
  * );
@@ -66,7 +66,7 @@ export const STORAGE_PROVIDER_STRATEGIES = [
  */
 export const storageProviderTest = test.extend<{
   storageProvider: StorageProvider;
-  pulledArtifactStore: PulledArtifactStore;
+  localArtifactStore: LocalArtifactStore;
   storageProviderFactory: StorageProviderFactory;
 }>({
   // The destructuring is required by vitest
@@ -81,10 +81,10 @@ export const storageProviderTest = test.extend<{
   },
   // The destructuring is required by vitest
   // eslint-disable-next-line no-empty-pattern
-  pulledArtifactStore: async ({}, use) => {
-    const pulledArtifactStoreSetup = await createTestPulledArtifactStore();
-    const pulledArtifactStore = pulledArtifactStoreSetup.pulledArtifactStore;
-    await use(pulledArtifactStore);
-    await pulledArtifactStoreSetup.cleanup();
+  localArtifactStore: async ({}, use) => {
+    const localArtifactStoreSetup = await createTestLocalArtifactStore();
+    const localArtifactStore = localArtifactStoreSetup.localArtifactStore;
+    await use(localArtifactStore);
+    await localArtifactStoreSetup.cleanup();
   },
 });

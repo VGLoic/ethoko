@@ -21,10 +21,10 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest.for(ARTIFACTS_STRATEGIES)(
       "push artifact [%s] without tag → pull by ID",
-      async ([, artifactFixture], { storageProvider, pulledArtifactStore }) => {
+      async ([, artifactFixture], { storageProvider, localArtifactStore }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         const artifactId = await runPushCommand(
           artifactFixture.folderPath,
@@ -44,7 +44,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const pullResult = await runPullCommand(
           { project, type: "id", id: artifactId },
-          { storageProvider, pulledArtifactStore, logger },
+          { storageProvider, localArtifactStore, logger },
           {
             force: false,
             debug: false,
@@ -55,7 +55,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(pullResult.pulledIds.length).toBe(1);
 
         const listArtifactsResult = await listPulledArtifacts(
-          { pulledArtifactStore, logger: logger.toDebugLogger() },
+          { localArtifactStore, logger: logger.toDebugLogger() },
           {
             debug: false,
           },
@@ -66,7 +66,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
           ),
         ).toBe(true);
 
-        const localArtifact = await pulledArtifactStore.retrieveInputArtifact(
+        const localArtifact = await localArtifactStore.retrieveInputArtifact(
           project,
           artifactId,
         );
@@ -94,13 +94,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest(
       "push artifact with tag → pull by tag",
-      async ({ storageProvider, pulledArtifactStore }) => {
+      async ({ storageProvider, localArtifactStore }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
         const artifactFixture =
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         const artifactId = await runPushCommand(
           artifactFixture.folderPath,
@@ -119,7 +119,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const pullResult = await runPullCommand(
           { project, type: "tag", tag },
-          { storageProvider, pulledArtifactStore, logger },
+          { storageProvider, localArtifactStore, logger },
           {
             force: false,
             debug: false,
@@ -132,7 +132,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(pullResult.pulledIds.length).toBe(1);
 
         const listArtifactsResult = await listPulledArtifacts(
-          { pulledArtifactStore, logger: logger.toDebugLogger() },
+          { localArtifactStore, logger: logger.toDebugLogger() },
           {
             debug: false,
           },
@@ -149,14 +149,14 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest(
       "pull all artifacts for a project",
-      async ({ storageProvider, pulledArtifactStore }) => {
+      async ({ storageProvider, localArtifactStore }) => {
         const project = createTestProjectName(
           TEST_CONSTANTS.PROJECTS.MULTI_ARTIFACT,
         );
         const artifactFixture =
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         const tag1 = TEST_CONSTANTS.TAGS.V1;
         const tag2 = TEST_CONSTANTS.TAGS.V2;
@@ -177,7 +177,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const pullResult = await runPullCommand(
           { project, type: "project" },
-          { storageProvider, pulledArtifactStore, logger },
+          { storageProvider, localArtifactStore, logger },
           { force: false, debug: false },
         );
 
@@ -186,7 +186,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         expect(pullResult.pulledTags).toContain(tag2);
 
         const listArtifactsResult = await listPulledArtifacts(
-          { pulledArtifactStore, logger: logger.toDebugLogger() },
+          { localArtifactStore, logger: logger.toDebugLogger() },
           {
             debug: false,
           },
@@ -201,7 +201,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest(
       "force push overwrites existing tag",
-      async ({ storageProvider, pulledArtifactStore }) => {
+      async ({ storageProvider, localArtifactStore }) => {
         const project = createTestProjectName(
           TEST_CONSTANTS.PROJECTS.FORCE_TEST,
         );
@@ -209,7 +209,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         const artifactFixture =
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         const id1 = await runPushCommand(
           artifactFixture.folderPath,
@@ -243,13 +243,13 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest(
       "pull with force re-downloads existing artifacts",
-      async ({ storageProvider, pulledArtifactStore }) => {
+      async ({ storageProvider, localArtifactStore }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
         const tag = TEST_CONSTANTS.TAGS.V1;
         const artifactFixture =
           TEST_CONSTANTS.ARTIFACTS_FIXTURES.COUNTER.TARGETS.HARDHAT_V3;
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         await runPushCommand(
           artifactFixture.folderPath,
@@ -259,7 +259,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
         );
         await runPullCommand(
           { project, type: "tag", tag },
-          { storageProvider, pulledArtifactStore, logger },
+          { storageProvider, localArtifactStore, logger },
           {
             force: false,
             debug: false,
@@ -268,7 +268,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const result1 = await runPullCommand(
           { project, type: "tag", tag },
-          { storageProvider, pulledArtifactStore, logger },
+          { storageProvider, localArtifactStore, logger },
           {
             force: false,
             debug: false,
@@ -278,7 +278,7 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
         const result2 = await runPullCommand(
           { project, type: "tag", tag },
-          { storageProvider, pulledArtifactStore, logger },
+          { storageProvider, localArtifactStore, logger },
           {
             force: true,
             debug: false,
@@ -291,15 +291,15 @@ describe.for(STORAGE_PROVIDER_STRATEGIES)(
 
     storageProviderTest(
       "pull non-existent artifact returns error",
-      async ({ storageProvider, pulledArtifactStore }) => {
+      async ({ storageProvider, localArtifactStore }) => {
         const project = createTestProjectName(TEST_CONSTANTS.PROJECTS.DEFAULT);
 
-        await pulledArtifactStore.ensureProjectSetup(project);
+        await localArtifactStore.ensureProjectSetup(project);
 
         await expect(
           runPullCommand(
             { project, type: "tag", tag: "non-existent-tag" },
-            { storageProvider, pulledArtifactStore, logger },
+            { storageProvider, localArtifactStore, logger },
             {
               force: false,
               debug: false,

@@ -29,18 +29,18 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
   const defaultStorageConfig = { type: "filesystem" };
   const invalidCases = [
     [
-      "Pulled artifacts path intentionally empty",
+      "Local artifact store path intentionally empty",
       {
-        pulledArtifactsPath: "",
+        localArtifactStorePath: "",
       },
-      /"pulledArtifactsPath" cannot be an empty string/,
+      /"localArtifactStorePath" cannot be an empty string/,
     ],
     [
-      "Pulled artifacts path equal to 'config.json'",
+      "Local artifact store path equal to 'config.json'",
       {
-        pulledArtifactsPath: "config.json",
+        localArtifactStorePath: "config.json",
       },
-      /"pulledArtifactsPath" cannot be equal to "config.json"/,
+      /"localArtifactStorePath" cannot be equal to "config.json"/,
     ],
     [
       '"projects" field is not an array',
@@ -60,11 +60,11 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
       },
       /Duplicate project name "dummy" found. Each project must have a unique name./,
     ],
-    // Storage path is a child of pulled artifacts path
+    // Storage path is a child of local artifact store path
     [
-      "Storage path is a child of pulled artifacts path",
+      "Storage path is a child of local artifact store path",
       {
-        pulledArtifactsPath: "artifacts",
+        localArtifactStorePath: "artifacts",
         projects: [
           {
             name: "project1",
@@ -74,11 +74,11 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
       },
       / cannot be a child of project "/,
     ],
-    // Storage path is equal to pulled artifacts path
+    // Storage path is equal to local artifact store path
     [
-      "Storage path is equal to pulled artifacts path",
+      "Storage path is equal to local artifact store path",
       {
-        pulledArtifactsPath: "artifacts",
+        localArtifactStorePath: "artifacts",
         projects: [
           {
             name: "project1",
@@ -88,11 +88,11 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
       },
       /" cannot be the same as project "/,
     ],
-    // Storage path is a parent of pulled artifacts path
+    // Storage path is a parent of local artifact store path
     [
-      "Storage path is a parent of pulled artifacts path",
+      "Storage path is a parent of local artifact store path",
       {
-        pulledArtifactsPath: "artifacts/project1-storage",
+        localArtifactStorePath: "artifacts/project1-storage",
         projects: [
           {
             name: "project1",
@@ -128,8 +128,8 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
 
   const validCases = [
     ["Empty config (should use defaults)", {}],
-    ["Relative path", { pulledArtifactsPath: "relative/path" }],
-    ["Absolute path", { pulledArtifactsPath: "/absolute/path" }],
+    ["Relative path", { localArtifactStorePath: "relative/path" }],
+    ["Absolute path", { localArtifactStorePath: "/absolute/path" }],
   ] as const;
 
   describe.for(validCases)("%s", ([description, configToTest]) => {
@@ -150,14 +150,14 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
     });
   });
 
-  describe("should resolve relative pulledArtifactsPath against global config directory", async () => {
+  describe("should resolve relative localArtifactStorePath against global config directory", async () => {
     let configPath: string;
     beforeAll(async () => {
-      // Create a temporary config file with a relative pulledArtifactsPath
+      // Create a temporary config file with a relative localArtifactStorePath
       configPath = path.join(tmpDirPath, "ethoko.config.json");
       await fs.writeFile(
         configPath,
-        JSON.stringify({ pulledArtifactsPath: "relative/path" }),
+        JSON.stringify({ localArtifactStorePath: "relative/path" }),
       );
       return async () => {
         // Clean up the temporary config file after the test
@@ -171,18 +171,20 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
       const expectedPath = new AbsolutePath(os.homedir(), ".ethoko").join(
         "relative/path",
       ).resolvedPath;
-      expect(loadedConfig.pulledArtifactsPath.resolvedPath).toBe(expectedPath);
+      expect(loadedConfig.localArtifactStorePath.resolvedPath).toBe(
+        expectedPath,
+      );
     });
   });
 
-  describe("should allow for absolute pulledArtifactsPath", async () => {
+  describe("should allow for absolute localArtifactStorePath", async () => {
     let configPath: string;
     beforeAll(async () => {
-      // Create a temporary config file with an absolute pulledArtifactsPath
+      // Create a temporary config file with an absolute localArtifactStorePath
       configPath = path.join(tmpDirPath, "ethoko.config.json");
       await fs.writeFile(
         configPath,
-        JSON.stringify({ pulledArtifactsPath: "/absolute/path" }),
+        JSON.stringify({ localArtifactStorePath: "/absolute/path" }),
       );
       return async () => {
         // Clean up the temporary config file after the test
@@ -193,7 +195,7 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
     test("should use the absolute path as is", async () => {
       const loadedConfig = await loadGlobalConfig(configPath);
       expect(loadedConfig).toBeDefined();
-      expect(loadedConfig.pulledArtifactsPath.resolvedPath).toBe(
+      expect(loadedConfig.localArtifactStorePath.resolvedPath).toBe(
         "/absolute/path",
       );
     });
@@ -205,10 +207,10 @@ describe('"loadGlobalConfig" must parse accordingly to rules', () => {
       "non-existent-config.json",
     );
     await expect(loadGlobalConfig(nonExistentConfigPath)).resolves.toEqual({
-      pulledArtifactsPath: new AbsolutePath(
+      localArtifactStorePath: new AbsolutePath(
         os.homedir(),
         ".ethoko",
-        "pulled-artifacts",
+        "local-artifact-store",
       ),
       projects: [],
     });

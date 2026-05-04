@@ -1,28 +1,28 @@
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { ArtifactKey, ResolvedArtifactKey } from "@/utils/artifact-key";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 
 /**
- * Resolve an artifact ID from the pulled artifact store if it exists, otherwise return null.
+ * Resolve an artifact ID from the Local Artifact Store if it exists, otherwise return null.
  * @param artifactKey The artifact key to resolve, either by tag or by ID.
- * @param pulledArtifactStore The pulled artifact store
+ * @param localArtifactStore The Local Artifact Store
  * @param opts Options for resolving the artifact ID, such as debug mode.
- * @returns The artifact ID if it exists in the pulled artifact store, otherwise null.
+ * @returns The artifact ID if it exists in the Local Artifact Store, otherwise null.
  */
 export async function resolvePulledArtifact(
   artifactKey: ArtifactKey,
-  pulledArtifactStore: PulledArtifactStore,
+  localArtifactStore: LocalArtifactStore,
   opts: { debug: boolean },
 ): Promise<ResolvedArtifactKey | null> {
   if (artifactKey.type === "id") {
     const hasIdResult = await toAsyncResult(
-      pulledArtifactStore.hasId(artifactKey.project, artifactKey.id),
+      localArtifactStore.hasId(artifactKey.project, artifactKey.id),
       { debug: opts.debug },
     );
     if (!hasIdResult.success) {
       throw new CliError(
-        "Error checking for artifact ID in pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+        "Error checking for artifact ID in Local Artifact Store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
     if (hasIdResult.value) {
@@ -30,17 +30,17 @@ export async function resolvePulledArtifact(
     }
   } else {
     const hasTagResult = await toAsyncResult(
-      pulledArtifactStore.hasTag(artifactKey.project, artifactKey.tag),
+      localArtifactStore.hasTag(artifactKey.project, artifactKey.tag),
       { debug: opts.debug },
     );
     if (!hasTagResult.success) {
       throw new CliError(
-        "Error checking for artifact tag in pulled artifact store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
+        "Error checking for artifact tag in Local Artifact Store, is the script not allowed to read from the filesystem? Run with debug mode for more info",
       );
     }
     if (hasTagResult.value) {
       const artifactIdResult = await toAsyncResult(
-        pulledArtifactStore.retrieveArtifactId(
+        localArtifactStore.retrieveArtifactId(
           artifactKey.project,
           artifactKey.tag,
         ),

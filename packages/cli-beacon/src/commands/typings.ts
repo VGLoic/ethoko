@@ -10,7 +10,7 @@ import {
   pullArtifact,
   pullProject,
 } from "@/client/index.js";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 
 import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
@@ -125,26 +125,22 @@ export function registerTypingsCommand(
         return;
       }
 
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
+      const localArtifactStore = new LocalArtifactStore(
+        config.localArtifactStorePath,
       );
 
       let promise: Promise<void>;
       if (parsingResult.data.empty) {
         logger.intro("Generating empty typings");
-        promise = generateEmptyTypings(
-          config.typingsPath,
-          pulledArtifactStore,
-          {
-            debug: parsingResult.data.debug,
-          },
-        );
+        promise = generateEmptyTypings(config.typingsPath, localArtifactStore, {
+          debug: parsingResult.data.debug,
+        });
       } else if (parsingResult.data.all) {
         logger.intro("Generating typings for all pulled artifacts");
         promise = generateAllPulledArtifactsTypings(
           config.typingsPath,
           {
-            pulledArtifactStore,
+            localArtifactStore,
             logger: logger.toDebugLogger(),
           },
           { debug: parsingResult.data.debug },
@@ -174,7 +170,7 @@ export function registerTypingsCommand(
             config.typingsPath,
             {
               storageProvider,
-              pulledArtifactStore,
+              localArtifactStore,
               logger,
             },
             { debug: parsingResult.data.debug },
@@ -189,7 +185,7 @@ export function registerTypingsCommand(
             config.typingsPath,
             {
               storageProvider,
-              pulledArtifactStore,
+              localArtifactStore,
               logger,
             },
             { debug: parsingResult.data.debug },
@@ -232,14 +228,14 @@ async function runProjectTypingsCommand(
   typingsPath: AbsolutePath,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: { debug: boolean },
 ): Promise<void> {
   const debugLogger = dependencies.logger.toDebugLogger();
   const hasProjectResult = await toAsyncResult(
-    dependencies.pulledArtifactStore
+    dependencies.localArtifactStore
       .listProjects()
       .then((projects) => projects.includes(project)),
     opts,
@@ -257,7 +253,7 @@ async function runProjectTypingsCommand(
       project,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       {
@@ -275,7 +271,7 @@ async function runProjectTypingsCommand(
     typingsPath,
     {
       storageProvider: dependencies.storageProvider,
-      pulledArtifactStore: dependencies.pulledArtifactStore,
+      localArtifactStore: dependencies.localArtifactStore,
       logger: debugLogger,
     },
     opts,
@@ -288,14 +284,14 @@ async function runTagTypingsCommand(
   typingsPath: AbsolutePath,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: { debug: boolean },
 ): Promise<void> {
   const debugLogger = dependencies.logger.toDebugLogger();
   const hasTagResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.hasTag(project, tag),
+    dependencies.localArtifactStore.hasTag(project, tag),
     { debug: opts.debug },
   );
   if (!hasTagResult.success) {
@@ -311,7 +307,7 @@ async function runTagTypingsCommand(
       { project, type: "tag", tag },
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       { force: false, debug: opts.debug },
@@ -327,7 +323,7 @@ async function runTagTypingsCommand(
     typingsPath,
     {
       storageProvider: dependencies.storageProvider,
-      pulledArtifactStore: dependencies.pulledArtifactStore,
+      localArtifactStore: dependencies.localArtifactStore,
       logger: debugLogger,
     },
     opts,

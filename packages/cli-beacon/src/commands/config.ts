@@ -44,7 +44,7 @@ export function registerConfigCommand(
 
       const effectiveLines: string[] = [
         "",
-        `  Pulled Artifacts Path: ${config.pulledArtifactsPath} ${styleText("dim", `(from ${config.pulledArtifactsSource})`)}`,
+        `  Local Artifact Store Path: ${config.localArtifactStorePath} ${styleText("dim", `(from ${config.localArtifactStorePathSource})`)}`,
         `  Typings Path: ${config.typingsPath}`,
         `  Compilation Output Path: ${config.compilationOutputPath ?? styleText("dim", "(not set)")}`,
         `  Debug: ${config.debug}`,

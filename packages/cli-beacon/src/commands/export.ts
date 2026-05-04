@@ -9,7 +9,7 @@ import {
   resolvePulledArtifact,
   type ExportContractArtifactResult,
 } from "@/client";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
 import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key.js";
@@ -116,8 +116,8 @@ export function registerExportCommand(
         );
       }
 
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
+      const localArtifactStore = new LocalArtifactStore(
+        config.localArtifactStorePath,
       );
       const storageProvider = createStorageProvider(
         projectConfig.storage,
@@ -130,7 +130,7 @@ export function registerExportCommand(
         optsParsingResult.data.contract,
         {
           storageProvider,
-          pulledArtifactStore,
+          localArtifactStore,
           logger,
         },
         {
@@ -158,7 +158,7 @@ export async function runExportCommand(
   shortOrFullyQualifiedContractName: string,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: {
@@ -168,7 +168,7 @@ export async function runExportCommand(
 ): Promise<ExportContractArtifactResult> {
   let resolvedArtifactKey = await resolvePulledArtifact(
     artifactKey,
-    dependencies.pulledArtifactStore,
+    dependencies.localArtifactStore,
     { debug: opts.debug },
   );
   if (!resolvedArtifactKey) {
@@ -182,7 +182,7 @@ export async function runExportCommand(
       artifactKey,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: dependencies.logger.toDebugLogger(),
       },
       {
@@ -205,7 +205,7 @@ export async function runExportCommand(
     resolvedArtifactKey,
     shortOrFullyQualifiedContractName,
     {
-      pulledArtifactStore: dependencies.pulledArtifactStore,
+      localArtifactStore: dependencies.localArtifactStore,
       logger: dependencies.logger.toDebugLogger(),
     },
     { debug: opts.debug },

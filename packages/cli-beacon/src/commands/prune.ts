@@ -2,7 +2,7 @@ import z from "zod";
 import { Command } from "commander";
 import { CommandLogger } from "@/ui";
 import { toAsyncResult } from "@/utils/result";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { ProjectOrArtifactKeySchema } from "./utils/parse-project-or-artifact-key";
 import type { EthokoCliConfig } from "../config";
 import {
@@ -46,8 +46,8 @@ export function registerPruneCommand(
       }
 
       const config = configResult.value;
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
+      const localArtifactStore = new LocalArtifactStore(
+        config.localArtifactStorePath,
       );
       const dryRun = Boolean(options.dryRun);
 
@@ -59,7 +59,7 @@ export function registerPruneCommand(
         await runPruneCommand(
           { type: "all", projects: configuredProjects },
           {
-            pulledArtifactStore,
+            localArtifactStore,
             logger,
           },
           {
@@ -92,7 +92,7 @@ export function registerPruneCommand(
       await runPruneCommand(
         { type: "specific", artifactKey: parsedKeyResult.data },
         {
-          pulledArtifactStore,
+          localArtifactStore,
           logger,
         },
         {
@@ -121,7 +121,7 @@ export async function runPruneCommand(
         artifactKey: z.infer<typeof ProjectOrArtifactKeySchema>;
       },
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: {
@@ -136,7 +136,7 @@ export async function runPruneCommand(
     pruneResult = await pruneOrphanedAndUntaggedArtifacts(
       target.projects,
       {
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       opts,
@@ -148,7 +148,7 @@ export async function runPruneCommand(
     pruneResult = await pruneProjectArtifacts(
       target.artifactKey.project,
       {
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       opts,
@@ -164,7 +164,7 @@ export async function runPruneCommand(
     pruneResult = await pruneArtifact(
       target.artifactKey,
       {
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       opts,

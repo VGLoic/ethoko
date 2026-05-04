@@ -8,7 +8,7 @@ import {
   pullArtifact,
   PullResult,
 } from "@/client/index.js";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 
 import type { EthokoCliConfig } from "../config";
 import { createStorageProvider } from "./utils/storage-provider.js";
@@ -89,15 +89,15 @@ export function registerPullCommand(
         logger.toDebugLogger(),
         optsParsingResult.data.debug,
       );
-      const pulledArtifactStore = new PulledArtifactStore(
-        config.pulledArtifactsPath,
+      const localArtifactStore = new LocalArtifactStore(
+        config.localArtifactStorePath,
       );
 
       await runPullCommand(
         artifactKeyParsingResult.data,
         {
           storageProvider,
-          pulledArtifactStore,
+          localArtifactStore,
           logger,
         },
         {
@@ -122,7 +122,7 @@ export async function runPullCommand(
   target: z.infer<typeof ProjectOrArtifactKeySchema>,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: {
@@ -139,7 +139,7 @@ export async function runPullCommand(
       target,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       opts,
@@ -158,7 +158,7 @@ export async function runPullCommand(
       target,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       opts,
@@ -178,7 +178,7 @@ export async function runPullCommand(
       target.project,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: debugLogger,
       },
       opts,

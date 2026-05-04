@@ -11,7 +11,7 @@ packages/cli-beacon/
 │   ├── commands/                      # CLI command definitions and handlers (consumes client methods), export `run<CommandName>Command` for testing
 │   ├── config/                        # CLI configuration management
 │   ├── ethoko-artifacts/              # Ethoko artifact definitions
-│   ├── pulled-artifact-store/         # Pulled artifact store read/write logic
+│   ├── local-artifact-store/          # Local Artifact Store read/write logic
 │   ├── solc-artifacts/                # Solc artifact definitions
 │   ├── storage-provider/              # Storage provider interfaces and implementations
 │   ├── supported-origins/             # Supported origins for artifacts with mapping logic (e.g., Hardhat, Foundry)
@@ -78,7 +78,7 @@ export async function runInspectCommand(
   artifactKey: ArtifactKey,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: CommandLogger;
   },
   opts: { debug: boolean; json?: boolean },
@@ -94,7 +94,7 @@ await runInspectCommand(
     artifactKeyParsingResult.data,
     {
       storageProvider,
-      pulledArtifactStore,
+      localArtifactStore,
       logger,
     },
     {
@@ -140,7 +140,7 @@ async function pullProject(
   project: string,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { force: boolean; debug: boolean; },
@@ -153,7 +153,7 @@ async function pullProject(
 - **Location:** `test/e2e/*.e2e.test.ts`
 - **Global setup:** `test/setup.ts` starts LocalStack (Docker), creates TestSession with unique ID
 - **Dual-provider testing:** Every test runs against both Filesystem and S3 via `describe.for(STORAGE_PROVIDER_STRATEGIES)`
-- **Scoped fixtures:** `storageProviderTest.scoped({ storageProviderFactory })` provides `storageProvider` and `pulledArtifactStore` -- auto-created and auto-cleaned per test
+- **Scoped fixtures:** `storageProviderTest.scoped({ storageProviderFactory })` provides `storageProvider` and `localArtifactStore` -- auto-created and auto-cleaned per test
 - **Parameterized tests:** `storageProviderTest.for(ARTIFACTS_STRATEGIES)` iterates over all fixture formats (Foundry, Hardhat v2/v3 variants)
 - **Project isolation:** `createTestProjectName()` generates `{sessionId}-{name}` to prevent collisions across parallel runs
 - **Fixtures:** Real compilation artifacts in `test/fixtures/` from Foundry and Hardhat

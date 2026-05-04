@@ -1,4 +1,4 @@
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import { ArtifactKey } from "@/utils/artifact-key";
@@ -13,7 +13,7 @@ export type PruneResult = {
 export async function pruneOrphanedAndUntaggedArtifacts(
   configuredProjects: Set<string>,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: {
@@ -22,7 +22,7 @@ export async function pruneOrphanedAndUntaggedArtifacts(
   },
 ): Promise<PruneResult> {
   const storedProjectsResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.listProjects(),
+    dependencies.localArtifactStore.listProjects(),
     {
       debug: opts.debug,
     },
@@ -66,7 +66,7 @@ export async function pruneOrphanedAndUntaggedArtifacts(
   // Retrieve all artifacts for orphaned projects
   const orphanedArtifactsSettlements = await Promise.allSettled(
     orphanedProjects.map((project) =>
-      listProjectArtifacts(project, dependencies.pulledArtifactStore).catch(
+      listProjectArtifacts(project, dependencies.localArtifactStore).catch(
         (err) => {
           throw new ProjectError(project, err);
         },
@@ -102,7 +102,7 @@ export async function pruneOrphanedAndUntaggedArtifacts(
   // Retrieve all untagged artifacts for configured projects
   const untaggedArtifactsSettlements = await Promise.allSettled(
     configuredStoredProjects.map((project) =>
-      listProjectArtifacts(project, dependencies.pulledArtifactStore)
+      listProjectArtifacts(project, dependencies.localArtifactStore)
         .then((artifacts) => artifacts.filter((a) => a.tag === null))
         .catch((err) => {
           throw new ProjectError(project, err);
@@ -137,7 +137,7 @@ export async function pruneOrphanedAndUntaggedArtifacts(
 
   const artifactsWithSizeSettlements = await Promise.allSettled(
     artifactsToPrune.map((artifact) =>
-      dependencies.pulledArtifactStore
+      dependencies.localArtifactStore
         .getIdSize(artifact.project, artifact.id)
         .then((size) => ({ ...artifact, size })),
     ),
@@ -177,15 +177,15 @@ export async function pruneOrphanedAndUntaggedArtifacts(
   const deleteSettlements = await Promise.allSettled(
     artifactsWithSize.map((artifact) => {
       const promise = artifact.tag
-        ? dependencies.pulledArtifactStore
+        ? dependencies.localArtifactStore
             .deleteTag(artifact.project, artifact.tag)
             .then(() =>
-              dependencies.pulledArtifactStore.deleteId(
+              dependencies.localArtifactStore.deleteId(
                 artifact.project,
                 artifact.id,
               ),
             )
-        : dependencies.pulledArtifactStore.deleteId(
+        : dependencies.localArtifactStore.deleteId(
             artifact.project,
             artifact.id,
           );
@@ -228,7 +228,7 @@ export async function pruneOrphanedAndUntaggedArtifacts(
 export async function pruneProjectArtifacts(
   project: string,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: {
@@ -238,11 +238,11 @@ export async function pruneProjectArtifacts(
 ): Promise<PruneResult> {
   const artifacts = await listProjectArtifacts(
     project,
-    dependencies.pulledArtifactStore,
+    dependencies.localArtifactStore,
   );
   const artifactsWithSizeSettlements = await Promise.allSettled(
     artifacts.map((artifact) =>
-      dependencies.pulledArtifactStore
+      dependencies.localArtifactStore
         .getIdSize(artifact.project, artifact.id)
         .then((size) => ({ ...artifact, size }))
         .catch((err) => {
@@ -295,15 +295,15 @@ export async function pruneProjectArtifacts(
   const deleteSettlements = await Promise.allSettled(
     artifactsWithSize.map((artifact) => {
       const promise = artifact.tag
-        ? dependencies.pulledArtifactStore
+        ? dependencies.localArtifactStore
             .deleteTag(artifact.project, artifact.tag)
             .then(() =>
-              dependencies.pulledArtifactStore.deleteId(
+              dependencies.localArtifactStore.deleteId(
                 artifact.project,
                 artifact.id,
               ),
             )
-        : dependencies.pulledArtifactStore.deleteId(
+        : dependencies.localArtifactStore.deleteId(
             artifact.project,
             artifact.id,
           );
@@ -354,7 +354,7 @@ export async function pruneProjectArtifacts(
 export async function pruneArtifact(
   artifactKey: ArtifactKey,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: {
@@ -383,7 +383,7 @@ async function pruneArtifactById(
   project: string,
   id: string,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: {
@@ -392,7 +392,7 @@ async function pruneArtifactById(
   },
 ): Promise<PruneResult> {
   const hasIdResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.hasId(project, id),
+    dependencies.localArtifactStore.hasId(project, id),
     {
       debug: opts.debug,
     },
@@ -408,7 +408,7 @@ async function pruneArtifactById(
     );
   }
   const sizeResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.getIdSize(project, id),
+    dependencies.localArtifactStore.getIdSize(project, id),
     {
       debug: opts.debug,
     },
@@ -436,7 +436,7 @@ async function pruneArtifactById(
   }
 
   const deleteResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.deleteId(project, id),
+    dependencies.localArtifactStore.deleteId(project, id),
     {
       debug: opts.debug,
     },
@@ -460,7 +460,7 @@ async function pruneArtifactByTag(
   project: string,
   tag: string,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: {
@@ -469,7 +469,7 @@ async function pruneArtifactByTag(
   },
 ): Promise<PruneResult> {
   const hasTagResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.hasTag(project, tag),
+    dependencies.localArtifactStore.hasTag(project, tag),
     {
       debug: opts.debug,
     },
@@ -485,7 +485,7 @@ async function pruneArtifactByTag(
     );
   }
   const idResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.retrieveArtifactId(project, tag),
+    dependencies.localArtifactStore.retrieveArtifactId(project, tag),
     {
       debug: opts.debug,
     },
@@ -503,7 +503,7 @@ async function pruneArtifactByTag(
   }
 
   const sizeResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.getIdSize(project, id),
+    dependencies.localArtifactStore.getIdSize(project, id),
     {
       debug: opts.debug,
     },
@@ -532,8 +532,8 @@ async function pruneArtifactByTag(
 
   const deleteResult = await toAsyncResult(
     Promise.all([
-      dependencies.pulledArtifactStore.deleteId(project, id),
-      dependencies.pulledArtifactStore.deleteTag(project, tag),
+      dependencies.localArtifactStore.deleteId(project, id),
+      dependencies.localArtifactStore.deleteTag(project, tag),
     ]),
     {
       debug: opts.debug,
@@ -556,7 +556,7 @@ async function pruneArtifactByTag(
 
 async function listProjectArtifacts(
   project: string,
-  store: PulledArtifactStore,
+  store: LocalArtifactStore,
 ): Promise<
   {
     project: string;

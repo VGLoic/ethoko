@@ -13,7 +13,7 @@ import { Dirent } from "fs";
 import { AbsolutePath } from "@/utils/path";
 
 /**
- * Store implementation for pulled artifacts on the local filesystem.
+ * Local Artifact Store: on-disk store for Ethoko artifacts.
  *
  * Methods favour use of ID instead of tag.
  *
@@ -22,7 +22,7 @@ import { AbsolutePath } from "@/utils/path";
  * - {project}/ids/{id}/outputs/{sourceName}/{contractName}.json
  * - {project}/tags/{tag}.json (manifest: { id })
  */
-export class PulledArtifactStore {
+export class LocalArtifactStore {
   public readonly rootPath: AbsolutePath;
 
   constructor(rootPath: AbsolutePath) {

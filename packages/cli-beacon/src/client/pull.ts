@@ -1,5 +1,5 @@
 import { DebugLogger } from "@/utils/debug-logger";
-import { PulledArtifactStore } from "../pulled-artifact-store";
+import { LocalArtifactStore } from "../local-artifact-store";
 import { StorageProvider } from "../storage-provider";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
@@ -16,16 +16,16 @@ export type PullResult = {
 
 /**
  * Pull artifacts for a given project, it consists of four steps:
- * 1. Set up the pulled artifact store for the project
+ * 1. Set up the Local Artifact Store for the project
  * 2. Fetch the list of remote tags and IDs from the storage provider, and filter them based on the provided tagOrId parameter
- * 3. Check which of the filtered tags and IDs are already present in the pulled artifact store, unless the force option is enabled
- * 4. Download the missing artifacts from the storage provider and save them to the pulled artifact store
+ * 3. Check which of the filtered tags and IDs are already present in the Local Artifact Store, unless the force option is enabled
+ * 4. Download the missing artifacts from the storage provider and save them to the Local Artifact Store
  *
  * The method returns an object containing the list of remote tags and IDs, the list of successfully pulled tags and IDs, and the list of tags and IDs that failed to be pulled.
- * @throws CliError if there is an error setting up the pulled artifact store, fetching the remote artifacts, checking the pulled artifact store, or downloading the artifacts. The error messages are meant to be user-friendly and can be directly shown to the user.
+ * @throws CliError if there is an error setting up the Local Artifact Store, fetching the remote artifacts, checking the Local Artifact Store, or downloading the artifacts. The error messages are meant to be user-friendly and can be directly shown to the user.
  * @param project The project to pull artifacts for
  * @param dependencies.storageProvider The storage provider used to access remote artifacts
- * @param dependencies.pulledArtifactStore The pulled artifact store used to persist pulled artifacts
+ * @param dependencies.localArtifactStore The Local Artifact Store used to persist pulled artifacts
  * @param dependencies.logger The DebugLogger instance to use for debug logging during the pull process
  * @param opts Options for the pull command
  * @param opts.force Force the pull to skip checking existing pulled artifacts
@@ -36,24 +36,24 @@ export async function pullProject(
   project: string,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { force: boolean; debug: boolean },
 ): Promise<PullResult> {
-  // Step 1: Set up pulled artifact store
+  // Step 1: Set up Local Artifact Store
   const ensureResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureProjectSetup(project),
+    dependencies.localArtifactStore.ensureProjectSetup(project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
   if (opts.debug) {
     dependencies.logger.debug(
-      `Pulled artifact store set up at ${dependencies.pulledArtifactStore.rootPath}`,
+      `Pulled artifact store set up at ${dependencies.localArtifactStore.rootPath}`,
     );
   }
 
@@ -85,7 +85,7 @@ export async function pullProject(
     dependencies.logger.debug(`IDs to download: ${idsToDownload.join(", ")}`);
   }
 
-  // Step 3: Check pulled artifact store
+  // Step 3: Check Local Artifact Store
   let filteredTagsToDownload: string[] = [];
   let filteredIdsToDownload: string[] = [];
   if (opts.force) {
@@ -94,13 +94,13 @@ export async function pullProject(
   } else {
     const localListingResult = await toAsyncResult(
       Promise.all([
-        dependencies.pulledArtifactStore
+        dependencies.localArtifactStore
           .listTags(project)
           .then(
             (tagMetadatas) =>
               new Set(tagMetadatas.map((metadata) => metadata.tag)),
           ),
-        dependencies.pulledArtifactStore
+        dependencies.localArtifactStore
           .listIds(project)
           .then(
             (idMetadatas) =>
@@ -166,7 +166,7 @@ export async function pullProject(
       }
 
       const createResult = await toAsyncResult(
-        dependencies.pulledArtifactStore.createArtifact(
+        dependencies.localArtifactStore.createArtifact(
           project,
           downloadResult.value.id,
           tag,
@@ -237,7 +237,7 @@ export async function pullProject(
       }
 
       const createResult = await toAsyncResult(
-        dependencies.pulledArtifactStore.createArtifact(project, id, null, {
+        dependencies.localArtifactStore.createArtifact(project, id, null, {
           input: downloadResult.value.input,
           outputs: downloadResult.value.contractOutputArtifacts,
         }),
@@ -298,10 +298,10 @@ export async function pullProject(
 
 /**
  * Pull a specific artifact by tag or ID, it consists of the same four steps as pullProject but without the need to fetch and filter the list of remote artifacts, since we already know which artifact we want to pull. The method returns an object containing the list of remote tags and IDs (which will contain only the pulled artifact), the list of successfully pulled tags and IDs, and the list of tags and IDs that failed to be pulled.
- * @throws CliError if there is an error setting up the pulled artifact store, checking the pulled artifact store, verifying the existence of the artifact remotely, or downloading the artifact. The error messages are meant to be user-friendly and can be directly shown to the user.
+ * @throws CliError if there is an error setting up the Local Artifact Store, checking the Local Artifact Store, verifying the existence of the artifact remotely, or downloading the artifact. The error messages are meant to be user-friendly and can be directly shown to the user.
  * @param artifactKey The key of the artifact to pull, which should specify the project and either a tag or an ID
  * @param dependencies.storageProvider The storage provider used to access remote artifacts
- * @param dependencies.pulledArtifactStore The store used to manage pulled artifacts locally
+ * @param dependencies.localArtifactStore The store used to manage pulled artifacts locally
  * @param dependencies.logger The DebugLogger instance to use for debug logging during the pull process
  * @param opts Options for the pull command
  * @param opts.force Force the pull to skip checking existing pulled artifacts
@@ -312,7 +312,7 @@ export async function pullArtifact(
   artifactKey: ArtifactKey,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { force: boolean; debug: boolean },
@@ -321,19 +321,19 @@ export async function pullArtifact(
   id: string;
   pulled: boolean;
 }> {
-  // Step 1: Set up pulled artifact store
+  // Step 1: Set up Local Artifact Store
   const ensureResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    dependencies.localArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
   if (opts.debug) {
     dependencies.logger.debug(
-      `Pulled artifact store set up at ${dependencies.pulledArtifactStore.rootPath}`,
+      `Pulled artifact store set up at ${dependencies.localArtifactStore.rootPath}`,
     );
   }
 
@@ -363,14 +363,14 @@ async function pullArtifactById(
   id: string,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { force: boolean; debug: boolean },
 ): Promise<{ tag: null; id: string; pulled: boolean }> {
   // Check if already pulled
   const hasAlreadyPulledResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.hasId(project, id),
+    dependencies.localArtifactStore.hasId(project, id),
     { debug: opts.debug },
   );
   if (!hasAlreadyPulledResult.success) {
@@ -429,7 +429,7 @@ async function pullArtifactById(
   }
 
   const createResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.createArtifact(project, id, null, {
+    dependencies.localArtifactStore.createArtifact(project, id, null, {
       input: downloadResult.value.input,
       outputs: downloadResult.value.contractOutputArtifacts,
     }),
@@ -458,14 +458,14 @@ async function pullArtifactByTag(
   tag: string,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { force: boolean; debug: boolean },
 ): Promise<{ tag: string; id: string; pulled: boolean }> {
   // Check if already pulled
   const hasAlreadyPulledResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.hasTag(project, tag),
+    dependencies.localArtifactStore.hasTag(project, tag),
     { debug: opts.debug },
   );
   if (!hasAlreadyPulledResult.success) {
@@ -484,7 +484,7 @@ async function pullArtifactByTag(
   // If already pulled and not force, skip
   if (hasAlreadyPulledResult.value && !opts.force) {
     const artifactIdResult = await toAsyncResult(
-      dependencies.pulledArtifactStore.retrieveArtifactId(project, tag),
+      dependencies.localArtifactStore.retrieveArtifactId(project, tag),
       { debug: opts.debug },
     );
     if (artifactIdResult.success) {
@@ -541,7 +541,7 @@ async function pullArtifactByTag(
   }
 
   const createResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.createArtifact(
+    dependencies.localArtifactStore.createArtifact(
       project,
       downloadResult.value.id,
       tag,

@@ -3,7 +3,7 @@ import fs from "fs/promises";
 // The ideal would be to work only with the path but it does not work right now with tsup (and NPM package) AND Bun (and binaries)
 // There is a plan to migrate everything to Bun in the future, and rely on Bun's file loading capabilities, but in the meantime we need to support both environments
 import typingsTemplate from "../../templates/typings.txt";
-import { PulledArtifactStore } from "../pulled-artifact-store";
+import { LocalArtifactStore } from "../local-artifact-store";
 import { toAsyncResult } from "../utils/result";
 import { CliError } from "./error";
 import { AbsolutePath } from "@/utils/path";
@@ -43,28 +43,28 @@ import { DebugLogger } from "@/utils/debug-logger";
  * ```
  *
  * The function consists of the following steps:
- * 1. Set up the pulled artifact store and the typings folder
- * 2. Read the projects, tags and contracts from the pulled artifact store and generate a summary object
+ * 1. Set up the Local Artifact Store and the typings folder
+ * 2. Read the projects, tags and contracts from the Local Artifact Store and generate a summary object
  * 3. If no projects are found, generate empty summaries and typings files.
  *    Otherwise, generate the content of the `summary-exports.ts` file and write all the typings files to the typings folder.
  *
- * @throws CliError if there is an error while reading pulled artifact store or writing typings files.
+ * @throws CliError if there is an error while reading Local Artifact Store or writing typings files.
  */
 export async function generateAllPulledArtifactsTypings(
   ethokoTypingsPath: AbsolutePath,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { debug: boolean },
 ): Promise<void> {
-  const ensurePulledArtifactStoreResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureSetup(),
+  const ensureLocalArtifactStoreResult = await toAsyncResult(
+    dependencies.localArtifactStore.ensureSetup(),
     { debug: opts.debug },
   );
-  if (!ensurePulledArtifactStoreResult.success) {
+  if (!ensureLocalArtifactStoreResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -90,7 +90,7 @@ export async function generateAllPulledArtifactsTypings(
   }
 
   const projectsResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.listProjects(),
+    dependencies.localArtifactStore.listProjects(),
     {
       debug: opts.debug,
     },
@@ -109,7 +109,7 @@ export async function generateAllPulledArtifactsTypings(
   if (projects.length === 0) {
     const emptySummariesResult = await toAsyncResult(
       writeEmptySummaries(
-        dependencies.pulledArtifactStore.rootPath,
+        dependencies.localArtifactStore.rootPath,
         ethokoTypingsPath,
       ),
       { debug: opts.debug },
@@ -140,7 +140,7 @@ export async function generateAllPulledArtifactsTypings(
 
   for (const project of projects) {
     const projectSummaryResult = await toAsyncResult(
-      retrieveProjectSummary(project, dependencies.pulledArtifactStore),
+      retrieveProjectSummary(project, dependencies.localArtifactStore),
       { debug: opts.debug },
     );
     if (!projectSummaryResult.success) {
@@ -165,7 +165,7 @@ export async function generateAllPulledArtifactsTypings(
   const generatedSummaryResult = await toAsyncResult(
     writeGeneratedSummaries(
       summary,
-      dependencies.pulledArtifactStore.rootPath,
+      dependencies.localArtifactStore.rootPath,
       ethokoTypingsPath,
     ),
     { debug: opts.debug },
@@ -201,18 +201,18 @@ export async function generateProjectTypings(
   ethokoTypingsPath: AbsolutePath,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { debug: boolean },
 ): Promise<void> {
-  const ensurePulledArtifactStoreResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureSetup(),
+  const ensureLocalArtifactStoreResult = await toAsyncResult(
+    dependencies.localArtifactStore.ensureSetup(),
     { debug: opts.debug },
   );
-  if (!ensurePulledArtifactStoreResult.success) {
+  if (!ensureLocalArtifactStoreResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -238,7 +238,7 @@ export async function generateProjectTypings(
   }
 
   const projectSummaryResult = await toAsyncResult(
-    retrieveProjectSummary(project, dependencies.pulledArtifactStore),
+    retrieveProjectSummary(project, dependencies.localArtifactStore),
     { debug: opts.debug },
   );
   if (!projectSummaryResult.success) {
@@ -260,7 +260,7 @@ export async function generateProjectTypings(
           contractsPerTag: projectSummaryResult.value.contractsPerTag,
         },
       },
-      dependencies.pulledArtifactStore.rootPath,
+      dependencies.localArtifactStore.rootPath,
       ethokoTypingsPath,
     ),
     { debug: opts.debug },
@@ -300,18 +300,18 @@ export async function generateTagTypings(
   ethokoTypingsPath: AbsolutePath,
   dependencies: {
     storageProvider: StorageProvider;
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { debug: boolean },
 ): Promise<void> {
-  const ensurePulledArtifactStoreResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureSetup(),
+  const ensureLocalArtifactStoreResult = await toAsyncResult(
+    dependencies.localArtifactStore.ensureSetup(),
     { debug: opts.debug },
   );
-  if (!ensurePulledArtifactStoreResult.success) {
+  if (!ensureLocalArtifactStoreResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -337,7 +337,7 @@ export async function generateTagTypings(
   }
 
   const projectSummaryResult = await toAsyncResult(
-    retrieveProjectSummary(project, dependencies.pulledArtifactStore),
+    retrieveProjectSummary(project, dependencies.localArtifactStore),
     { debug: opts.debug },
   );
   if (!projectSummaryResult.success) {
@@ -387,7 +387,7 @@ export async function generateTagTypings(
           contractsPerTag: filteredContractsPerTag,
         },
       },
-      dependencies.pulledArtifactStore.rootPath,
+      dependencies.localArtifactStore.rootPath,
       ethokoTypingsPath,
     ),
     { debug: opts.debug },
@@ -423,19 +423,19 @@ export async function generateTagTypings(
 
 async function retrieveProjectSummary(
   project: string,
-  pulledArtifactStore: PulledArtifactStore,
+  localArtifactStore: LocalArtifactStore,
 ): Promise<{
   tagsPerContract: Record<string, string[]>;
   contractsPerTag: Record<string, string[]>;
   abisPerContractPerTag: Record<string, Record<string, unknown[]>>;
 }> {
-  const tags = await pulledArtifactStore.listTags(project);
+  const tags = await localArtifactStore.listTags(project);
 
   const tagsPerContract: Record<string, string[]> = {};
   const contractsPerTag: Record<string, string[]> = {};
   const abisPerContractPerTag: Record<string, Record<string, unknown[]>> = {};
   for (const { tag } of tags) {
-    const abis = await retrieveTagAbis(project, tag, pulledArtifactStore);
+    const abis = await retrieveTagAbis(project, tag, localArtifactStore);
     for (const [contractKey, abi] of Object.entries(abis.abis)) {
       if (!contractsPerTag[tag]) {
         contractsPerTag[tag] = [];
@@ -462,13 +462,13 @@ async function retrieveProjectSummary(
 async function retrieveTagAbis(
   project: string,
   tag: string,
-  pulledArtifactStore: PulledArtifactStore,
+  localArtifactStore: LocalArtifactStore,
 ): Promise<{
   abis: Record<string, unknown[]>;
 }> {
-  const artifactId = await pulledArtifactStore.retrieveArtifactId(project, tag);
+  const artifactId = await localArtifactStore.retrieveArtifactId(project, tag);
 
-  const contractArtifacts = pulledArtifactStore.listContractArtifacts(
+  const contractArtifacts = localArtifactStore.listContractArtifacts(
     project,
     artifactId,
   );
@@ -476,7 +476,7 @@ async function retrieveTagAbis(
   const abis: Record<string, unknown[]> = {};
 
   for (const { sourceName, contractName } of await contractArtifacts) {
-    const artifact = await pulledArtifactStore.retrieveContractOutputArtifact(
+    const artifact = await localArtifactStore.retrieveContractOutputArtifact(
       project,
       artifactId,
       sourceName,
@@ -491,7 +491,7 @@ async function retrieveTagAbis(
 
 export async function generateEmptyTypings(
   ethokoTypingsPath: AbsolutePath,
-  pulledArtifactStore: PulledArtifactStore,
+  localArtifactStore: LocalArtifactStore,
   opts: { debug: boolean },
 ): Promise<void> {
   const typingsFolderStatResult = await toAsyncResult(
@@ -511,7 +511,7 @@ export async function generateEmptyTypings(
   }
 
   const emptySummariesResult = await toAsyncResult(
-    writeEmptySummaries(pulledArtifactStore.rootPath, ethokoTypingsPath),
+    writeEmptySummaries(localArtifactStore.rootPath, ethokoTypingsPath),
     { debug: opts.debug },
   );
   if (!emptySummariesResult.success) {

@@ -142,7 +142,7 @@ describe("Project configuration validation", () => {
       {
         name: "dummy",
         typingsPath: "path/to/typings",
-        pulledArtifactsPath: "path/to/artifacts",
+        localArtifactStorePath: "path/to/artifacts",
         storage: { type: "filesystem", path: "path/to/storage" },
       },
     ],

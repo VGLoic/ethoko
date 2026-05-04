@@ -15,17 +15,17 @@ export function getEthokoGlobalConfigPath(): AbsolutePath {
 
 const GlobalEthokoConfigSchema = z
   .object({
-    pulledArtifactsPath: z
-      .string('"pulledArtifactsPath" field must be a string or left empty')
+    localArtifactStorePath: z
+      .string('"localArtifactStorePath" field must be a string or left empty')
       .min(
         1,
-        '"pulledArtifactsPath" cannot be an empty string. Provide a valid relative path to "~/.ethoko" or leave it empty to use the default path.',
+        '"localArtifactStorePath" cannot be an empty string. Provide a valid relative path to "~/.ethoko" or leave it empty to use the default path.',
       )
       .refine(
         (value) => value !== "config.json",
-        '"pulledArtifactsPath" cannot be equal to "config.json". Please choose a different name for the pulled artifacts directory.',
+        '"localArtifactStorePath" cannot be equal to "config.json". Please choose a different name for the local artifact store directory.',
       )
-      .default("pulled-artifacts")
+      .default("local-artifact-store")
       .pipe(generateAbsolutePathSchema(getEthokoGlobalPath)),
     projects: z
       .array(
@@ -48,25 +48,25 @@ const GlobalEthokoConfigSchema = z
       }),
   })
   .superRefine((data, ctx) => {
-    // Pulled artifacts path must not be a child relationship with any of the project paths
+    // Local artifact store path must not be a child relationship with any of the project paths
     for (const project of data.projects) {
       if (project.storage.type === "filesystem") {
-        if (data.pulledArtifactsPath.eq(project.storage.path)) {
+        if (data.localArtifactStorePath.eq(project.storage.path)) {
           ctx.addIssue({
             code: "custom",
-            message: `Pulled artifacts path "${data.pulledArtifactsPath.resolvedPath}" cannot be the same as project "${project.name}" storage path "${project.storage.path.resolvedPath}". Please choose a different pulled artifacts path or storage path.`,
+            message: `Local artifact store path "${data.localArtifactStorePath.resolvedPath}" cannot be the same as project "${project.name}" storage path "${project.storage.path.resolvedPath}". Please choose a different local artifact store path or storage path.`,
           });
         }
-        if (data.pulledArtifactsPath.isChildOf(project.storage.path)) {
+        if (data.localArtifactStorePath.isChildOf(project.storage.path)) {
           ctx.addIssue({
             code: "custom",
-            message: `Pulled artifacts path "${data.pulledArtifactsPath.resolvedPath}" cannot be a parent of project "${project.name}" storage path "${project.storage.path.resolvedPath}". Please choose a different pulled artifacts path or storage path.`,
+            message: `Local artifact store path "${data.localArtifactStorePath.resolvedPath}" cannot be a parent of project "${project.name}" storage path "${project.storage.path.resolvedPath}". Please choose a different local artifact store path or storage path.`,
           });
         }
-        if (project.storage.path.isChildOf(data.pulledArtifactsPath)) {
+        if (project.storage.path.isChildOf(data.localArtifactStorePath)) {
           ctx.addIssue({
             code: "custom",
-            message: `Pulled artifacts path "${data.pulledArtifactsPath.resolvedPath}" cannot be a child of project "${project.name}" storage path "${project.storage.path.resolvedPath}". Please choose a different pulled artifacts path or storage path.`,
+            message: `Local artifact store path "${data.localArtifactStorePath.resolvedPath}" cannot be a child of project "${project.name}" storage path "${project.storage.path.resolvedPath}". Please choose a different local artifact store path or storage path.`,
           });
         }
       }

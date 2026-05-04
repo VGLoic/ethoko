@@ -6,7 +6,7 @@ Vocabulary specific to `@ethoko/cli-beacon` — the standalone Ethoko CLI. Share
 
 ### Local Artifact Store
 
-The on-disk store of artifacts the user has brought into their machine. Located at `pulledArtifactsPath` (default `~/.ethoko/pulled-artifacts`). Populated by `pull`; consumed by `typings`, `restore`, `inspect`, `diff`. Acts as a cache for pulled artifacts and as the source of truth for commands that derive from local state.
+The on-disk store of artifacts the user has brought into their machine. Located at `localArtifactStorePath` (default `~/.ethoko/local-artifact-store`). Populated by `pull`; consumed by `typings`, `restore`, `inspect`, `diff`. Acts as a cache for pulled artifacts and as the source of truth for commands that derive from local state.
 _Avoid_: "pulled artifact store" (too narrow — commands beyond `pull` use it), "cache" alone (it's authoritative for derived operations like typings).
 
 ### Local Config

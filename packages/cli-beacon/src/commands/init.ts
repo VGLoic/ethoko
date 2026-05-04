@@ -61,9 +61,9 @@ type ProjectConfigInput = NonNullable<
  *  4.A. If detected, suggest default compilation output path (./artifacts for Hardhat, ./out for Foundry) and ask user to confirm or input another path, go to step 5
  *  4.B. If not detected, go to step 5
  * 5. Check if .git directory exists,
- *  5.A. If it exists and `.gitignore` exists, add the typings path to .gitignore if not already present. If the pulled artifacts path is local (relative path), add it to .gitignore if not already present. Inform the user about the changes made to .gitignore.
- *  5.B. If it exists and `.gitignore` does not exist, create a .gitignore file with the typings path and, if applicable, the pulled artifacts path. Inform the user about the creation of .gitignore.
- *  5.C. If it does not exist, skip .gitignore handling and inform the user that they should manually ignore the typings path and pulled artifacts path if they are local.
+ *  5.A. If it exists and `.gitignore` exists, add the typings path to .gitignore if not already present. If the local artifact store path is local (relative path), add it to .gitignore if not already present. Inform the user about the changes made to .gitignore.
+ *  5.B. If it exists and `.gitignore` does not exist, create a .gitignore file with the typings path and, if applicable, the local artifact store path. Inform the user about the creation of .gitignore.
+ *  5.C. If it does not exist, skip .gitignore handling and inform the user that they should manually ignore the typings path and local artifact store path if they are local.
  * 6. Show summary of the changed configuration and inform user where the config files are located, next steps, and how to edit the config file to add more projects or customize further.
  */
 async function runInit(
@@ -141,7 +141,7 @@ async function runInit(
     logger,
     new AbsolutePath(process.cwd()),
     config.typingsPath,
-    config.pulledArtifactsPath,
+    config.localArtifactStorePath,
   );
 
   const outroLines: string[] = [
@@ -992,13 +992,13 @@ async function deriveCompilationOutputPathsOptions(): Promise<
  * @param logger Command logger instance
  * @param cwd Current working directory
  * @param typingsPath Path to the generated TypeScript typings (always added to .gitignore)
- * @param pulledArtifactsPath Path to pulled artifacts store (added only if relative)
+ * @param localArtifactStorePath Path to local artifact store (added only if relative)
  */
 async function handleGitignore(
   logger: CommandLogger,
   cwd: AbsolutePath,
   typingsPath: AbsolutePath,
-  pulledArtifactsPath: AbsolutePath | undefined,
+  localArtifactStorePath: AbsolutePath | undefined,
 ): Promise<void> {
   const isInAGitRepo = await isInGitRepository(cwd);
   if (!isInAGitRepo) {
@@ -1013,10 +1013,10 @@ async function handleGitignore(
       label: "TypeScript typings path",
     });
   }
-  if (pulledArtifactsPath && pulledArtifactsPath.isChildOf(cwd)) {
+  if (localArtifactStorePath && localArtifactStorePath.isChildOf(cwd)) {
     pathsToAdd.push({
-      path: pulledArtifactsPath.relativeTo(cwd).relativePath,
-      label: "pulled artifacts path",
+      path: localArtifactStorePath.relativeTo(cwd).relativePath,
+      label: "local artifact store path",
     });
   }
 

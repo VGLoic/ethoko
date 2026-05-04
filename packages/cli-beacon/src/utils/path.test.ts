@@ -85,7 +85,7 @@ describe("absolute path utils", () => {
   });
 });
 // typingsPath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/',
-//   pulledArtifactsPath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/typings',
+//   localArtifactStorePath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/typings',
 
 describe("relative path utils", () => {
   const VALID_RELATIVE_PATHS = [

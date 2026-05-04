@@ -29,35 +29,35 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
   const invalidCases = [
     // Without projects considerations
     [
-      "Typings path and pulled artifacts path are equal",
+      "Typings path and local artifact store path are equal",
       {
         typingsPath: "path/to/typings",
-        pulledArtifactsPath: "path/to/typings",
+        localArtifactStorePath: "path/to/typings",
       },
-      /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
+      /"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship/,
     ],
     [
-      "Typings path parent of pulled artifacts path",
+      "Typings path parent of local artifact store path",
       {
         typingsPath: "path/to/",
-        pulledArtifactsPath: "path/to/typings",
+        localArtifactStorePath: "path/to/typings",
       },
-      /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
+      /"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship/,
     ],
     [
-      "Typings path child of pulled artifacts path",
+      "Typings path child of local artifact store path",
       {
         typingsPath: "path/to/typings",
-        pulledArtifactsPath: "path/to/",
+        localArtifactStorePath: "path/to/",
       },
-      /"typingsPath" and "pulledArtifactsPath" cannot be in a parent-child relationship/,
+      /"typingsPath" and "localArtifactStorePath" cannot be in a parent-child relationship/,
     ],
     [
-      "Pulled artifacts path empty",
+      "Local artifact store path empty",
       {
-        pulledArtifactsPath: "",
+        localArtifactStorePath: "",
       },
-      /'pulledArtifactsPath' cannot be an empty string/,
+      /'localArtifactStorePath' cannot be an empty string/,
     ],
     [
       "Typings path empty",
@@ -113,11 +113,11 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
       },
       /For project "dummy", the "storage.path" cannot be a child or parent of "typingsPath"./,
     ],
-    // Storage path is a child of pulled artifacts path
+    // Storage path is a child of local artifact store path
     [
-      "Storage path is a child of pulled artifacts path",
+      "Storage path is a child of local artifact store path",
       {
-        pulledArtifactsPath: "path/to/artifacts",
+        localArtifactStorePath: "path/to/artifacts",
         projects: [
           {
             name: "dummy",
@@ -125,13 +125,13 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
           },
         ],
       },
-      /For project "dummy", the "storage.path" cannot be a child or parent of "pulledArtifactsPath"./,
+      /For project "dummy", the "storage.path" cannot be a child or parent of "localArtifactStorePath"./,
     ],
-    // Storage path is a parent of pulled artifacts path
+    // Storage path is a parent of local artifact store path
     [
-      "Storage path is a parent of pulled artifacts path",
+      "Storage path is a parent of local artifact store path",
       {
-        pulledArtifactsPath: "path/to/artifacts",
+        localArtifactStorePath: "path/to/artifacts",
         projects: [
           {
             name: "dummy",
@@ -139,7 +139,7 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
           },
         ],
       },
-      /For project "dummy", the "storage.path" cannot be a child or parent of "pulledArtifactsPath"./,
+      /For project "dummy", the "storage.path" cannot be a child or parent of "localArtifactStorePath"./,
     ],
   ] as const;
 
@@ -181,7 +181,7 @@ describe('"loadLocalConfig" must parse accordingly to rules', () => {
           {
             name: "dummy",
             typingsPath: "path/to/typings",
-            pulledArtifactsPath: "path/to/artifacts",
+            localArtifactStorePath: "path/to/artifacts",
             storage: { type: "filesystem", path: "path/to/storage" },
           },
         ],

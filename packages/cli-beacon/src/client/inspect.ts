@@ -1,4 +1,4 @@
-import { PulledArtifactStore } from "../pulled-artifact-store";
+import { LocalArtifactStore } from "../local-artifact-store";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import type { EthokoInputArtifact } from "@/ethoko-artifacts/v0";
@@ -42,28 +42,28 @@ export type InspectResult = {
 export async function inspectArtifact(
   artifactKey: ResolvedArtifactKey,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { debug: boolean },
 ): Promise<InspectResult> {
   const ensureResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureProjectSetup(artifactKey.project),
+    dependencies.localArtifactStore.ensureProjectSetup(artifactKey.project),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
   const artifactsResult = await toAsyncResult(
     Promise.all([
-      dependencies.pulledArtifactStore.retrieveInputArtifact(
+      dependencies.localArtifactStore.retrieveInputArtifact(
         artifactKey.project,
         artifactKey.id,
       ),
-      dependencies.pulledArtifactStore.listContractArtifacts(
+      dependencies.localArtifactStore.listContractArtifacts(
         artifactKey.project,
         artifactKey.id,
       ),
@@ -72,7 +72,7 @@ export async function inspectArtifact(
   );
   if (!artifactsResult.success) {
     throw new CliError(
-      "Unable to retrieve the artifact content from the pulled artifact store, please ensure it exists locally. Run with debug mode for more info",
+      "Unable to retrieve the artifact content from the Local Artifact Store, please ensure it exists locally. Run with debug mode for more info",
     );
   }
   const [inputArtifact, contractList] = artifactsResult.value;

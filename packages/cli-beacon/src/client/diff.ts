@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 import { toAsyncResult, toResult } from "@/utils/result";
 import { ResolvedArtifactKey } from "@/utils/artifact-key";
 import { EthokoContractOutputArtifact } from "@/ethoko-artifacts/v0";
@@ -95,20 +95,20 @@ export async function generateDiffWithTargetRelease(
     outputContractArtifacts: EthokoContractOutputArtifact[];
   },
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     logger: DebugLogger;
   },
   opts: { debug: boolean },
 ): Promise<Difference[]> {
   const ensureResult = await toAsyncResult(
-    dependencies.pulledArtifactStore.ensureProjectSetup(
+    dependencies.localArtifactStore.ensureProjectSetup(
       targetArtifactKey.project,
     ),
     { debug: opts.debug },
   );
   if (!ensureResult.success) {
     throw new CliError(
-      "Error setting up pulled artifact store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
+      "Error setting up Local Artifact Store, is the script not allowed to write to the filesystem? Run with debug mode for more info",
     );
   }
 
@@ -128,12 +128,12 @@ export async function generateDiffWithTargetRelease(
   }
 
   const targetContractsResult = await toAsyncResult(
-    dependencies.pulledArtifactStore
+    dependencies.localArtifactStore
       .listContractArtifacts(targetArtifactKey.project, targetArtifactKey.id)
       .then((commonContracts) =>
         Promise.all(
           commonContracts.map((c) =>
-            dependencies.pulledArtifactStore.retrieveContractOutputArtifact(
+            dependencies.localArtifactStore.retrieveContractOutputArtifact(
               targetArtifactKey.project,
               targetArtifactKey.id,
               c.sourceName,

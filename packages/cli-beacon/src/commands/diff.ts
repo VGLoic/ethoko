@@ -11,7 +11,7 @@ import {
   mapCandidateArtifactToEthokoArtifact,
   pullArtifact,
 } from "@/client";
-import { PulledArtifactStore } from "@/pulled-artifact-store";
+import { LocalArtifactStore } from "@/local-artifact-store";
 
 import type { EthokoCliConfig } from "../config";
 import { toAsyncResult } from "@/utils/result.js";
@@ -136,8 +136,8 @@ export function registerDiffCommand(
         artifactKeyParsingResult.data,
         {
           logger,
-          pulledArtifactStore: new PulledArtifactStore(
-            config.pulledArtifactsPath,
+          localArtifactStore: new LocalArtifactStore(
+            config.localArtifactStorePath,
           ),
           storageProvider: createStorageProvider(
             projectConfig.storage,
@@ -166,7 +166,7 @@ async function runDiffCommand(
   artifactPath: AbsolutePath,
   artifactKey: ArtifactKey,
   dependencies: {
-    pulledArtifactStore: PulledArtifactStore;
+    localArtifactStore: LocalArtifactStore;
     storageProvider: StorageProvider;
     logger: CommandLogger;
   },
@@ -191,7 +191,7 @@ async function runDiffCommand(
 
   let resolvedArtifactKey = await resolvePulledArtifact(
     artifactKey,
-    dependencies.pulledArtifactStore,
+    dependencies.localArtifactStore,
     { debug: opts.debug },
   );
   if (!resolvedArtifactKey) {
@@ -205,7 +205,7 @@ async function runDiffCommand(
       artifactKey,
       {
         storageProvider: dependencies.storageProvider,
-        pulledArtifactStore: dependencies.pulledArtifactStore,
+        localArtifactStore: dependencies.localArtifactStore,
         logger: dependencies.logger.toDebugLogger(),
       },
       {
@@ -228,7 +228,7 @@ async function runDiffCommand(
     resolvedArtifactKey,
     candidateArtifact,
     {
-      pulledArtifactStore: dependencies.pulledArtifactStore,
+      localArtifactStore: dependencies.localArtifactStore,
       logger: dependencies.logger.toDebugLogger(),
     },
     { debug: opts.debug },
