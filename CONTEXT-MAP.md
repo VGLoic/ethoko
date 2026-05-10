@@ -15,8 +15,24 @@ These terms appear in both contexts and at user-facing surfaces (CLI, README, fu
 
 ### Project
 
-A named namespace within a **Storage Backend** that groups related compilation artifacts. Identified by a name; carries one storage configuration. Users address its artifacts via the **Artifact Reference** syntax.
-_Avoid_: "repository" (overloaded with git/Docker), "namespace" (too generic), "warehouse" (Ethoko itself is the warehouse).
+A named container within a **Storage Backend** that groups related compilation artifacts. Identified by a name; carries one storage configuration. Users address its artifacts via the **Artifact Reference** syntax.
+
+On filesystem and AWS backends, Project names are flat and configured locally — multi-tenancy is implicit in the filesystem path or bucket. On **Ethoko Central**, each Project lives within a **Namespace** and carries a **Visibility** (public or private).
+_Avoid_: "repository" (overloaded with git/Docker), "warehouse" (Ethoko itself is the warehouse).
+
+### Namespace
+
+The owner-prefix of a **Project** on **Ethoko Central** (e.g. the `vincent` in `vincent/my-contracts`). For v1, every Namespace corresponds to exactly one **User** and is identical to that User's handle. Filesystem and AWS backends have no Namespace — Projects are flat-named in local config.
+_Avoid_: "scope" (npm's word, conflicts with the storage-scoping language already used in code), "owner" (keep that for the human role).
+
+### Visibility
+
+Per-Project property on **Ethoko Central**: `public` (anyone, including unauthenticated CLI clients, can read artifacts) or `private` (only authorized clients can read or write). Set at Project creation; the Project owner may change it. Filesystem and AWS backends have no Visibility — access is governed by filesystem permissions or IAM.
+
+### User
+
+A person with an account on **Ethoko Central**. Identified by a unique, **immutable** handle that doubles as their **Namespace** (e.g. `vincent`). May authenticate via email + password, a linked GitHub account, or both — multiple auth methods can be attached to the same User, but only by adding them from an authenticated session. Sign-in flows never silently merge accounts. The "User" concept does not apply to filesystem or AWS storage backends.
+_Avoid_: "account" (overloaded — could mean billing, GitHub, AWS), "developer" (a role, not an identity).
 
 ### Compilation Artifact
 
@@ -63,6 +79,8 @@ The user-visible addressing syntax for artifacts:
 | `my-project` | The Project itself (no specific artifact) |
 | `my-project:v1.2.3` | The Ethoko Artifact tagged `v1.2.3` in `my-project` |
 | `my-project@b5e41181986a` | The Ethoko Artifact with that ID in `my-project` |
+
+On **Ethoko Central**, references are prefixed with a **Namespace** — `vincent/my-project`, `vincent/my-project:v1.2.3`, `vincent/my-project@b5e41181986a`. For filesystem and AWS backends, the namespace is implicit (in the bucket name or filesystem path) and is not part of the reference.
 
 ### Origin
 
