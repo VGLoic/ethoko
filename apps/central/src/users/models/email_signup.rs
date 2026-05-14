@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -8,6 +9,14 @@ use crate::{
     },
     users::password_hasher,
 };
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignupEmailBody {
+    pub email: String,
+    pub handle: String,
+    pub password: String,
+}
 
 pub struct EmailSignupRequest {
     pub email: Email,
@@ -31,10 +40,10 @@ impl EmailSignupRequest {
     /// Creates a new `EmailSignupRequest` after validating the formats and hashing the password.
     ///
     /// # Errors
-    /// `EmailSgnupRequestError::InvalidEmail` if the email format is invalid.
-    /// `EmailSgnupRequestError::InvalidHandle` if the handle format is invalid
-    /// `EmailSgnupRequestError::InvalidPassword` if the password format is invalid
-    /// `EmailSgnupRequestError::Unknown` for any other errors that may occur during the process.
+    /// `EmailSignupRequestError::InvalidEmail` if the email format is invalid.
+    /// `EmailSignupRequestError::InvalidHandle` if the handle format is invalid
+    /// `EmailSignupRequestError::InvalidPassword` if the password format is invalid
+    /// `EmailSignupRequestError::Unknown` for any other errors that may occur during the process.
     pub fn new(
         email: String,
         handle: String,

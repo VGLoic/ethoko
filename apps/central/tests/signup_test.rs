@@ -1,7 +1,8 @@
 use axum::http::StatusCode;
 use ethoko_central::{
     newtypes::{email::Email, handle::Handle, password::Password},
-    users::handlers::email_signup::SignupEmailBody,
+    users::models::email_signup::SignupEmailBody,
+    users::models::users_response,
 };
 mod common;
 use common::{default_test_config, setup_instance};
@@ -28,8 +29,10 @@ async fn test_signup() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::CREATED)
-    // REMIMD ME: complete with checking the response body for the created user details
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let response_body: users_response::UserResponse = response.json().await.unwrap();
+    assert_eq!(response_body.email, email);
+    assert_eq!(response_body.handle, handle);
 }
 
 #[tokio::test]

@@ -40,6 +40,7 @@ pub fn hash_password(password: &Password) -> Result<String, anyhow::Error> {
         .map(|v| v.to_string())
 }
 
+#[allow(dead_code)]
 /// Verifies a password against a stored hash.
 pub fn verify_password(password: &Password, hash: &str) -> Result<(), anyhow::Error> {
     let parsed_hash = PasswordHash::new(hash)

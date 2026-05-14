@@ -1,33 +1,15 @@
 use crate::{
-    newtypes::{
-        email::{Email, EmailError},
-        handle::{Handle, HandleError},
-        password::PasswordError,
-    },
+    newtypes::{email::EmailError, handle::HandleError, password::PasswordError},
     router::{ApiError, AppState},
     users::models::{
-        email_signup::{EmailSignupError, EmailSignupRequest, EmailSignupRequestError},
+        email_signup::{
+            EmailSignupError, EmailSignupRequest, EmailSignupRequestError, SignupEmailBody,
+        },
         user::User,
+        users_response::UserResponse,
     },
 };
 use axum::{Json, extract::State, http::StatusCode};
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Serialize)]
-pub struct SignupEmailBody {
-    pub email: String,
-    pub handle: String,
-    pub password: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct UserResponse {
-    pub email: Email,
-    pub handle: Handle,
-    pub email_verified: bool,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
 
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
