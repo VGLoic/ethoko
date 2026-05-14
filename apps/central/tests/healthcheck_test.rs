@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use ethoko_central::routes::GetHealthcheckResponse;
+use ethoko_central::router::GetHealthcheckResponse;
 mod common;
 use common::{default_test_config, setup_instance};
 

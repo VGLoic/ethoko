@@ -1,3 +1,4 @@
+use crate::users::auth_router;
 use axum::{
     Json, Router,
     http::StatusCode,
@@ -6,12 +7,11 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
-pub mod auth;
 
 pub fn app_router() -> Router {
     Router::new()
         .route("/health", get(get_healthcheck))
-        .nest("/auth", auth::auth_router())
+        .nest("/auth", auth_router::auth_router())
         .fallback(not_found)
 }
 

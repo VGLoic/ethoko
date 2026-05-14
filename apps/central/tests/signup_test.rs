@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use ethoko_central::{
     newtypes::{email::Email, handle::Handle},
-    routes::auth::SignupEmailBody,
+    users::auth_router::SignupEmailBody,
 };
 mod common;
 use common::{default_test_config, setup_instance};
