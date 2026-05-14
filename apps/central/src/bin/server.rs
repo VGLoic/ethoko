@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use ethoko_central::{config::Config, httpserver::serve_http_server};
+use ethoko_central::{config::Config, httpserver::serve_http_server, users};
 use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
 use tracing::{info, level_filters::LevelFilter};
@@ -52,6 +52,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Successfully ran migrations");
 
+    let users_repository = users::repository::PsqlAccountsRepository::new(pool);
+    let users_service = users::service::UsersServiceImpl::new(users_repository);
+
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|err| {
         anyhow::Error::new(err).context(format!(
@@ -64,5 +67,5 @@ async fn main() -> Result<(), anyhow::Error> {
         listener.local_addr().unwrap()
     );
 
-    serve_http_server(listener).await
+    serve_http_server(listener, users_service).await
 }

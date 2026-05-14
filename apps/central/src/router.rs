@@ -1,4 +1,6 @@
-use crate::users::auth_router;
+use std::sync::Arc;
+
+use crate::users::{auth_router, service::UsersService};
 use axum::{
     Json, Router,
     http::StatusCode,
@@ -8,11 +10,19 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-pub fn app_router() -> Router {
+pub fn app_router(users_service: impl UsersService) -> Router {
+    let users_service = Arc::new(users_service);
+    let state = AppState { users_service };
     Router::new()
         .route("/health", get(get_healthcheck))
         .nest("/auth", auth_router::auth_router())
         .fallback(not_found)
+        .with_state(state)
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub users_service: Arc<dyn UsersService>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -35,6 +45,7 @@ async fn not_found() -> impl IntoResponse {
 pub enum ApiError {
     NotFound,
     InternalServerError(anyhow::Error),
+    UnprocessableEntity(String),
     BadRequest(String),
     Unauthorized(String),
 }
@@ -57,6 +68,10 @@ impl IntoResponse for ApiError {
             Self::Unauthorized(msg) => {
                 warn!("Unauthorized access attempt: {}", msg);
                 StatusCode::UNAUTHORIZED.into_response()
+            }
+            Self::UnprocessableEntity(msg) => {
+                warn!("Unprocessable entity: {}", msg);
+                (StatusCode::UNPROCESSABLE_ENTITY, "Unprocessable entity").into_response()
             }
         }
     }

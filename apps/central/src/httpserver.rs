@@ -1,4 +1,4 @@
-use crate::router::app_router;
+use crate::{router::app_router, users::service::UsersService};
 use axum::{
     body::Body,
     extract::{MatchedPath, Request},
@@ -16,10 +16,13 @@ use tracing::{Span, error, info, info_span};
 const REQUEST_ID_HEADER: &str = "x-request-id";
 const TIMEOUT_SECONDS: u64 = 10;
 
-pub async fn serve_http_server(tcp_listener: TcpListener) -> Result<(), anyhow::Error> {
+pub async fn serve_http_server(
+    tcp_listener: TcpListener,
+    users_service: impl UsersService,
+) -> Result<(), anyhow::Error> {
     let x_request_id = HeaderName::from_static(REQUEST_ID_HEADER);
 
-    let app = app_router().layer((
+    let app = app_router(users_service).layer((
         // Set `x-request-id` header for every request
         SetRequestIdLayer::new(x_request_id.clone(), MakeRequestUuid),
         // Log request and response

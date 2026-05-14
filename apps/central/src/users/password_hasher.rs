@@ -53,27 +53,29 @@ pub fn verify_password(password: &Password, hash: &str) -> Result<(), anyhow::Er
 
 #[cfg(test)]
 mod tests {
+    use fake::{Fake, Faker};
+
     use super::*;
 
     #[test]
     fn test_hash_password() {
-        let password = Password::new("test-password").unwrap();
+        let password: Password = Faker.fake();
         let hash = hash_password(&password).unwrap();
         assert!(!hash.is_empty());
     }
 
     #[test]
     fn test_verify_password() {
-        let password = Password::new("test-password").unwrap();
+        let password: Password = Faker.fake();
         let hash = hash_password(&password).unwrap();
         assert!(verify_password(&password, &hash).is_ok());
     }
 
     #[test]
     fn test_verify_password_invalid() {
-        let password = Password::new("test-password").unwrap();
+        let password: Password = Faker.fake();
         let hash = hash_password(&password).unwrap();
-        let invalid_password = Password::new("invalid-password").unwrap();
-        assert!(verify_password(&invalid_password, &hash).is_err());
+        let different_password: Password = Faker.fake();
+        assert!(verify_password(&different_password, &hash).is_err());
     }
 }
