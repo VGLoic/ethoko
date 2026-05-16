@@ -26,6 +26,6 @@ export {
 } from "./prune";
 export { resolveLocalArtifact } from "./resolve-local-artifact";
 export {
-  lookForCandidateArtifacts,
-  mapCandidateArtifactToEthokoArtifact,
-} from "./candidate-artifact";
+  lookForBuildInfos,
+  mapBuildInfoToEthokoArtifact,
+} from "./build-info";
