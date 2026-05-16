@@ -5,7 +5,5 @@ import { BuildInfoPaths } from "../supported-origins/map-build-info-to-ethoko-ar
 test("BuildInfoPaths handled the same format than EthokoArtifactOrigin", () => {
   type EthokoArtifactOriginFormat = EthokoArtifactOrigin["type"];
   type BuildInfoPathsFormat = BuildInfoPaths["format"];
-  assertType<EthokoArtifactOriginFormat>(
-    {} as unknown as BuildInfoPathsFormat,
-  );
+  assertType<EthokoArtifactOriginFormat>({} as unknown as BuildInfoPathsFormat);
 });

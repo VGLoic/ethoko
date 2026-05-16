@@ -25,7 +25,4 @@ export {
   type PruneResult,
 } from "./prune";
 export { resolveLocalArtifact } from "./resolve-local-artifact";
-export {
-  lookForBuildInfos,
-  mapBuildInfoToEthokoArtifact,
-} from "./build-info";
+export { lookForBuildInfos, mapBuildInfoToEthokoArtifact } from "./build-info";
