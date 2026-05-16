@@ -15,9 +15,9 @@ export type InferredHardhatV3Artifacts = {
     typeof FormatInferenceHardhatV3CompilerOutputPieceSchema
   >;
 };
-type InferredArtifact = {
+type InferredHardhatV3BuildInfo = {
   [K in keyof InferredHardhatV3Artifacts]: {
-    format: K;
+    origin: K;
     data: InferredHardhatV3Artifacts[K];
   };
 }[keyof InferredHardhatV3Artifacts];
@@ -25,7 +25,7 @@ type InferredArtifact = {
 export function inferHardhatV3Artifact(data: unknown):
   | {
       recognized: true;
-      artifact: InferredArtifact;
+      artifact: InferredHardhatV3BuildInfo;
     }
   | {
       recognized: false;
@@ -35,7 +35,7 @@ export function inferHardhatV3Artifact(data: unknown):
   if (outputFormatResult.success) {
     return {
       recognized: true,
-      artifact: { format: "hardhat-v3-output", data: outputFormatResult.data },
+      artifact: { origin: "hardhat-v3-output", data: outputFormatResult.data },
     };
   }
 
@@ -50,7 +50,7 @@ export function inferHardhatV3Artifact(data: unknown):
       return {
         recognized: true,
         artifact: {
-          format: "hardhat-v3-input-isolated-build",
+          origin: "hardhat-v3-input-isolated-build",
           data: inputFormatResult.data,
         },
       };
@@ -58,7 +58,7 @@ export function inferHardhatV3Artifact(data: unknown):
       return {
         recognized: true,
         artifact: {
-          format: "hardhat-v3-input-no-isolated-build",
+          origin: "hardhat-v3-input-no-isolated-build",
           data: inputFormatResult.data,
         },
       };

@@ -10,7 +10,7 @@ import { mapHardhatV3ArtifactsToEthokoArtifact } from "./hardhat-v3/map-isolated
 import { mapNonIsolatedBuildHardhatV3ArtifactsToEthokoArtifact } from "./hardhat-v3/map-non-isolated-build-to-ethoko-artifact";
 import { DebugLogger } from "@/utils/debug-logger";
 
-export type OriginalBuildInfoPaths =
+export type BuildInfoPaths =
   | {
       format:
         | "forge-v1-default"
@@ -33,15 +33,15 @@ export type OriginalBuildInfoPaths =
       }[];
     };
 /**
- * Given the paths description of an original artifact, map it to Ethoko artifacts.
- * The mapping is done by reading the original artifact(s) from the given path(s), parsing them, and then transforming them to the Ethoko input and output artifact formats.
- * @param paths The paths to the original artifact(s) to map, along with the format of the original artifact(s)
+ * Given the paths description of a Build Info, map it to Ethoko artifacts.
+ * The mapping is done by reading the Build Info file(s) from the given path(s), parsing them, and then transforming them to the Ethoko input and output artifact formats.
+ * @param paths The paths to the Build Info file(s) to map, along with the format of the Build Info
  * @param dependencies.logger Logger
  * @param opts.debug The debug flag to enable debug logging during the mapping process
  * @returns The mapped Ethoko input and output artifacts, along with the paths to the original content files that were read during the mapping process
  */
-export function mapOriginalArtifactToEthokoArtifact(
-  paths: OriginalBuildInfoPaths,
+export function mapBuildInfoToEthokoArtifact(
+  paths: BuildInfoPaths,
   dependencies: { logger: DebugLogger },
   opts: { debug: boolean },
 ): Promise<{
@@ -84,7 +84,7 @@ export function mapOriginalArtifactToEthokoArtifact(
     );
   } else {
     throw new Error(
-      `Unsupported artifact format: ${paths.format satisfies never}. Please provide a valid build info JSON file.`,
+      `Unsupported build info format: ${paths.format satisfies never}. Please provide a valid Build Info JSON file.`,
     );
   }
 }

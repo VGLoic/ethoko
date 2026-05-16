@@ -12,9 +12,9 @@ export type InferredForgeArtifacts = {
     typeof FormatInferenceForgeCompilerOutputWithBuildInfoOptionSchema
   >;
 };
-type InferredArtifact = {
+type InferredForgeBuildInfo = {
   [K in keyof InferredForgeArtifacts]: {
-    format: K;
+    origin: K;
     data: InferredForgeArtifacts[K];
   };
 }[keyof InferredForgeArtifacts];
@@ -22,7 +22,7 @@ type InferredArtifact = {
 export function inferForgeArtifact(data: unknown):
   | {
       recognized: true;
-      artifact: InferredArtifact;
+      artifact: InferredForgeBuildInfo;
     }
   | {
       recognized: false;
@@ -32,7 +32,7 @@ export function inferForgeArtifact(data: unknown):
   if (defaultFormatResult.success) {
     return {
       recognized: true,
-      artifact: { format: "forge-v1-default", data: defaultFormatResult.data },
+      artifact: { origin: "forge-v1-default", data: defaultFormatResult.data },
     };
   }
   const withBuildInfoOptionResult =
@@ -41,7 +41,7 @@ export function inferForgeArtifact(data: unknown):
     return {
       recognized: true,
       artifact: {
-        format: "forge-v1-with-build-info-option",
+        origin: "forge-v1-with-build-info-option",
         data: withBuildInfoOptionResult.data,
       },
     };

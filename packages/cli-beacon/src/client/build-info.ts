@@ -2,13 +2,13 @@ import fs from "fs/promises";
 import { toAsyncResult } from "@/utils/result";
 import { CliError } from "./error";
 import {
-  inferOriginalArtifactFormat,
-  InferredArtifact,
-} from "@/supported-origins/infer-original-artifact-format";
+  inferBuildInfoOrigin,
+  InferredBuildInfo,
+} from "@/supported-origins/infer-build-info-origin";
 import {
-  mapOriginalArtifactToEthokoArtifact,
-  OriginalBuildInfoPaths,
-} from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+  mapBuildInfoToEthokoArtifact as mapBuildInfoToEthokoArtifactInternal,
+  BuildInfoPaths,
+} from "@/supported-origins/map-build-info-to-ethoko-artifact";
 import { AbsolutePath, RelativePath } from "@/utils/path";
 import {
   EthokoContractOutputArtifact,
@@ -17,15 +17,15 @@ import {
 import { DebugLogger } from "@/utils/debug-logger";
 
 /**
- * Map a candidate artifact (build info) to the Ethoko format, based on its format.
- * This function is a wrapper around the `mapOriginalArtifactToEthokoArtifact` function with CliError handling.
- * @param buildInfoPaths The paths to the candidate artifact
+ * Map a Build Info to the Ethoko format, based on its format.
+ * This function is a wrapper around the internal `mapBuildInfoToEthokoArtifact` function with CliError handling.
+ * @param buildInfoPaths The paths to the Build Info
  * @param dependencies The dependencies for mapping, including a logger
  * @param opts Options for mapping, including debug mode
  * @returns The mapped Ethoko artifact
  */
-export async function mapCandidateArtifactToEthokoArtifact(
-  buildInfoPaths: OriginalBuildInfoPaths,
+export async function mapBuildInfoToEthokoArtifact(
+  buildInfoPaths: BuildInfoPaths,
   dependencies: { logger: DebugLogger },
   opts: { debug: boolean },
 ): Promise<{
@@ -37,45 +37,42 @@ export async function mapCandidateArtifactToEthokoArtifact(
   };
 }> {
   const ethokoArtifactParsingResult = await toAsyncResult(
-    mapOriginalArtifactToEthokoArtifact(buildInfoPaths, dependencies, opts),
+    mapBuildInfoToEthokoArtifactInternal(buildInfoPaths, dependencies, opts),
     { debug: opts.debug },
   );
   if (!ethokoArtifactParsingResult.success) {
     throw new CliError(
       FORMAT_TO_ERROR_MESSAGE[buildInfoPaths.format] ||
-        `An error occurred while mapping the build info to Ethoko artifacts. Please provide valid build info JSON files or contact us. Run with debug mode for more info.`,
+        `An error occurred while mapping the Build Info to Ethoko artifacts. Please provide valid Build Info JSON files or contact us. Run with debug mode for more info.`,
     );
   }
   return ethokoArtifactParsingResult.value;
 }
 
-const FORMAT_TO_ERROR_MESSAGE: Record<
-  OriginalBuildInfoPaths["format"],
-  string
-> = {
+const FORMAT_TO_ERROR_MESSAGE: Record<BuildInfoPaths["format"], string> = {
   "hardhat-v3":
     "Hardhat v3 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
   "hardhat-v3-non-isolated-build":
     "Hardhat v3 (non isolated build) compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide valid Hardhat v3 compilation files or contact us. Run with debug mode for more info.",
   "hardhat-v2":
-    "Hardhat v2 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Hardhat v2 build info JSON file or contact us. Run with debug mode for more info.",
+    "Hardhat v2 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Hardhat v2 Build Info JSON file or contact us. Run with debug mode for more info.",
   "forge-v1-with-build-info-option":
-    "Forge v1 compilation artifacts with the build info option have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 build info JSON file or contact us. Run with debug mode for more info.",
+    "Forge v1 compilation artifacts with the build info option have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 Build Info JSON file or contact us. Run with debug mode for more info.",
   "forge-v1-default":
-    "Forge v1 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 build info JSON file or contact us. Run with debug mode for more info.",
+    "Forge v1 compilation artifacts have been identified but the mapping to Ethoko artifact format failed. Please provide a valid Forge v1 Build Info JSON file or contact us. Run with debug mode for more info.",
 };
 
-type CandidateBuildInfoOption = {
+type BuildInfoOption = {
   label: string;
-  value: OriginalBuildInfoPaths;
+  value: BuildInfoPaths;
 };
 
 /**
- * Given the input path, look for candidate compilation artifacts (build info).
+ * Given the input path, look for Build Info files.
  *
  * This function is meant to be used in other CLI client methods, since it throws a CliError, it can be used without any wrapping, i.e.
  * ```ts
- * const buildInfoPath = await lookForBuildInfo(inputPath);
+ * const buildInfoPath = await lookForBuildInfos(inputPath);
  * ```
  *
  * The goal is to support multiple providers of compilation artifacts, which may have different formats and structures.
@@ -88,7 +85,7 @@ type CandidateBuildInfoOption = {
  * The strategy is the following:
  * - If the inputPath is directly a JSON file:
  *  - we infer the format of the file based on its content,
- *  - if the format is recognized as a supported build info format, we return it. In case of Hardhat v3, we rebuild the pair of input/output files based on the common id field and return both paths, we don't look for other pairs.
+ *  - if the format is recognized as a supported Build Info format, we return it. In case of Hardhat v3, we rebuild the pair of input/output files based on the common id field and return both paths, we don't look for other pairs.
  * - if the inputPath is a directory, we look for a `build-info` directory:
  *  - if it exists, we consider it as the main candidate to look for JSON files,
  *  - if it doesn't exist, we look for JSON files directly in the inputPath directory.
@@ -99,24 +96,24 @@ type CandidateBuildInfoOption = {
  *    - we gather the pairs,
  *    - we gather the pairs with the same Solc version and with creation window close (2 minutes, based on the mtime of the files) since they are more likely to be related to the same compilation,
  *    - an option is created for each of these set of pairs, with a display name containing the Solc version and the mtime of the files for the user to differentiate them.
- * The list of options is returned to the caller, as well as the count of ignored files (files that are not recognized as valid build info files) and the final folder path where the files are located (either the inputPath or the build-info directory if it exists).
- * @param inputPath The path to look for the build info JSON file
+ * The list of options is returned to the caller, as well as the count of ignored files (files that are not recognized as valid Build Info files) and the final folder path where the files are located (either the inputPath or the build-info directory if it exists).
+ * @param inputPath The path to look for the Build Info JSON file
  * @param dependencies The dependencies for the function, including a logger
  * @param opts Options for the function
  * @param opts.debug Enable debug mode
- * @returns An object containing the candidate artifact options, the count of ignored files, and the final folder path
+ * @returns An object containing the Build Info options, the count of ignored files, and the final folder path
  * @throws A CliError
  */
-export async function lookForCandidateArtifacts(
+export async function lookForBuildInfos(
   inputPath: AbsolutePath,
   dependencies: { logger: DebugLogger },
   opts: { debug: boolean },
 ): Promise<{
-  candidateBuildInfo:
-    | { type: "multiple"; options: CandidateBuildInfoOption[] }
+  buildInfos:
+    | { type: "multiple"; options: BuildInfoOption[] }
     | {
         type: "single";
-        buildInfoPaths: OriginalBuildInfoPaths;
+        buildInfoPaths: BuildInfoPaths;
       };
   ignoredFilesCount: number;
   finalFolderPath: AbsolutePath;
@@ -127,7 +124,7 @@ export async function lookForCandidateArtifacts(
   });
   if (!statResult.success) {
     throw new CliError(
-      `The provided path "${inputPath.resolvedPath}" does not exist or is not accessible. Please provide a valid path to a compilation artifact (build info) or a directory containing it.`,
+      `The provided path "${inputPath.resolvedPath}" does not exist or is not accessible. Please provide a valid path to a Build Info or a directory containing it.`,
     );
   }
 
@@ -135,7 +132,7 @@ export async function lookForCandidateArtifacts(
   if (statResult.value.isFile()) {
     if (!inputPath.resolvedPath.endsWith(".json")) {
       throw new CliError(
-        `The provided path "${inputPath.resolvedPath}" is a file but does not have a .json extension. Please provide a valid path to a JSON compilation artifact (build info).`,
+        `The provided path "${inputPath.resolvedPath}" is a file but does not have a .json extension. Please provide a valid path to a JSON Build Info.`,
       );
     }
     const contentResult = await toAsyncResult(
@@ -148,15 +145,15 @@ export async function lookForCandidateArtifacts(
       );
     }
 
-    const format = inferOriginalArtifactFormat(contentResult.value);
-    if (!format.recognized) {
+    const inference = inferBuildInfoOrigin(contentResult.value);
+    if (!inference.recognized) {
       throw new CliError(
-        `The provided file "${inputPath}" does not seem to be a valid build info JSON file in a supported format. Please provide a valid build info JSON file. Run with debug mode for more info.`,
+        `The provided file "${inputPath}" does not seem to be a valid Build Info JSON file in a supported format. Please provide a valid Build Info JSON file. Run with debug mode for more info.`,
       );
     }
     if (
-      format.artifact.format === "hardhat-v3-input-isolated-build" ||
-      format.artifact.format === "hardhat-v3-input-no-isolated-build"
+      inference.artifact.origin === "hardhat-v3-input-isolated-build" ||
+      inference.artifact.origin === "hardhat-v3-input-no-isolated-build"
     ) {
       // We verify that the corresponding output file exists
       const matchingOutputPath = new AbsolutePath(
@@ -168,10 +165,10 @@ export async function lookForCandidateArtifacts(
           .then(() => fs.readFile(matchingOutputPath.resolvedPath, "utf-8"))
           .then(JSON.parse)
           .then((json) => {
-            const inferredFormat = inferOriginalArtifactFormat(json);
+            const inferredOrigin = inferBuildInfoOrigin(json);
             if (
-              !inferredFormat.recognized ||
-              inferredFormat.artifact.format !== "hardhat-v3-output"
+              !inferredOrigin.recognized ||
+              inferredOrigin.artifact.origin !== "hardhat-v3-output"
             ) {
               throw new Error(
                 "Output file does not seem to be in hardhat v3 output format",
@@ -188,7 +185,7 @@ export async function lookForCandidateArtifacts(
       return {
         finalFolderPath: inputPath.dirname(),
         ignoredFilesCount: 0,
-        candidateBuildInfo: {
+        buildInfos: {
           type: "single",
           buildInfoPaths: {
             format: "hardhat-v3",
@@ -197,7 +194,7 @@ export async function lookForCandidateArtifacts(
         },
       };
     }
-    if (format.artifact.format === "hardhat-v3-output") {
+    if (inference.artifact.origin === "hardhat-v3-output") {
       // We verify that the corresponding input file exists
       const matchingInputPath = new AbsolutePath(
         inputPath.resolvedPath.replace(".output.json", ".json"),
@@ -208,12 +205,12 @@ export async function lookForCandidateArtifacts(
           .then(() => fs.readFile(matchingInputPath.resolvedPath, "utf-8"))
           .then(JSON.parse)
           .then((json) => {
-            const inferredFormat = inferOriginalArtifactFormat(json);
+            const inferredOrigin = inferBuildInfoOrigin(json);
             if (
-              !inferredFormat.recognized ||
-              (inferredFormat.artifact.format !==
+              !inferredOrigin.recognized ||
+              (inferredOrigin.artifact.origin !==
                 "hardhat-v3-input-isolated-build" &&
-                inferredFormat.artifact.format !==
+                inferredOrigin.artifact.origin !==
                   "hardhat-v3-input-no-isolated-build")
             ) {
               throw new Error(
@@ -231,7 +228,7 @@ export async function lookForCandidateArtifacts(
       return {
         finalFolderPath: inputPath.dirname(),
         ignoredFilesCount: 0,
-        candidateBuildInfo: {
+        buildInfos: {
           type: "single",
           buildInfoPaths: {
             format: "hardhat-v3",
@@ -244,11 +241,11 @@ export async function lookForCandidateArtifacts(
     return {
       finalFolderPath: inputPath.dirname(),
       ignoredFilesCount: 0,
-      candidateBuildInfo: {
+      buildInfos: {
         type: "single",
         buildInfoPaths: {
           buildInfoPath: inputPath,
-          format: format.artifact.format,
+          format: inference.artifact.origin,
         },
       },
     };
@@ -256,7 +253,7 @@ export async function lookForCandidateArtifacts(
 
   if (!statResult.value.isDirectory()) {
     throw new CliError(
-      `The provided path "${inputPath}" is neither a file nor a directory. Please provide a valid path to a compilation artifact (build info) or a directory containing it.`,
+      `The provided path "${inputPath}" is neither a file nor a directory. Please provide a valid path to a Build Info or a directory containing it.`,
     );
   }
 
@@ -326,13 +323,13 @@ export async function lookForCandidateArtifacts(
         fs
           .readFile(filePath.resolvedPath, "utf-8")
           .then((v) => JSON.parse(v))
-          .then(inferOriginalArtifactFormat),
+          .then(inferBuildInfoOrigin),
         { debug },
       );
       if (!inferrenceResult.success) {
         if (opts.debug) {
           dependencies.logger.debug(
-            `Failed to infer format for file "${filePath}". Error: ${inferrenceResult.error}`,
+            `Failed to infer origin for file "${filePath}". Error: ${inferrenceResult.error}`,
           );
         }
         return {
@@ -343,7 +340,7 @@ export async function lookForCandidateArtifacts(
       if (!inferrenceResult.value.recognized) {
         if (opts.debug) {
           dependencies.logger.debug(
-            `File "${filePath}" is not a valid build info JSON file (format inferred as "unknown"). It will be ignored.`,
+            `File "${filePath}" is not a valid Build Info JSON file (origin inferred as "unknown"). It will be ignored.`,
           );
         }
         return {
@@ -382,13 +379,13 @@ export async function lookForCandidateArtifacts(
   const firstOption = options[0];
   if (!firstOption) {
     throw new CliError(
-      "No valid compilation artifacts were found in the provided path. Please provide a valid path to a compilation artifact (build info) or a directory containing it.",
+      "No valid Build Info files were found in the provided path. Please provide a valid path to a Build Info or a directory containing it.",
     );
   }
 
   if (options.length === 1) {
     return {
-      candidateBuildInfo: {
+      buildInfos: {
         type: "single",
         buildInfoPaths: firstOption.value,
       },
@@ -398,7 +395,7 @@ export async function lookForCandidateArtifacts(
   }
 
   return {
-    candidateBuildInfo: {
+    buildInfos: {
       type: "multiple",
       options,
     },
@@ -412,10 +409,10 @@ type FileSummary = {
   filePath: AbsolutePath;
   mtime: Date;
   size: number;
-  artifact: InferredArtifact;
+  artifact: InferredBuildInfo;
 };
-function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
-  const options: CandidateBuildInfoOption[] = [];
+function filesToOptions(files: FileSummary[]): BuildInfoOption[] {
+  const options: BuildInfoOption[] = [];
   const hardhatV3Pairs: {
     input: {
       path: AbsolutePath;
@@ -430,12 +427,12 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
     mtime: Date;
   }[] = [];
   for (const file of files) {
-    if (file.artifact.format === "hardhat-v3-input-no-isolated-build") {
+    if (file.artifact.origin === "hardhat-v3-input-no-isolated-build") {
       const hardhatV3BuildInfoId = file.artifact.data.id;
-      // We check if the corresponding output file is present in the list of files, if not, we ignore this file since it is not a valid build info on its own
+      // We check if the corresponding output file is present in the list of files, if not, we ignore this file since it is not a valid Build Info on its own
       const matchingOutputFile = files.find(
         (f) =>
-          f.artifact.format === "hardhat-v3-output" &&
+          f.artifact.origin === "hardhat-v3-output" &&
           f.artifact.data.id === hardhatV3BuildInfoId,
       );
       if (!matchingOutputFile) {
@@ -451,12 +448,12 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
           },
         },
       });
-    } else if (file.artifact.format === "hardhat-v3-input-isolated-build") {
+    } else if (file.artifact.origin === "hardhat-v3-input-isolated-build") {
       const hardhatV3BuildInfoId = file.artifact.data.id;
-      // We check if the corresponding output file is present in the list of files, if not, we ignore this file since it is not a valid build info on its own
+      // We check if the corresponding output file is present in the list of files, if not, we ignore this file since it is not a valid Build Info on its own
       const matchingOutputFile = files.find(
         (f) =>
-          f.artifact.format === "hardhat-v3-output" &&
+          f.artifact.origin === "hardhat-v3-output" &&
           f.artifact.data.id === hardhatV3BuildInfoId,
       );
       if (!matchingOutputFile) {
@@ -475,14 +472,14 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
           size: matchingOutputFile.size,
         },
       });
-    } else if (file.artifact.format === "hardhat-v3-output") {
+    } else if (file.artifact.origin === "hardhat-v3-output") {
       // Hardhat V3 output files are ignored as they will be handled together with their corresponding input file
     } else {
       options.push({
-        label: `${truncateFilename(file.name)} (${BUILD_INFO_FORMAT_TO_HUMAN_READABLE[file.artifact.format]}, ${formatTimeAgo(file.mtime)}, ${formatFileSize(file.size)})`,
+        label: `${truncateFilename(file.name)} (${BUILD_INFO_FORMAT_TO_HUMAN_READABLE[file.artifact.origin]}, ${formatTimeAgo(file.mtime)}, ${formatFileSize(file.size)})`,
         value: {
           buildInfoPath: file.filePath,
-          format: file.artifact.format,
+          format: file.artifact.origin,
         },
       });
     }
@@ -512,10 +509,10 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
       });
     }
   }
-  const hardhatV3OptionGroups: CandidateBuildInfoOption[] =
-    hardhatV3PairsGroups.map((group) => {
+  const hardhatV3OptionGroups: BuildInfoOption[] = hardhatV3PairsGroups.map(
+    (group) => {
       const label = `${BUILD_INFO_FORMAT_TO_HUMAN_READABLE["hardhat-v3"]} (Solc ${group.solcLongVersion}, ${formatTimeAgo(group.startWindow)}`;
-      const value: OriginalBuildInfoPaths = {
+      const value: BuildInfoPaths = {
         format: "hardhat-v3",
         buildInfoPaths: group.pairs.map((pair) => ({
           input: pair.input.path,
@@ -526,7 +523,8 @@ function filesToOptions(files: FileSummary[]): CandidateBuildInfoOption[] {
         label,
         value,
       };
-    });
+    },
+  );
 
   options.push(...hardhatV3OptionGroups);
 
@@ -568,7 +566,7 @@ function truncateFilename(filename: string, maxLength: number = 60): string {
 }
 
 const BUILD_INFO_FORMAT_TO_HUMAN_READABLE: Record<
-  OriginalBuildInfoPaths["format"],
+  BuildInfoPaths["format"],
   string
 > = {
   "hardhat-v2": "Hardhat v2",

@@ -7,8 +7,8 @@ import {
   Difference,
   generateDiffWithTargetRelease,
   resolveLocalArtifact,
-  lookForCandidateArtifacts,
-  mapCandidateArtifactToEthokoArtifact,
+  lookForBuildInfos,
+  mapBuildInfoToEthokoArtifact,
   pullArtifact,
 } from "@/client";
 import { LocalArtifactStore } from "@/local-artifact-store";
@@ -28,7 +28,7 @@ import {
 } from "@/ethoko-artifacts/v0";
 import { StorageProvider } from "@/storage-provider";
 import { ArtifactReference } from "@/utils/artifact-reference";
-import { OriginalBuildInfoPaths } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import { BuildInfoPaths } from "@/supported-origins/map-build-info-to-ethoko-artifact";
 import { promptUserSelection } from "./utils/prompt-select";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
@@ -176,7 +176,7 @@ async function runDiffCommand(
   const spinner1 = dependencies.logger.createSpinner(
     "Looking for compilation artifacts...",
   );
-  const candidateArtifact = await parseCandidateArtifact(artifactPath, {
+  const buildInfo = await parseBuildInfo(artifactPath, {
     debug: opts.debug,
     logger: dependencies.logger,
     isCI: process.env.CI === "true" || process.env.CI === "1",
@@ -185,7 +185,7 @@ async function runDiffCommand(
     throw err;
   });
   spinner1.succeed(
-    artifactOriginToSuccessText(candidateArtifact.inputArtifact.origin.type),
+    artifactOriginToSuccessText(buildInfo.inputArtifact.origin.type),
   );
 
   let resolvedArtifactRef = await resolveLocalArtifact(
@@ -225,7 +225,7 @@ async function runDiffCommand(
 
   const diffResult = await generateDiffWithTargetRelease(
     resolvedArtifactRef,
-    candidateArtifact,
+    buildInfo,
     {
       localArtifactStore: dependencies.localArtifactStore,
       logger: dependencies.logger.toDebugLogger(),
@@ -307,7 +307,7 @@ function artifactOriginToSuccessText(
   );
 }
 
-async function parseCandidateArtifact(
+async function parseBuildInfo(
   artifactPath: AbsolutePath,
   opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
 ): Promise<{
@@ -318,7 +318,7 @@ async function parseCandidateArtifact(
     paths: RelativePath[];
   };
 }> {
-  const candidateArtifacts = await lookForCandidateArtifacts(
+  const buildInfos = await lookForBuildInfos(
     artifactPath,
     {
       logger: opts.logger.toDebugLogger(),
@@ -328,26 +328,25 @@ async function parseCandidateArtifact(
     },
   );
 
-  let selectedBuildInfoPaths: OriginalBuildInfoPaths;
-  if (candidateArtifacts.candidateBuildInfo.type === "single") {
-    selectedBuildInfoPaths =
-      candidateArtifacts.candidateBuildInfo.buildInfoPaths;
+  let selectedBuildInfoPaths: BuildInfoPaths;
+  if (buildInfos.buildInfos.type === "single") {
+    selectedBuildInfoPaths = buildInfos.buildInfos.buildInfoPaths;
   } else {
     if (opts.isCI) {
       throw new CliError(
-        "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
+        "Multiple Build Info files were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired Build Info.",
       );
     }
     const selectedOption = await promptUserSelection(
       opts.logger,
-      `Multiple JSON files found in "${candidateArtifacts.finalFolderPath}" (${candidateArtifacts.ignoredFilesCount} ignored). Please select which build info file to use:`,
-      candidateArtifacts.candidateBuildInfo.options,
+      `Multiple JSON files found in "${buildInfos.finalFolderPath}" (${buildInfos.ignoredFilesCount} ignored). Please select which Build Info file to use:`,
+      buildInfos.buildInfos.options,
       30_000,
     );
     selectedBuildInfoPaths = selectedOption;
   }
 
-  const ethokoArtifact = await mapCandidateArtifactToEthokoArtifact(
+  const ethokoArtifact = await mapBuildInfoToEthokoArtifact(
     selectedBuildInfoPaths,
     { logger: opts.logger.toDebugLogger() },
     { debug: opts.debug },

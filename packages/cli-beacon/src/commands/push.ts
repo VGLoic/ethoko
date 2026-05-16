@@ -3,8 +3,8 @@ import { z } from "zod";
 import { CommandLogger } from "@/ui";
 import {
   CliError,
-  lookForCandidateArtifacts,
-  mapCandidateArtifactToEthokoArtifact,
+  lookForBuildInfos,
+  mapBuildInfoToEthokoArtifact,
 } from "@/client";
 
 import type { EthokoCliConfig } from "@/config";
@@ -21,7 +21,7 @@ import {
   EthokoInputArtifact,
 } from "@/ethoko-artifacts/v0";
 import { StorageProvider } from "@/storage-provider";
-import { OriginalBuildInfoPaths } from "@/supported-origins/map-original-artifact-to-ethoko-artifact";
+import { BuildInfoPaths } from "@/supported-origins/map-build-info-to-ethoko-artifact";
 import { promptUserSelection } from "./utils/prompt-select";
 
 type GetConfig = (configPath?: string) => Promise<EthokoCliConfig>;
@@ -184,7 +184,7 @@ export async function runPushCommand(
   const spinner1 = dependencies.logger.createSpinner(
     "Looking for compilation artifacts...",
   );
-  const candidateArtifact = await parseCandidateArtifact(artifactPath, {
+  const buildInfo = await parseBuildInfo(artifactPath, {
     debug: opts.debug,
     logger: dependencies.logger,
     isCI: process.env.CI === "true" || process.env.CI === "1",
@@ -193,20 +193,20 @@ export async function runPushCommand(
     throw err;
   });
   spinner1.succeed(
-    artifactOriginToSuccessText(candidateArtifact.inputArtifact.origin.type),
+    artifactOriginToSuccessText(buildInfo.inputArtifact.origin.type),
   );
 
   // We verify that the input sources contain the `content` field.
   // It is not required for Ethoko but may ensure an easy verification later on.
   const missingContentInSource = Object.values(
-    candidateArtifact.inputArtifact.input.sources,
+    buildInfo.inputArtifact.input.sources,
   ).some((source) => !("content" in source));
   if (missingContentInSource) {
     // For Forge, we encourage users to use the `--use-literal-content` option to ensure the content is included in the artifact, which can help with later verification and debugging
     if (
-      candidateArtifact.inputArtifact.origin.type ===
+      buildInfo.inputArtifact.origin.type ===
         "forge-v1-with-build-info-option" ||
-      candidateArtifact.inputArtifact.origin.type === "forge-v1-default"
+      buildInfo.inputArtifact.origin.type === "forge-v1-default"
     ) {
       dependencies.logger.warn(
         `The provided Forge compilation artifacts do not include the literal content of the sources. We recommend using the "--use-literal-content" option when generating the build info files with Forge to include the content in the artifact, which can help with later verification and debugging.`,
@@ -261,10 +261,10 @@ export async function runPushCommand(
   const pushResult = await toAsyncResult(
     dependencies.storageProvider.uploadArtifact(
       artifact.project,
-      candidateArtifact.inputArtifact,
-      candidateArtifact.outputContractArtifacts,
+      buildInfo.inputArtifact,
+      buildInfo.outputContractArtifacts,
       artifact.tag,
-      candidateArtifact.originalContent,
+      buildInfo.originalContent,
     ),
     { debug: opts.debug },
   );
@@ -272,7 +272,7 @@ export async function runPushCommand(
   if (!pushResult.success) {
     uploadSpinner.fail("Failed to upload artifact");
     throw new CliError(
-      `Error pushing the artifact "${artifact.project}${artifact.tag ? `:${artifact.tag}` : `@:${candidateArtifact.inputArtifact.id}`}" to the storage, please check the storage configuration or run with debug mode for more info`,
+      `Error pushing the artifact "${artifact.project}${artifact.tag ? `:${artifact.tag}` : `@:${buildInfo.inputArtifact.id}`}" to the storage, please check the storage configuration or run with debug mode for more info`,
     );
   }
   uploadSpinner.succeed("Artifact uploaded successfully");
@@ -281,10 +281,10 @@ export async function runPushCommand(
     dependencies.logger,
     artifact.project,
     artifact.tag,
-    candidateArtifact.inputArtifact.id,
+    buildInfo.inputArtifact.id,
   );
 
-  return candidateArtifact.inputArtifact.id;
+  return buildInfo.inputArtifact.id;
 }
 
 function displayPushResult(
@@ -325,7 +325,7 @@ function artifactOriginToSuccessText(
   );
 }
 
-async function parseCandidateArtifact(
+async function parseBuildInfo(
   artifactPath: AbsolutePath,
   opts: { debug: boolean; logger: CommandLogger; isCI?: boolean },
 ): Promise<{
@@ -336,7 +336,7 @@ async function parseCandidateArtifact(
     paths: RelativePath[];
   };
 }> {
-  const candidateArtifacts = await lookForCandidateArtifacts(
+  const buildInfos = await lookForBuildInfos(
     artifactPath,
     {
       logger: opts.logger.toDebugLogger(),
@@ -346,26 +346,25 @@ async function parseCandidateArtifact(
     },
   );
 
-  let selectedBuildInfoPaths: OriginalBuildInfoPaths;
-  if (candidateArtifacts.candidateBuildInfo.type === "single") {
-    selectedBuildInfoPaths =
-      candidateArtifacts.candidateBuildInfo.buildInfoPaths;
+  let selectedBuildInfoPaths: BuildInfoPaths;
+  if (buildInfos.buildInfos.type === "single") {
+    selectedBuildInfoPaths = buildInfos.buildInfos.buildInfoPaths;
   } else {
     if (opts.isCI) {
       throw new CliError(
-        "Multiple compilation artifacts were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired artifact.",
+        "Multiple Build Info files were found in the provided path. Please provide a more specific path or run the command in interactive mode to select the desired Build Info.",
       );
     }
     const selectedOption = await promptUserSelection(
       opts.logger,
-      `Multiple JSON files found in "${candidateArtifacts.finalFolderPath}" (${candidateArtifacts.ignoredFilesCount} ignored). Please select which build info file to use:`,
-      candidateArtifacts.candidateBuildInfo.options,
+      `Multiple JSON files found in "${buildInfos.finalFolderPath}" (${buildInfos.ignoredFilesCount} ignored). Please select which Build Info file to use:`,
+      buildInfos.buildInfos.options,
       30_000,
     );
     selectedBuildInfoPaths = selectedOption;
   }
 
-  const ethokoArtifact = await mapCandidateArtifactToEthokoArtifact(
+  const ethokoArtifact = await mapBuildInfoToEthokoArtifact(
     selectedBuildInfoPaths,
     { logger: opts.logger.toDebugLogger() },
     { debug: opts.debug },
