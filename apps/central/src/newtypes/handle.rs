@@ -1,4 +1,4 @@
-use fake::{Dummy, Fake, faker, rand};
+use fake::{Dummy, Fake, rand};
 use serde::{Deserialize, Serialize, de::Visitor};
 use sqlx::{Database, Decode, Encode};
 
@@ -160,7 +160,7 @@ where
 
 impl<T> Dummy<T> for Handle {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &T, rng: &mut R) -> Self {
-        let handle: String = faker::name::en::FirstName().fake_with_rng(rng);
+        let handle: String = (5..10).fake_with_rng(rng);
         Handle::new(&handle).unwrap()
     }
 }
