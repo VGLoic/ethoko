@@ -1,7 +1,12 @@
+use chrono::Utc;
 use tracing::info;
 
-use crate::users::models::{
-    auth_credential::AuthCredential, email_signup::EmailSignupError, user::User,
+use crate::{
+    jobs::{
+        job,
+        queue::{Queue, QueueError},
+    },
+    users::models::{auth_credential::AuthCredential, email_signup::EmailSignupError, user::User},
 };
 
 #[async_trait::async_trait]
@@ -18,16 +23,18 @@ pub trait UsersNotifier: Send + Sync + 'static {
 }
 
 #[derive(Clone)]
-pub struct UsersNotifierImpl;
+pub struct UsersNotifierImpl<Q: Queue> {
+    queue: Q,
+}
 
-impl Default for UsersNotifierImpl {
-    fn default() -> Self {
-        Self
+impl<Q: Queue> UsersNotifierImpl<Q> {
+    pub fn new(queue: Q) -> Self {
+        Self { queue }
     }
 }
 
 #[async_trait::async_trait]
-impl UsersNotifier for UsersNotifierImpl {
+impl<Q: Queue> UsersNotifier for UsersNotifierImpl<Q> {
     async fn user_signed_up_with_email(
         &self,
         user: &User,
@@ -37,6 +44,16 @@ impl UsersNotifier for UsersNotifierImpl {
             "sending notification for user signed up with email: {}",
             user.email
         );
+        let job = job::Job::new(job::JobPayload::Bob, Utc::now());
+        self.queue.enqueue(job)?;
         Ok(())
+    }
+}
+
+impl From<QueueError> for EmailSignupError {
+    fn from(value: QueueError) -> Self {
+        match value {
+            QueueError::Unknown(e) => EmailSignupError::Unknown(e),
+        }
     }
 }

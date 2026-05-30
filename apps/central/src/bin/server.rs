@@ -1,8 +1,9 @@
 use dotenvy::dotenv;
-use ethoko_central::{config::Config, httpserver::serve_http_server, users};
+use ethoko_central::{config::Config, httpserver::serve_http_server, jobs, users};
 use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
-use tracing::{info, level_filters::LevelFilter};
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -52,9 +53,22 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Successfully ran migrations");
 
-    let users_notifier = users::notifier::UsersNotifierImpl;
+    let job_queue = jobs::queue::InMemoryQueue::default();
+    let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
     let users_service = users::service::UsersServiceImpl::new(users_repository, users_notifier);
+
+    let cancellation_token = CancellationToken::new();
+    let job_worker_queue = job_queue.clone();
+    let job_worker_token = cancellation_token.clone();
+    let job_worker_handle = tokio::spawn(async {
+        let worker = jobs::worker::Worker::new(job_worker_queue, job_worker_token, 1_000);
+
+        if let Err(e) = worker.run().await {
+            error!("Worker error: {e:?}")
+        }
+        info!("Gracefully exiting job worker handle")
+    });
 
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|err| {
@@ -68,5 +82,17 @@ async fn main() -> Result<(), anyhow::Error> {
         listener.local_addr().unwrap()
     );
 
-    serve_http_server(listener, users_service).await
+    if let Err(e) = serve_http_server(listener, users_service).await {
+        error!("Error during http server graceful shutdown: {e:?}");
+    }
+
+    info!("Cancelling other app handles");
+
+    cancellation_token.cancel();
+
+    if let Err(e) = job_worker_handle.await {
+        error!("Error during job worker handler graceful shutdown: {e:?}");
+    }
+
+    Ok(())
 }
