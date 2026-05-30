@@ -49,6 +49,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let job_queue = jobs::queue::InMemoryQueue::default();
 
     let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
+    let users_job_processor = users::notifier::job_processor::UsersJobProcessor;
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
     let users_service = users::service::UsersServiceImpl::new(users_repository, users_notifier);
 
@@ -56,7 +57,12 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let job_worker_queue = job_queue.clone();
     let job_worker_token = cancellation_token.clone();
     let job_worker_handle = tokio::spawn(async {
-        let worker = jobs::worker::Worker::new(job_worker_queue, job_worker_token, 1_000);
+        let worker = jobs::worker::Worker::new(
+            job_worker_queue,
+            users_job_processor,
+            job_worker_token,
+            1_000,
+        );
 
         if let Err(e) = worker.run().await {
             error!("Worker error: {e:?}")

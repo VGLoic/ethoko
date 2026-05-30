@@ -2,12 +2,15 @@ use chrono::Utc;
 use tracing::info;
 
 use crate::{
-    jobs::{
-        job,
-        queue::{Queue, QueueError},
+    jobs as generic_jobs,
+    users::{
+        models::{auth_credential::AuthCredential, email_signup::EmailSignupError, user::User},
+        notifier::jobs::{DummyJobPayload, UsersJob},
     },
-    users::models::{auth_credential::AuthCredential, email_signup::EmailSignupError, user::User},
 };
+
+pub mod job_processor;
+pub mod jobs;
 
 #[async_trait::async_trait]
 /// Defines the UsersNotifier trait for users related notifications
@@ -23,18 +26,18 @@ pub trait UsersNotifier: Send + Sync + 'static {
 }
 
 #[derive(Clone)]
-pub struct UsersNotifierImpl<Q: Queue> {
+pub struct UsersNotifierImpl<Q: generic_jobs::queue::Queue> {
     queue: Q,
 }
 
-impl<Q: Queue> UsersNotifierImpl<Q> {
+impl<Q: generic_jobs::queue::Queue> UsersNotifierImpl<Q> {
     pub fn new(queue: Q) -> Self {
         Self { queue }
     }
 }
 
 #[async_trait::async_trait]
-impl<Q: Queue> UsersNotifier for UsersNotifierImpl<Q> {
+impl<Q: generic_jobs::queue::Queue> UsersNotifier for UsersNotifierImpl<Q> {
     async fn user_signed_up_with_email(
         &self,
         user: &User,
@@ -44,16 +47,19 @@ impl<Q: Queue> UsersNotifier for UsersNotifierImpl<Q> {
             "sending notification for user signed up with email: {}",
             user.email
         );
-        let job = job::Job::new(job::JobPayload::Bob, Utc::now());
+        let job = generic_jobs::job::Job::new(
+            UsersJob::DummyJob(DummyJobPayload::new(user.id)),
+            Utc::now(),
+        )?;
         self.queue.enqueue(job)?;
         Ok(())
     }
 }
 
-impl From<QueueError> for EmailSignupError {
-    fn from(value: QueueError) -> Self {
+impl From<generic_jobs::queue::QueueError> for EmailSignupError {
+    fn from(value: generic_jobs::queue::QueueError) -> Self {
         match value {
-            QueueError::Unknown(e) => EmailSignupError::Unknown(e),
+            generic_jobs::queue::QueueError::Unknown(e) => EmailSignupError::Unknown(e),
         }
     }
 }
