@@ -8,8 +8,10 @@ use thiserror::Error;
 use crate::jobs::job::Job;
 
 // NEXT STEPS:
-// - fit in existing codebase
-// - define job payload and work on job structure
+// - fit in existing codebase --> check
+// - define job payload --> check
+// - handle testing
+// - work on job structure
 // - update logging
 // - use database for jobs
 

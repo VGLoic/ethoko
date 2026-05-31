@@ -13,7 +13,6 @@ pub struct Job {
 impl Job {
     pub fn new<Payload: Serialize + DeserializeOwned>(
         payload: Payload,
-        scheduled_at: chrono::DateTime<Utc>,
     ) -> Result<Self, anyhow::Error> {
         let id = uuid::Uuid::new_v4();
         let serialized_payload = serde_json::to_string(&payload)
@@ -21,10 +20,20 @@ impl Job {
         Ok(Self {
             id,
             payload: serialized_payload,
-            scheduled_at,
+            scheduled_at: Utc::now(),
             retries: 0,
             max_retries: 3,
         })
+    }
+
+    pub fn with_scheduled_at(mut self, scheduled_at: chrono::DateTime<Utc>) -> Self {
+        self.scheduled_at = scheduled_at;
+        self
+    }
+
+    pub fn with_max_retries(mut self, max_retries: u8) -> Self {
+        self.max_retries = max_retries;
+        self
     }
 
     pub fn schedule_retry(&mut self) -> &mut Self {

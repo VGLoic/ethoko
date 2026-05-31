@@ -5,10 +5,14 @@ use tokio_util::sync::CancellationToken;
 use tracing::{Level, error, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
+use crate::common::users_processor::FakeUserJobProcessor;
+mod users_processor;
+
 #[allow(dead_code)]
 pub struct InstanceState {
     pub reqwest_client: reqwest::Client,
     pub server_url: String,
+    pub users_processor: FakeUserJobProcessor,
 }
 
 pub fn default_test_config() -> Config {
@@ -49,19 +53,20 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let job_queue = jobs::queue::InMemoryQueue::default();
 
     let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
-    let users_job_processor = users::notifier::job_processor::UsersJobProcessor;
+    let users_job_processor = FakeUserJobProcessor::default();
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
     let users_service = users::service::UsersServiceImpl::new(users_repository, users_notifier);
 
     let cancellation_token = CancellationToken::new();
     let job_worker_queue = job_queue.clone();
     let job_worker_token = cancellation_token.clone();
+    let job_worker_users_job_processor = users_job_processor.clone();
     let job_worker_handle = tokio::spawn(async {
         let worker = jobs::worker::Worker::new(
             job_worker_queue,
-            users_job_processor,
+            job_worker_users_job_processor,
             job_worker_token,
-            1_000,
+            500,
         );
 
         if let Err(e) = worker.run().await {
@@ -99,6 +104,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
 
     Ok(InstanceState {
         server_url,
+        users_processor: users_job_processor,
         reqwest_client: reqwest::Client::new(),
     })
 }
