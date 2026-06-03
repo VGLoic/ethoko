@@ -3,15 +3,7 @@ use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
-use crate::jobs::{job::Job, queue::Queue};
-
-#[async_trait::async_trait]
-pub trait JobProcessor: Send + Sync + 'static {
-    /// Process a job
-    /// # Errors
-    /// A `anyhow::Error` is returned when failed to process the job. Job will be retried according to its configuration.
-    async fn process_job(&self, job: &Job) -> Result<(), anyhow::Error>;
-}
+use crate::jobs::{processor::JobProcessor, queue::Queue};
 
 pub struct Worker<Q: Queue, Processor: JobProcessor> {
     queue: Q,
@@ -41,18 +33,18 @@ impl<Q: Queue, Processor: JobProcessor> Worker<Q, Processor> {
                 debug!("Received instruction to close");
                 break;
             }
-            match self.queue.dequeue() {
+            match self.queue.dequeue().await {
                 Ok(Some(job)) => {
                     info!("Processing job: {:?}", job.id);
 
                     match self.processor.process_job(&job).await {
                         Ok(()) => {
-                            if let Err(e) = self.queue.success(job.id) {
+                            if let Err(e) = self.queue.success(job.id).await {
                                 error!("Failed to register success for job {}: {e:?}", job.id);
                             }
                         }
                         Err(_e) => {
-                            if let Err(e) = self.queue.fail(job.id) {
+                            if let Err(e) = self.queue.fail(job.id).await {
                                 error!("Failed to register failure for job: {:?}: {e:?}", job.id);
                             }
                         }
@@ -70,22 +62,3 @@ impl<Q: Queue, Processor: JobProcessor> Worker<Q, Processor> {
         Ok(())
     }
 }
-
-// async fn process_job(job: &Job) -> Result<(), anyhow::Error> {
-// sleep(Duration::from_millis(250)).await;
-
-// match job.payload {
-//     JobPayload::Bob => {
-//         info!("dealing with Bob");
-//         Ok(())
-//     }
-//     JobPayload::Jack => {
-//         info!("dealing with Jack");
-//         Ok(())
-//     }
-//     JobPayload::Roger => {
-//         info!("dealing with Jack");
-//         Ok(())
-//     }
-// }
-// }

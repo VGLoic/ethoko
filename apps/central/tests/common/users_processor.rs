@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use ethoko_central::{
-    jobs::{job::Job, worker::JobProcessor},
+    jobs::{job::Job, processor::JobProcessor},
     newtypes::{email::Email, handle::Handle},
     users::notifier::jobs::UsersJob,
 };

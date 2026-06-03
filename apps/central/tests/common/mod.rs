@@ -1,11 +1,16 @@
-use ethoko_central::{config::Config, httpserver::serve_http_server, jobs, users};
+use ethoko_central::{
+    config::Config,
+    httpserver::serve_http_server,
+    jobs::{processor::RootProcessor, queue::InMemoryQueue},
+    users,
+};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, time::Duration};
-use tokio_util::sync::CancellationToken;
 use tracing::{Level, error, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::common::users_processor::FakeUserJobProcessor;
+use crate::common::{manual_worker::ManualWorker, users_processor::FakeUserJobProcessor};
+mod manual_worker;
 mod users_processor;
 
 #[allow(dead_code)]
@@ -13,6 +18,7 @@ pub struct InstanceState {
     pub reqwest_client: reqwest::Client,
     pub server_url: String,
     pub users_processor: FakeUserJobProcessor,
+    pub job_worker: ManualWorker<InMemoryQueue, RootProcessor<FakeUserJobProcessor>>,
 }
 
 pub fn default_test_config() -> Config {
@@ -50,29 +56,17 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         return Err(anyhow::anyhow!(err));
     };
 
-    let job_queue = jobs::queue::InMemoryQueue::default();
+    let job_queue = InMemoryQueue::new(2);
 
     let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
     let users_job_processor = FakeUserJobProcessor::default();
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
     let users_service = users::service::UsersServiceImpl::new(users_repository, users_notifier);
 
-    let cancellation_token = CancellationToken::new();
     let job_worker_queue = job_queue.clone();
-    let job_worker_token = cancellation_token.clone();
     let job_worker_users_job_processor = users_job_processor.clone();
-    let job_worker_handle = tokio::spawn(async {
-        let worker = jobs::worker::Worker::new(
-            job_worker_queue,
-            job_worker_users_job_processor,
-            job_worker_token,
-            500,
-        );
-
-        if let Err(e) = worker.run().await {
-            error!("Worker error: {e:?}")
-        }
-    });
+    let root_processor = RootProcessor::new(Some(job_worker_users_job_processor));
+    let job_worker = ManualWorker::new(job_worker_queue, root_processor);
 
     let port = config.port;
 
@@ -95,15 +89,11 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         if let Err(e) = serve_http_server(listener, users_service).await {
             error!("Error during http server graceful shutdown: {e:?}");
         }
-        cancellation_token.cancel();
-
-        if let Err(e) = job_worker_handle.await {
-            error!("Error during job worker handler graceful shutdown: {e:?}");
-        }
     });
 
     Ok(InstanceState {
         server_url,
+        job_worker,
         users_processor: users_job_processor,
         reqwest_client: reqwest::Client::new(),
     })

@@ -53,7 +53,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Successfully ran migrations");
 
-    let job_queue = jobs::queue::InMemoryQueue::default();
+    let job_queue = jobs::queue::InMemoryQueue::new(2);
     let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
     let users_job_processor = users::notifier::job_processor::UsersJobProcessor;
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
@@ -63,9 +63,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let job_worker_queue = job_queue.clone();
     let job_worker_token = cancellation_token.clone();
     let job_worker_handle = tokio::spawn(async {
-        let worker = jobs::worker::Worker::new(
+        let root_processor = jobs::processor::RootProcessor::new(Some(users_job_processor));
+        let worker = jobs::polling_worker::Worker::new(
             job_worker_queue,
-            users_job_processor,
+            root_processor,
             job_worker_token,
             1_000,
         );

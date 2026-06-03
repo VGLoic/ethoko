@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use axum::http::StatusCode;
 use ethoko_central::{
     newtypes::{email::Email, handle::Handle, password::Password},
@@ -9,7 +7,6 @@ use ethoko_central::{
 mod common;
 use common::{default_test_config, setup_instance};
 use fake::{Fake, Faker};
-use tokio::time::sleep;
 
 #[tokio::test]
 async fn test_signup() {
@@ -37,7 +34,7 @@ async fn test_signup() {
     assert_eq!(response_body.email, email);
     assert_eq!(response_body.handle, handle);
 
-    sleep(Duration::from_millis(500)).await;
+    instance_state.job_worker.consume_jobs().await.unwrap();
 
     assert!(instance_state.users_processor.has_email(&email))
 }

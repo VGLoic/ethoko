@@ -4,7 +4,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 use crate::{
-    jobs::{job::Job, worker::JobProcessor},
+    jobs::{job::Job, processor::JobProcessor},
     users::notifier::jobs::UsersJob,
 };
 

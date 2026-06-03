@@ -47,10 +47,13 @@ impl<Q: generic_jobs::queue::Queue> UsersNotifier for UsersNotifierImpl<Q> {
             "sending notification for user signed up with email: {}",
             user.email
         );
-        let job = generic_jobs::job::Job::new(UsersJob::DummyJob(DummyJobPayload::new(user)))?
-            .with_max_retries(3)
-            .with_scheduled_at(Utc::now());
-        self.queue.enqueue(job)?;
+        let job = generic_jobs::job::Job::new(
+            generic_jobs::job::Topic::Users,
+            UsersJob::DummyJob(DummyJobPayload::new(user)),
+        )?
+        .with_max_retries(3)
+        .with_scheduled_at(Utc::now());
+        self.queue.enqueue(job).await?;
         Ok(())
     }
 }
