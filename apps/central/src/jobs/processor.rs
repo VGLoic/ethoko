@@ -1,6 +1,6 @@
 use tracing::warn;
 
-use crate::jobs::job::{Job, Topic};
+use crate::jobs::{job::Job, topic::Topic};
 
 #[async_trait::async_trait]
 pub trait JobProcessor: Send + Sync + 'static {

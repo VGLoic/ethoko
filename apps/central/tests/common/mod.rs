@@ -1,7 +1,7 @@
 use ethoko_central::{
     config::Config,
     httpserver::serve_http_server,
-    jobs::{processor::RootProcessor, queue::InMemoryQueue},
+    jobs::{memoryqueue::InMemoryQueue, processor::RootProcessor},
     users,
 };
 use sqlx::postgres::PgPoolOptions;

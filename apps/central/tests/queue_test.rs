@@ -1,10 +1,7 @@
 use std::time::Duration;
 
 use chrono::{TimeDelta, Utc};
-use ethoko_central::jobs::{
-    job::{Job, Topic},
-    queue::{InMemoryQueue, Queue},
-};
+use ethoko_central::jobs::{job::Job, memoryqueue::InMemoryQueue, queue::Queue, topic::Topic};
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 

@@ -1,3 +1,4 @@
+use super::topic::Topic;
 use chrono::Utc;
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -9,11 +10,6 @@ pub struct Job {
     pub scheduled_at: chrono::DateTime<Utc>,
     pub retries: u8,
     pub max_retries: u8,
-}
-
-#[derive(Debug, Clone)]
-pub enum Topic {
-    Users,
 }
 
 impl Job {
