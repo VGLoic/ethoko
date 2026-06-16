@@ -86,7 +86,7 @@ impl Queue for InMemoryQueue {
             .remove(&id)
             .ok_or_else(|| anyhow::anyhow!("job {id} not found"))?;
 
-        if job.retries >= job.max_retries {
+        if job.retry_count >= job.max_retries {
             warn!("Job {} has retried too much, ending up in DLQ", job.id);
             let mut dead_jobs = self.dead_jobs.lock().map_err(|e| {
                 anyhow::anyhow!("{e}").context("failed to aquire idle_jobs lock during dequeue")
@@ -95,7 +95,7 @@ impl Queue for InMemoryQueue {
         } else {
             warn!(
                 "Job {} scheduled for retry with retry #{}",
-                job.id, job.retries
+                job.id, job.retry_count
             );
             let scheduled_at = Utc::now()
                 .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds))

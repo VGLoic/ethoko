@@ -1,15 +1,16 @@
 use super::topic::Topic;
 use chrono::Utc;
 use serde::{Serialize, de::DeserializeOwned};
+use sqlx::prelude::FromRow;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromRow)]
 pub struct Job {
     pub id: uuid::Uuid,
     pub topic: Topic,
     pub payload: String,
     pub scheduled_at: chrono::DateTime<Utc>,
-    pub retries: u8,
-    pub max_retries: u8,
+    pub retry_count: i16,
+    pub max_retries: i16,
 }
 
 impl Job {
@@ -25,7 +26,7 @@ impl Job {
             topic,
             payload: serialized_payload,
             scheduled_at: Utc::now(),
-            retries: 0,
+            retry_count: 0,
             max_retries: 3,
         })
     }
@@ -35,19 +36,19 @@ impl Job {
         self
     }
 
-    pub fn with_max_retries(mut self, max_retries: u8) -> Self {
+    pub fn with_max_retries(mut self, max_retries: i16) -> Self {
         self.max_retries = max_retries;
         self
     }
 
     pub fn schedule_retry(&mut self, scheduled_at: chrono::DateTime<Utc>) -> &mut Self {
-        self.retries += 1;
+        self.retry_count += 1;
         self.scheduled_at = scheduled_at;
         self
     }
 
     pub fn reset_retries(&mut self) -> &mut Self {
-        self.retries = 0;
+        self.retry_count = 0;
         self
     }
 }
