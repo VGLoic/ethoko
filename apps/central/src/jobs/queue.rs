@@ -2,17 +2,6 @@ use thiserror::Error;
 
 use crate::jobs::job::Job;
 
-// NEXT STEPS:
-// - fit in existing codebase --> check
-// - define job payload --> check
-// - handle testing --> check
-// - work on job structure --> check
-// - update logging --> check
-// - add a series of test --> check
-// - add a version with database
-// - add ADR
-// - PR
-
 #[async_trait::async_trait]
 pub trait Queue: Send + Sync + 'static {
     /// Enqueue a job
@@ -25,8 +14,8 @@ pub trait Queue: Send + Sync + 'static {
     /// Job is retried if it has not reached its max retries
     /// Else, job is put in the DLQ
     async fn fail(&self, id: uuid::Uuid) -> Result<(), QueueError>;
-    /// Retry job from DLQ
-    /// Job is moved from DLQ to ready_jobs
+    /// Retry a dead job
+    /// Job is moved from dead jobs to ready jobs
     async fn retry(&self, id: uuid::Uuid) -> Result<(), QueueError>;
     /// Get idle jobs
     async fn idle_jobs(&self) -> Result<Vec<Job>, QueueError>;
