@@ -2,7 +2,7 @@ use dotenvy::dotenv;
 use ethoko_central::{
     config::Config,
     httpserver::serve_http_server,
-    jobs,
+    jobs::{self, processor::JobProcessor},
     users::{self, notifier::USERS_JOB_TOPIC},
 };
 use sqlx::postgres::PgPoolOptions;
@@ -70,7 +70,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let job_worker_handle = tokio::spawn(async {
         let root_processor = jobs::rootprocessor::RootProcessor::new(HashMap::from([(
             USERS_JOB_TOPIC.to_string(),
-            users_job_processor,
+            Box::new(users_job_processor) as Box<dyn JobProcessor>,
         )]));
         let worker = jobs::polling_worker::Worker::new(
             job_worker_queue,

@@ -4,18 +4,18 @@ use tracing::warn;
 
 use crate::jobs::{job::Job, processor::JobProcessor};
 
-pub struct RootProcessor<P: JobProcessor> {
-    processors: HashMap<String, P>,
+pub struct RootProcessor {
+    processors: HashMap<String, Box<dyn JobProcessor>>,
 }
 
-impl<P: JobProcessor> RootProcessor<P> {
-    pub fn new(processors: HashMap<String, P>) -> Self {
+impl RootProcessor {
+    pub fn new(processors: HashMap<String, Box<dyn JobProcessor>>) -> Self {
         Self { processors }
     }
 }
 
 #[async_trait::async_trait]
-impl<P: JobProcessor> JobProcessor for RootProcessor<P> {
+impl JobProcessor for RootProcessor {
     async fn process_job(&self, job: &Job) -> Result<(), anyhow::Error> {
         let processor = self.processors.get(&job.topic);
         if let Some(processor) = processor {

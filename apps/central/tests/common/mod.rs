@@ -1,7 +1,7 @@
 use ethoko_central::{
     config::Config,
     httpserver::serve_http_server,
-    jobs::{memoryqueue::InMemoryQueue, rootprocessor::RootProcessor},
+    jobs::{memoryqueue::InMemoryQueue, processor::JobProcessor, rootprocessor::RootProcessor},
     users::{self, notifier::USERS_JOB_TOPIC},
 };
 use sqlx::postgres::PgPoolOptions;
@@ -18,7 +18,7 @@ pub struct InstanceState {
     pub reqwest_client: reqwest::Client,
     pub server_url: String,
     pub users_processor: FakeUserJobProcessor,
-    pub job_worker: ManualWorker<InMemoryQueue, RootProcessor<FakeUserJobProcessor>>,
+    pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
 }
 
 pub fn default_test_config() -> Config {
@@ -67,7 +67,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let job_worker_users_job_processor = users_job_processor.clone();
     let root_processor = RootProcessor::new(HashMap::from([(
         USERS_JOB_TOPIC.to_string(),
-        job_worker_users_job_processor,
+        Box::new(job_worker_users_job_processor) as Box<dyn JobProcessor>,
     )]));
     let job_worker = ManualWorker::new(job_worker_queue, root_processor);
 
