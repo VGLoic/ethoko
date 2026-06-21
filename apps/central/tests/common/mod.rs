@@ -1,11 +1,11 @@
 use ethoko_central::{
     config::Config,
     httpserver::serve_http_server,
-    jobs::{memoryqueue::InMemoryQueue, processor::RootProcessor},
-    users,
+    jobs::{memoryqueue::InMemoryQueue, rootprocessor::RootProcessor},
+    users::{self, notifier::USERS_JOB_TOPIC},
 };
 use sqlx::postgres::PgPoolOptions;
-use std::{net::SocketAddr, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tracing::{Level, error, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -65,7 +65,10 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
 
     let job_worker_queue = job_queue.clone();
     let job_worker_users_job_processor = users_job_processor.clone();
-    let root_processor = RootProcessor::new(Some(job_worker_users_job_processor));
+    let root_processor = RootProcessor::new(HashMap::from([(
+        USERS_JOB_TOPIC.to_string(),
+        job_worker_users_job_processor,
+    )]));
     let job_worker = ManualWorker::new(job_worker_queue, root_processor);
 
     let port = config.port;

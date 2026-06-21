@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use chrono::{Days, TimeDelta, Utc};
 use ethoko_central::jobs::{
-    job::Job, memoryqueue::InMemoryQueue, psqlqueue::PsqlQueue, queue::Queue, topic::Topic,
+    job::Job, memoryqueue::InMemoryQueue, psqlqueue::PsqlQueue, queue::Queue,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
@@ -51,7 +51,7 @@ async fn test_enqueue_single_job<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload)
+    let job = Job::new("test-topic".to_string(), payload)
         .unwrap()
         .with_scheduled_at(Utc::now().checked_add_days(Days::new(1)).unwrap());
 
@@ -79,10 +79,10 @@ async fn test_enqueue_multiple_jobs<Q: Queue>(queue: Q) {
     let payload2 = TestJobPayload {
         message: "Goodbye, world!".to_string(),
     };
-    let job1 = Job::new(Topic::Users, payload1)
+    let job1 = Job::new("test-topic".to_string(), payload1)
         .unwrap()
         .with_scheduled_at(Utc::now().checked_add_signed(TimeDelta::days(1)).unwrap());
-    let job2 = Job::new(Topic::Users, payload2)
+    let job2 = Job::new("test-topic".to_string(), payload2)
         .unwrap()
         .with_scheduled_at(Utc::now().checked_add_signed(TimeDelta::days(1)).unwrap());
 
@@ -110,11 +110,13 @@ async fn test_dequeue_ready_job<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload).unwrap().with_scheduled_at(
-        Utc::now()
-            .checked_sub_signed(TimeDelta::seconds(1))
-            .unwrap(),
-    );
+    let job = Job::new("test-topic".to_string(), payload)
+        .unwrap()
+        .with_scheduled_at(
+            Utc::now()
+                .checked_sub_signed(TimeDelta::seconds(1))
+                .unwrap(),
+        );
     queue.enqueue(job.clone()).await.unwrap();
     let _ = queue.dequeue().await.unwrap();
     assert!(
@@ -151,11 +153,13 @@ async fn test_dequeue_not_ready_job<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload).unwrap().with_scheduled_at(
-        Utc::now()
-            .checked_add_signed(TimeDelta::seconds(20))
-            .unwrap(),
-    );
+    let job = Job::new("test-topic".to_string(), payload)
+        .unwrap()
+        .with_scheduled_at(
+            Utc::now()
+                .checked_add_signed(TimeDelta::seconds(20))
+                .unwrap(),
+        );
     queue.enqueue(job.clone()).await.unwrap();
     let _ = queue.dequeue().await.unwrap();
     assert!(
@@ -192,11 +196,13 @@ async fn test_success_process<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload).unwrap().with_scheduled_at(
-        Utc::now()
-            .checked_sub_signed(TimeDelta::seconds(1))
-            .unwrap(),
-    );
+    let job = Job::new("test-topic".to_string(), payload)
+        .unwrap()
+        .with_scheduled_at(
+            Utc::now()
+                .checked_sub_signed(TimeDelta::seconds(1))
+                .unwrap(),
+        );
     queue.enqueue(job.clone()).await.unwrap();
     let _ = queue.dequeue().await.unwrap().unwrap();
 
@@ -234,7 +240,7 @@ async fn test_fail_process<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload)
+    let job = Job::new("test-topic".to_string(), payload)
         .unwrap()
         .with_scheduled_at(
             Utc::now()
@@ -283,7 +289,7 @@ async fn test_fail_process_exceeding_retries<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload)
+    let job = Job::new("test-topic".to_string(), payload)
         .unwrap()
         .with_scheduled_at(
             Utc::now()
@@ -320,7 +326,7 @@ async fn test_fail_into_success<Q: Queue>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new(Topic::Users, payload)
+    let job = Job::new("test-topic".to_string(), payload)
         .unwrap()
         .with_scheduled_at(
             Utc::now()

@@ -1,7 +1,12 @@
 use dotenvy::dotenv;
-use ethoko_central::{config::Config, httpserver::serve_http_server, jobs, users};
+use ethoko_central::{
+    config::Config,
+    httpserver::serve_http_server,
+    jobs,
+    users::{self, notifier::USERS_JOB_TOPIC},
+};
 use sqlx::postgres::PgPoolOptions;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
@@ -63,7 +68,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let job_worker_queue = job_queue.clone();
     let job_worker_token = cancellation_token.clone();
     let job_worker_handle = tokio::spawn(async {
-        let root_processor = jobs::processor::RootProcessor::new(Some(users_job_processor));
+        let root_processor = jobs::rootprocessor::RootProcessor::new(HashMap::from([(
+            USERS_JOB_TOPIC.to_string(),
+            users_job_processor,
+        )]));
         let worker = jobs::polling_worker::Worker::new(
             job_worker_queue,
             root_processor,

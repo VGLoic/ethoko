@@ -1,4 +1,3 @@
-use super::topic::Topic;
 use chrono::Utc;
 use serde::{Serialize, de::DeserializeOwned};
 use sqlx::prelude::FromRow;
@@ -6,7 +5,7 @@ use sqlx::prelude::FromRow;
 #[derive(Debug, Clone, FromRow)]
 pub struct Job {
     pub id: uuid::Uuid,
-    pub topic: Topic,
+    pub topic: String,
     pub payload: String,
     pub scheduled_at: chrono::DateTime<Utc>,
     pub retry_count: i16,
@@ -15,7 +14,7 @@ pub struct Job {
 
 impl Job {
     pub fn new<Payload: Serialize + DeserializeOwned>(
-        topic: Topic,
+        topic: String,
         payload: Payload,
     ) -> Result<Self, anyhow::Error> {
         let id = uuid::Uuid::new_v4();

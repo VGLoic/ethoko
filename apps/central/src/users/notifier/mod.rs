@@ -5,7 +5,6 @@ use crate::{
     jobs::{
         job::Job,
         queue::{Queue, QueueError},
-        topic::Topic,
     },
     users::{
         models::{auth_credential::AuthCredential, email_signup::EmailSignupError, user::User},
@@ -15,6 +14,8 @@ use crate::{
 
 pub mod job_processor;
 pub mod jobs;
+
+pub const USERS_JOB_TOPIC: &str = "users";
 
 #[async_trait::async_trait]
 /// Defines the UsersNotifier trait for users related notifications
@@ -51,9 +52,12 @@ impl<Q: Queue> UsersNotifier for UsersNotifierImpl<Q> {
             "sending notification for user signed up with email: {}",
             user.email
         );
-        let job = Job::new(Topic::Users, UsersJob::DummyJob(DummyJobPayload::new(user)))?
-            .with_max_retries(3)
-            .with_scheduled_at(Utc::now());
+        let job = Job::new(
+            USERS_JOB_TOPIC.to_string(),
+            UsersJob::DummyJob(DummyJobPayload::new(user)),
+        )?
+        .with_max_retries(3)
+        .with_scheduled_at(Utc::now());
         self.queue.enqueue(job).await?;
         Ok(())
     }
