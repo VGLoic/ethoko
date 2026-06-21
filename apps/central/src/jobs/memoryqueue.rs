@@ -8,6 +8,16 @@ use tracing::{debug, info, warn};
 use crate::jobs::{job::Job, queue::Queue, queue::QueueError};
 
 #[derive(Debug, Clone)]
+/// An in-memory queue for jobs
+/// It defines three hash maps protected by Mutext for storing the jobs in their different states
+/// `idle_jobs` contain jobs waiting to be ready,
+/// `ready_jobs` contain jobs ready to be picked,
+/// `dead_jobs` contain jobs that have failed too many times and are considered dead
+///
+/// Because of locking constraints in multi-threaded environments, a consistent order for the lock MUST be applied:
+/// 1. idle_jobs,
+/// 2. ready_jobs,
+/// 3. dead_jobs.
 pub struct InMemoryQueue {
     retry_delay_seconds: i64,
     idle_jobs: Arc<Mutex<HashMap<uuid::Uuid, Job>>>,
@@ -38,11 +48,11 @@ impl Queue for InMemoryQueue {
     }
 
     async fn dequeue(&self) -> Result<Option<Job>, QueueError> {
-        let mut ready_jobs = self.ready_jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire ready_jobs lock during dequeue")
-        })?;
         let mut idle_jobs = self.idle_jobs.lock().map_err(|e| {
             anyhow::anyhow!("{e}").context("failed to aquire idle_jobs lock during dequeue")
+        })?;
+        let mut ready_jobs = self.ready_jobs.lock().map_err(|e| {
+            anyhow::anyhow!("{e}").context("failed to aquire ready_jobs lock during dequeue")
         })?;
         let now = Utc::now();
         let new_ready_ids = idle_jobs
@@ -78,6 +88,10 @@ impl Queue for InMemoryQueue {
     }
 
     async fn fail(&self, id: uuid::Uuid) -> Result<(), QueueError> {
+        let mut idle_jobs = self.idle_jobs.lock().map_err(|e| {
+            anyhow::anyhow!("{e}").context("failed to aquire idle_jobs lock during dequeue")
+        })?;
+
         let mut ready_jobs = self.ready_jobs.lock().map_err(|e| {
             anyhow::anyhow!("{e}").context("failed to aquire ready_jobs lock during dequeue")
         })?;
@@ -102,10 +116,6 @@ impl Queue for InMemoryQueue {
                 .ok_or_else(|| anyhow::anyhow!("failed to compute scheduled_at for retry"))?;
             job.schedule_retry(scheduled_at);
 
-            let mut idle_jobs = self.idle_jobs.lock().map_err(|e| {
-                anyhow::anyhow!("{e}").context("failed to aquire idle_jobs lock during dequeue")
-            })?;
-
             idle_jobs.insert(id, job);
         }
 
@@ -113,6 +123,9 @@ impl Queue for InMemoryQueue {
     }
 
     async fn retry(&self, id: uuid::Uuid) -> Result<(), QueueError> {
+        let mut ready_jobs = self.ready_jobs.lock().map_err(|e| {
+            anyhow::anyhow!("{e}").context("failed to aquire ready_jobs lock during dequeue")
+        })?;
         let mut dead_jobs = self.dead_jobs.lock().map_err(|e| {
             anyhow::anyhow!("{e}").context("failed to aquire dead_jobs lock during dequeue")
         })?;
@@ -120,9 +133,6 @@ impl Queue for InMemoryQueue {
             .remove(&id)
             .ok_or_else(|| anyhow::anyhow!("job {id} not found"))?;
         job.reset_retries();
-        let mut ready_jobs = self.ready_jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire ready_jobs lock during dequeue")
-        })?;
         info!("Job {} retried from DLQ", job.id);
         ready_jobs.insert(id, job);
         Ok(())
