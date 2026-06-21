@@ -5,7 +5,11 @@ use std::{
 };
 use tracing::{debug, info, warn};
 
-use crate::jobs::{job::Job, queue::Queue, queue::QueueError};
+use crate::jobs::{
+    job::Job,
+    queue::QueueError,
+    queue::{Queue, QueueInspector},
+};
 
 #[derive(Debug, Clone)]
 /// An in-memory queue for jobs
@@ -137,7 +141,10 @@ impl Queue for InMemoryQueue {
         ready_jobs.insert(id, job);
         Ok(())
     }
+}
 
+#[async_trait::async_trait]
+impl QueueInspector for InMemoryQueue {
     async fn idle_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let idle_jobs = self.idle_jobs.lock().map_err(|e| {
             anyhow::anyhow!("{e}").context("failed to aquire idle_jobs lock during dequeue")

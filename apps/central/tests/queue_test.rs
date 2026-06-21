@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use chrono::{Days, TimeDelta, Utc};
 use ethoko_central::jobs::{
-    job::Job, memoryqueue::InMemoryQueue, psqlqueue::PsqlQueue, queue::Queue,
+    job::Job,
+    memoryqueue::InMemoryQueue,
+    psqlqueue::PsqlQueue,
+    queue::{Queue, QueueInspector},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
@@ -47,7 +50,7 @@ async fn test_enqueue_single_job_memory_queue() {
     test_enqueue_single_job(queue).await;
 }
 
-async fn test_enqueue_single_job<Q: Queue>(queue: Q) {
+async fn test_enqueue_single_job<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -72,7 +75,7 @@ async fn test_enqueue_multiple_jobs_memory_queue() {
     test_enqueue_multiple_jobs(queue).await;
 }
 
-async fn test_enqueue_multiple_jobs<Q: Queue>(queue: Q) {
+async fn test_enqueue_multiple_jobs<Q: Queue + QueueInspector>(queue: Q) {
     let payload1 = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -106,7 +109,7 @@ async fn test_dequeue_ready_job_memory_queue() {
     test_dequeue_ready_job(queue).await;
 }
 
-async fn test_dequeue_ready_job<Q: Queue>(queue: Q) {
+async fn test_dequeue_ready_job<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -149,7 +152,7 @@ async fn test_dequeue_not_ready_job_memory_queue() {
     test_dequeue_not_ready_job(queue).await;
 }
 
-async fn test_dequeue_not_ready_job<Q: Queue>(queue: Q) {
+async fn test_dequeue_not_ready_job<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -192,7 +195,7 @@ async fn test_success_process_memory_queue() {
     test_success_process(queue).await;
 }
 
-async fn test_success_process<Q: Queue>(queue: Q) {
+async fn test_success_process<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -236,7 +239,7 @@ async fn test_fail_process_psql_queue() {
     test_fail_process(queue).await;
 }
 
-async fn test_fail_process<Q: Queue>(queue: Q) {
+async fn test_fail_process<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -285,7 +288,7 @@ async fn test_fail_process_exceeding_retries_psql_queue() {
     test_fail_process_exceeding_retries(queue).await;
 }
 
-async fn test_fail_process_exceeding_retries<Q: Queue>(queue: Q) {
+async fn test_fail_process_exceeding_retries<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
@@ -322,7 +325,7 @@ async fn test_fail_into_success_psql_queue() {
     test_fail_into_success(queue).await;
 }
 
-async fn test_fail_into_success<Q: Queue>(queue: Q) {
+async fn test_fail_into_success<Q: Queue + QueueInspector>(queue: Q) {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };

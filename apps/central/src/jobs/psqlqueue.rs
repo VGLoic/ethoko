@@ -1,4 +1,8 @@
-use crate::jobs::{job::Job, queue::Queue, queue::QueueError};
+use crate::jobs::{
+    job::Job,
+    queue::QueueError,
+    queue::{Queue, QueueInspector},
+};
 use chrono::Utc;
 use sqlx::{Pool, Postgres};
 use tracing::{debug, warn};
@@ -220,7 +224,10 @@ impl Queue for PsqlQueue {
         debug!("Job {} retried from DLQ", id);
         Ok(())
     }
+}
 
+#[async_trait::async_trait]
+impl QueueInspector for PsqlQueue {
     async fn idle_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = sqlx::query_as::<_, Job>(
             r#"
