@@ -15,3 +15,8 @@ The design allows for an `at least once delivery` by adding dedicated `success` 
 Each job is created with a specific `max retries`, once reach, the job is considered **dead** and will not be picked up automatically. A dead job can be retried manually.
 
 The PostgreSQL backing is non optimal compared to other technologies but it has been chosen as a pragmatic approach. Another queue can be implemented with a more suited technology when needed.
+
+## Identified optimizations for larger scale
+
+1. Add a `(dead, scheduled_at)` composite index for the `dequeue` query when it becomes a bottleneck.
+2. Move the queue system to a more performant system such as RabbitMQ or Redis.
