@@ -13,3 +13,5 @@ The queue manages jobs with a PostgreSQL database, jobs are stored in database w
 
 The design allows for an `at least once delivery` by adding dedicated `success` and `fail` registration methods for a job in the queue.
 Each job has is created with a specific `max retries`, once reach, the job is considered **dead** and will not be picked up automatically. A dead job can be retried manually.
+
+The PostgreSQL backing is non optimal compared to other technologies but it has been chosen as a pragmatic approach. Another queue can be implemented with a more suited technology when needed.
