@@ -58,7 +58,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Successfully ran migrations");
 
-    let job_queue = jobs::memoryqueue::InMemoryQueue::new(2);
+    let job_queue = jobs::psqlqueue::PsqlQueue::new(3, pool.clone());
     let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
     let users_job_processor = users::notifier::job_processor::UsersJobProcessor;
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
