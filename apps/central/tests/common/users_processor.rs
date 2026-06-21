@@ -20,7 +20,6 @@ impl Default for FakeUserJobProcessor {
 }
 
 #[async_trait::async_trait]
-#[async_trait::async_trait]
 impl JobProcessor for FakeUserJobProcessor {
     async fn process_job(&self, job: &Job) -> Result<(), anyhow::Error> {
         let payload: UsersJob = serde_json::from_str(&job.payload).map_err(|e| {
