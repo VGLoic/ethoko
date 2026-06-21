@@ -5,7 +5,7 @@ A single async work queue is used to process all asynchronous work in the system
 The server binary instantiates:
 - a single async work queue,
 - a root processor, set up using child processors, that processeses all jobs,
-- a worker, set up from the root processor, that poll the queue for new jobs and process them in the background.
+- a single worker, set up from the root processor, that poll the queue for new jobs and process them in the background.
 
 Each **bounded context** (e.g. users) defines its unique job topic, its job types and payloads and its child processor. Jobs are enqueued by the bounded context **Notifier** using the single work queue. The child processor is setup with the topic in the root processor.
 
