@@ -16,6 +16,8 @@ struct TestJobPayload {
     pub message: String,
 }
 
+const RETRY_DELAY_SECONDS: u64 = 1;
+
 async fn setup_psql_queue() -> Result<PsqlQueue, anyhow::Error> {
     let pool = match PgPoolOptions::new()
         .max_connections(5)
@@ -35,7 +37,7 @@ async fn setup_psql_queue() -> Result<PsqlQueue, anyhow::Error> {
         return Err(anyhow::anyhow!(err));
     };
 
-    Ok(PsqlQueue::new(1, pool))
+    Ok(PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool))
 }
 
 #[tokio::test]
@@ -46,7 +48,7 @@ async fn test_enqueue_single_job_psql_queue() {
 
 #[tokio::test]
 async fn test_enqueue_single_job_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_enqueue_single_job(queue).await;
 }
 
@@ -71,7 +73,7 @@ async fn test_enqueue_multiple_jobs_psql_queue() {
 
 #[tokio::test]
 async fn test_enqueue_multiple_jobs_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_enqueue_multiple_jobs(queue).await;
 }
 
@@ -105,7 +107,7 @@ async fn test_dequeue_ready_job_psql_queue() {
 
 #[tokio::test]
 async fn test_dequeue_ready_job_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_dequeue_ready_job(queue).await;
 }
 
@@ -148,7 +150,7 @@ async fn test_dequeue_not_ready_job_psql_queue() {
 
 #[tokio::test]
 async fn test_dequeue_not_ready_job_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_dequeue_not_ready_job(queue).await;
 }
 
@@ -191,7 +193,7 @@ async fn test_success_process_psql_queue() {
 
 #[tokio::test]
 async fn test_success_process_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_success_process(queue).await;
 }
 
@@ -230,7 +232,7 @@ async fn test_success_process<Q: Queue + QueueInspector>(queue: Q) {
 
 #[tokio::test]
 async fn test_fail_process_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_fail_process(queue).await;
 }
 #[tokio::test]
@@ -255,7 +257,7 @@ async fn test_fail_process<Q: Queue + QueueInspector>(queue: Q) {
     let _ = queue.dequeue().await.unwrap().unwrap();
 
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
     let _ = queue.dequeue().await.unwrap().unwrap();
 
     assert!(
@@ -278,7 +280,7 @@ async fn test_fail_process<Q: Queue + QueueInspector>(queue: Q) {
 
 #[tokio::test]
 async fn test_fail_process_exceeding_retries_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_fail_process_exceeding_retries(queue).await;
 }
 
@@ -304,7 +306,7 @@ async fn test_fail_process_exceeding_retries<Q: Queue + QueueInspector>(queue: Q
 
     let _ = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
     let _ = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
 
@@ -315,7 +317,7 @@ async fn test_fail_process_exceeding_retries<Q: Queue + QueueInspector>(queue: Q
 
 #[tokio::test]
 async fn test_fail_into_success_memory_queue() {
-    let queue = InMemoryQueue::new(1);
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
     test_fail_into_success(queue).await;
 }
 
@@ -341,7 +343,7 @@ async fn test_fail_into_success<Q: Queue + QueueInspector>(queue: Q) {
 
     let _ = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
     let _ = queue.dequeue().await.unwrap().unwrap();
 
     queue.success(job.id).await.unwrap();
