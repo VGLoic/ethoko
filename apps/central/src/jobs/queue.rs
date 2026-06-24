@@ -2,6 +2,18 @@ use thiserror::Error;
 
 use crate::jobs::job::Job;
 
+// REMIND ME:
+// With the current design, we don't support concurrent workers. In order to do so, we need to introduce the notion of `processing`.
+// A job given by the `dequeue` should be considered processing, another `dequeue` call would give another job.
+// It introduces an issue which is: in case of issue in the worker, not calling `fail` or `success`, we are not stuck with a job in `processing`.
+// Ways to solve this:
+//  - in PSQL, we can manage all this with a transaction, see https://www.netdata.cloud/academy/update-skip-locked/. It is not clear however how we would implement it with a memory queue.
+//  - introducing a timeout for the processing jobs, reverting them to pending after a particular amount of time.
+//
+// Important considerations:
+// - we need to add the tests first -> done unless for
+// - we could introduce a ProcessingJob struct that would host the `success` or `fail` methods, it would be needed for the PSQL transaction approach
+
 #[async_trait::async_trait]
 /// Trait for async work queue allowing for at least once processing.
 ///
