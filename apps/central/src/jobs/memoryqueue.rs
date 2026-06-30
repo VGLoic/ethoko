@@ -6,9 +6,8 @@ use std::{
 use tracing::{debug, info, warn};
 
 use crate::jobs::{
-    job::Job,
-    queue::QueueError,
-    queue::{Queue, QueueInspector},
+    job::{Job, JobRequest},
+    queue::{Queue, QueueError, QueueInspector},
 };
 
 #[derive(Debug, Clone)]
@@ -43,16 +42,33 @@ impl InMemoryQueue {
     }
 }
 
+impl From<JobRequest> for Job {
+    fn from(value: JobRequest) -> Self {
+        Job {
+            id: uuid::Uuid::new_v4(),
+            topic: value.topic,
+            payload: value.payload,
+            processing_timeout_seconds: value.processing_timeout_seconds,
+            scheduled_at: value.scheduled_at,
+            dequeued_at: None,
+            processing_timeout_at: None,
+            retry_count: 0,
+            max_retries: value.max_retries,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl Queue for InMemoryQueue {
-    async fn enqueue(&self, job: Job) -> Result<(), QueueError> {
+    async fn enqueue(&self, job_request: JobRequest) -> Result<Job, QueueError> {
         let mut idle_jobs = self.idle_jobs.lock().map_err(|e| {
             anyhow::anyhow!("{e}").context("failed to aquire idle_jobs lock during enqueue")
         })?;
+        let job = Job::from(job_request);
         debug!("Job {} enqueued", job.id);
-        idle_jobs.insert(job.id, job);
+        idle_jobs.insert(job.id, job.clone());
 
-        Ok(())
+        Ok(job)
     }
 
     async fn dequeue(&self) -> Result<Option<Job>, QueueError> {

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::jobs::job::Job;
+use crate::jobs::job::{Job, JobRequest};
 
 // REMIND ME:
 // With the current design, we don't support concurrent workers. In order to do so, we need to introduce the notion of `processing`.
@@ -25,7 +25,7 @@ use crate::jobs::job::Job;
 /// If a job has failed too many times, it is considered `dead` and can be manually retried using the `retry` method.
 pub trait Queue: Send + Sync + 'static {
     /// Enqueue a job
-    async fn enqueue(&self, job: Job) -> Result<(), QueueError>;
+    async fn enqueue(&self, job: JobRequest) -> Result<Job, QueueError>;
     /// Dequeue a job if any
     async fn dequeue(&self) -> Result<Option<Job>, QueueError>;
     /// Register success for a processing job

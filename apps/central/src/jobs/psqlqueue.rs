@@ -1,7 +1,6 @@
 use crate::jobs::{
-    job::Job,
-    queue::QueueError,
-    queue::{Queue, QueueInspector},
+    job::{Job, JobRequest},
+    queue::{Queue, QueueError, QueueInspector},
 };
 use chrono::{TimeDelta, Utc};
 use sqlx::{Pool, Postgres};
@@ -113,33 +112,39 @@ impl PsqlQueue {
 
 #[async_trait::async_trait]
 impl Queue for PsqlQueue {
-    async fn enqueue(&self, job: Job) -> Result<(), QueueError> {
-        sqlx::query(
+    async fn enqueue(&self, job_request: JobRequest) -> Result<Job, QueueError> {
+        let job = sqlx::query_as::<_, Job>(
             r#"
             INSERT INTO "ethoko_job" (
+                topic,
+                payload,
+                scheduled_at,
+                processing_timeout_seconds,
+                max_retries
+            ) VALUES ($1, $2, $3, $4, $5)
+             RETURNING
                 id,
                 topic,
                 payload,
                 scheduled_at,
+                dequeued_at,
+                processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
                 max_retries
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
         )
-        .bind(job.id)
-        .bind(job.topic)
-        .bind(job.payload)
-        .bind(job.scheduled_at)
-        .bind(job.retry_count)
-        .bind(job.processing_timeout_seconds)
-        .bind(job.max_retries)
-        .execute(&self.pool)
+        .bind(job_request.topic)
+        .bind(job_request.payload)
+        .bind(job_request.scheduled_at)
+        .bind(job_request.processing_timeout_seconds)
+        .bind(job_request.max_retries)
+        .fetch_one(&self.pool)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to insert job into psql queue"))?;
 
         debug!("enqueued job: {}", job.id);
-        Ok(())
+        Ok(job)
     }
 
     async fn dequeue(&self) -> Result<Option<Job>, QueueError> {

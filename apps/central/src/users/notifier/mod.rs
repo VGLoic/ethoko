@@ -3,7 +3,7 @@ use tracing::info;
 
 use crate::{
     jobs::{
-        job::Job,
+        job::JobRequest,
         queue::{Queue, QueueError},
     },
     users::{
@@ -52,7 +52,7 @@ impl<Q: Queue> UsersNotifier for UsersNotifierImpl<Q> {
             "sending notification for user signed up with email: {}",
             user.email
         );
-        let job = Job::new(
+        let job = JobRequest::new(
             USERS_JOB_TOPIC.to_string(),
             UsersJob::DummyJob(DummyJobPayload::new(user)),
         )?

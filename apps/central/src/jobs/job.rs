@@ -15,23 +15,27 @@ pub struct Job {
     pub max_retries: i16,
 }
 
-impl Job {
+#[derive(Debug, Clone)]
+pub struct JobRequest {
+    pub topic: String,
+    pub payload: String,
+    pub processing_timeout_seconds: i16,
+    pub scheduled_at: chrono::DateTime<Utc>,
+    pub max_retries: i16,
+}
+
+impl JobRequest {
     pub fn new<Payload: Serialize + DeserializeOwned>(
         topic: String,
         payload: Payload,
     ) -> Result<Self, anyhow::Error> {
-        let id = uuid::Uuid::new_v4();
         let serialized_payload = serde_json::to_string(&payload)
             .map_err(|e| anyhow::Error::new(e).context("failed to build new job"))?;
         Ok(Self {
-            id,
             topic,
             payload: serialized_payload,
             processing_timeout_seconds: 5,
             scheduled_at: Utc::now(),
-            dequeued_at: None,
-            processing_timeout_at: None,
-            retry_count: 0,
             max_retries: 3,
         })
     }

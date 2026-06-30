@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use chrono::{Days, TimeDelta, Utc};
 use ethoko_central::jobs::{
-    job::Job, memoryqueue::InMemoryQueue, psqlqueue::PsqlQueue, queue::Queue,
+    job::JobRequest, memoryqueue::InMemoryQueue, psqlqueue::PsqlQueue, queue::Queue,
 };
 use fake::rand::{self, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
@@ -144,11 +144,11 @@ async fn test_memory_dequeued_jobs_in_scheduled_at_order() {
     test_dequeued_jobs_in_scheduled_at_order(queue).await;
 }
 
-fn dummy_job() -> Job {
+fn dummy_job() -> JobRequest {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    Job::new("test-topic".to_string(), payload)
+    JobRequest::new("test-topic".to_string(), payload)
         .unwrap()
         // We substract a few milliseconds because the PSQL queue does not pick up the job otherwise
         // The dequeue query contains a "<=" so it is strange, there may be something related to testing that creates issue
@@ -166,18 +166,19 @@ fn setup() {
 }
 
 async fn test_dequeue_non_ready_job<Q: Queue>(queue: Q) {
-    let job = dummy_job().with_scheduled_at(Utc::now().checked_add_days(Days::new(1)).unwrap());
+    let job_request =
+        dummy_job().with_scheduled_at(Utc::now().checked_add_days(Days::new(1)).unwrap());
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let _ = queue.enqueue(job_request).await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
 
     assert!(dequeued_job.is_none(), "dequeued_job must be none");
 }
 
 async fn test_dequeue_ready_job<Q: Queue>(queue: Q) {
-    let job = dummy_job();
+    let job_request = dummy_job();
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let job = queue.enqueue(job_request).await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
     assert!(dequeued_job.is_some(), "dequeued job must be some");
     let dequeued_job = dequeued_job.unwrap();
@@ -189,9 +190,9 @@ async fn test_dequeue_ready_job<Q: Queue>(queue: Q) {
 }
 
 async fn test_successive_dequeue_ready_job<Q: Queue>(queue: Q) {
-    let job = dummy_job();
+    let job_request = dummy_job();
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let _ = queue.enqueue(job_request).await.unwrap();
     let dequeued_job_0 = queue.dequeue().await.unwrap();
     let dequeued_job_1 = queue.dequeue().await.unwrap();
     assert!(dequeued_job_0.is_some(), "first dequeue must be some");
@@ -200,9 +201,10 @@ async fn test_successive_dequeue_ready_job<Q: Queue>(queue: Q) {
 
 async fn test_process_timeout<Q: Queue>(queue: Q) {
     let processing_timeout_in_seconds = 1_u16;
-    let job = dummy_job().with_processing_timeout(processing_timeout_in_seconds.cast_signed());
+    let job_request =
+        dummy_job().with_processing_timeout(processing_timeout_in_seconds.cast_signed());
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let job = queue.enqueue(job_request).await.unwrap();
     let _ = queue.dequeue().await.unwrap();
     let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds.into());
     sleep(Duration::from_secs(seconds_to_wait)).await;
@@ -221,9 +223,9 @@ async fn test_process_timeout<Q: Queue>(queue: Q) {
 }
 
 async fn test_process_success<Q: Queue>(queue: Q) {
-    let job = dummy_job();
+    let job_request = dummy_job();
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let job = queue.enqueue(job_request).await.unwrap();
     let _ = queue.dequeue().await.unwrap().unwrap();
     queue.success(job.id).await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
@@ -232,9 +234,9 @@ async fn test_process_success<Q: Queue>(queue: Q) {
 }
 
 async fn test_process_fail_into_success<Q: Queue>(queue: Q) {
-    let job = dummy_job().with_max_retries(1);
+    let job_request = dummy_job().with_max_retries(1);
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let job = queue.enqueue(job_request).await.unwrap();
     let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
@@ -249,9 +251,9 @@ async fn test_process_fail_into_success<Q: Queue>(queue: Q) {
 }
 
 async fn test_process_fail_into_dead<Q: Queue>(queue: Q) {
-    let job = dummy_job().with_max_retries(1);
+    let job_request = dummy_job().with_max_retries(1);
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let job = queue.enqueue(job_request).await.unwrap();
     let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
@@ -268,9 +270,9 @@ async fn test_process_fail_into_dead<Q: Queue>(queue: Q) {
 }
 
 async fn test_retry_dead_job<Q: Queue>(queue: Q) {
-    let job = dummy_job().with_max_retries(1);
+    let job_request = dummy_job().with_max_retries(1);
 
-    queue.enqueue(job.clone()).await.unwrap();
+    let job = queue.enqueue(job_request).await.unwrap();
     let _ = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
@@ -286,29 +288,45 @@ async fn test_retry_dead_job<Q: Queue>(queue: Q) {
 }
 
 async fn test_dequeued_jobs_in_scheduled_at_order<Q: Queue>(queue: Q) {
-    let ready_job_0 = dummy_job().with_scheduled_at(
-        Utc::now()
-            .checked_sub_signed(TimeDelta::seconds(2))
-            .unwrap(),
-    );
-    let ready_job_1 = dummy_job().with_scheduled_at(
-        Utc::now()
-            .checked_sub_signed(TimeDelta::seconds(1))
-            .unwrap(),
-    );
+    let scheduled_at_0 = Utc::now()
+        .checked_sub_signed(TimeDelta::seconds(2))
+        .unwrap();
+    let ready_job_0_request = dummy_job().with_scheduled_at(scheduled_at_0);
+    let scheduled_at_1 = Utc::now()
+        .checked_sub_signed(TimeDelta::seconds(1))
+        .unwrap();
+    let ready_job_1_request = dummy_job().with_scheduled_at(scheduled_at_1);
 
-    let future_job = dummy_job().with_scheduled_at(
-        Utc::now()
-            .checked_add_signed(TimeDelta::seconds(1))
-            .unwrap(),
-    );
+    let future_scheduled_at = Utc::now()
+        .checked_add_signed(TimeDelta::seconds(1))
+        .unwrap();
+    let future_job_request = dummy_job().with_scheduled_at(future_scheduled_at);
 
-    let mut jobs = [ready_job_0.clone(), ready_job_1.clone(), future_job.clone()];
+    let mut job_requests = [ready_job_0_request, ready_job_1_request, future_job_request];
     let mut rng = rand::rng();
-    jobs.shuffle(&mut rng);
-    for j in jobs {
-        queue.enqueue(j).await.unwrap();
+    job_requests.shuffle(&mut rng);
+
+    let mut jobs = vec![];
+    for j in job_requests {
+        let job = queue.enqueue(j).await.unwrap();
+        jobs.push(job);
     }
+
+    let ready_job_0 = jobs
+        .iter()
+        .find(|j| j.scheduled_at == scheduled_at_0)
+        .cloned()
+        .unwrap();
+    let ready_job_1 = jobs
+        .iter()
+        .find(|j| j.scheduled_at == scheduled_at_1)
+        .cloned()
+        .unwrap();
+    let _future_job = jobs
+        .iter()
+        .find(|j| j.scheduled_at == future_scheduled_at)
+        .cloned()
+        .unwrap();
 
     let dequeued_job_0 = queue.dequeue().await.unwrap();
     let dequeued_job_1 = queue.dequeue().await.unwrap();
