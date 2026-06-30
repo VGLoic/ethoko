@@ -1,15 +1,18 @@
 -- Add migration script here
 
 CREATE TABLE "ethoko_job" (
-    id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-    topic          TEXT         NOT NULL,
-    payload        TEXT         NOT NULL,
-    scheduled_at   TIMESTAMPTZ  NOT NULL,
-    retry_count    INT2         NOT NULL DEFAULT 0,
-    max_retries    INT2         NOT NULL,
-    dead           BOOLEAN      NOT NULL DEFAULT FALSE,
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
+    id                         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    topic                      TEXT         NOT NULL,
+    payload                    TEXT         NOT NULL,
+    scheduled_at               TIMESTAMPTZ  NOT NULL,
+    retry_count                INT2         NOT NULL DEFAULT 0,
+    processing_timeout_seconds INT2         NOT NULL,
+    dequeued_at                TIMESTAMPTZ,
+    processing_timeout_at      TIMESTAMPTZ,
+    max_retries                INT2         NOT NULL,
+    dead                       BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at                 TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at                 TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_ethoko_job_dead ON "ethoko_job" (dead);

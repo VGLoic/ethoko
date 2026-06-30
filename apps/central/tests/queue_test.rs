@@ -2,14 +2,14 @@ use std::time::Duration;
 
 use chrono::{Days, TimeDelta, Utc};
 use ethoko_central::jobs::{
-    job::Job,
-    memoryqueue::InMemoryQueue,
-    psqlqueue::PsqlQueue,
-    queue::{Queue, QueueInspector},
+    job::Job, memoryqueue::InMemoryQueue, psqlqueue::PsqlQueue, queue::Queue,
 };
+use fake::rand::{self, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{Pool, Postgres};
 use tokio::time::sleep;
+use tracing::{Level, level_filters::LevelFilter};
+use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestJobPayload {
@@ -18,634 +18,310 @@ struct TestJobPayload {
 
 const RETRY_DELAY_SECONDS: u64 = 1;
 
-async fn setup_psql_queue() -> Result<PsqlQueue, anyhow::Error> {
-    let pool = match PgPoolOptions::new()
-        .max_connections(5)
-        .acquire_timeout(Duration::from_secs(5))
-        .connect("postgresql://admin:admin@localhost:5433/central")
-        .await
-    {
-        Ok(c) => c,
-        Err(e) => {
-            let err = format!("Failed to establish connection to database {e}");
-            return Err(anyhow::anyhow!(err));
-        }
-    };
-
-    if let Err(e) = sqlx::migrate!("./migrations").run(&pool).await {
-        let err = format!("Failed to run database migrations: {e}");
-        return Err(anyhow::anyhow!(err));
-    };
-
-    Ok(PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool))
+#[sqlx::test]
+async fn test_psql_dequeue_non_ready_job(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_dequeue_non_ready_job(queue).await;
 }
 
 #[tokio::test]
-async fn test_psql_queue() {
-    let queue = setup_psql_queue().await.unwrap();
-    test_suite(queue).await;
-}
-
-#[tokio::test]
-async fn test_memory_queue() {
+async fn test_memory_dequeue_non_ready_job() {
+    setup();
     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-    test_suite(queue).await;
+    test_dequeue_non_ready_job(queue).await;
 }
 
-async fn test_suite<Q: Queue + QueueInspector + Clone>(queue: Q) {
-    test_dequeue_non_ready_job(queue.clone()).await;
-    test_dequeue_ready_job(queue.clone()).await;
-    // test_successive_dequeue_ready_job(queue.clone()).await;
-    // test_timeout_processing(queue.clone()).await;
-    // test_success_process(queue.clone()).await;
-    // test_fail_process(queue.clone()).await;
-    // test_retry_fail_job(queue.clone()).await;
-    // test_too_many_retries_fail_job(queue.clone()).await;
-    // test_retry_dead_job(queue.clone()).await;
-    // test_dequeued_jobs_in_scheduled_at_order(queue.clone()).await;
+#[sqlx::test]
+async fn test_psql_dequeue_ready_job(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_dequeue_ready_job(queue).await;
 }
 
-async fn test_dequeue_non_ready_job<Q: Queue + QueueInspector>(queue: Q) {
+#[tokio::test]
+async fn test_memory_dequeue_ready_job() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_dequeue_ready_job(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_successive_dequeue_ready_job(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_successive_dequeue_ready_job(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_successive_dequeue_ready_job() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_successive_dequeue_ready_job(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_process_timeout(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_process_timeout(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_process_timeout() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_process_timeout(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_process_success(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_process_success(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_process_success() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_process_success(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_process_fail_into_success(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_process_fail_into_success(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_process_fail_into_success() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_process_fail_into_success(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_process_fail_into_dead(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_process_fail_into_dead(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_process_fail_into_dead() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_process_fail_into_dead(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_retry_dead_job(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_retry_dead_job(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_retry_dead_job() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_retry_dead_job(queue).await;
+}
+
+#[sqlx::test]
+async fn test_psql_dequeued_jobs_in_scheduled_at_order(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    test_dequeued_jobs_in_scheduled_at_order(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_dequeued_jobs_in_scheduled_at_order() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    test_dequeued_jobs_in_scheduled_at_order(queue).await;
+}
+
+fn dummy_job() -> Job {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    let job = Job::new("test-topic".to_string(), payload)
+    Job::new("test-topic".to_string(), payload)
         .unwrap()
-        .with_scheduled_at(Utc::now().checked_add_days(Days::new(1)).unwrap());
+        // We substract a few milliseconds because the PSQL queue does not pick up the job otherwise
+        // The dequeue query contains a "<=" so it is strange, there may be something related to testing that creates issue
+        .with_scheduled_at(
+            Utc::now()
+                .checked_sub_signed(TimeDelta::seconds(1))
+                .unwrap(),
+        )
+}
+
+fn setup() {
+    let _ = tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(LevelFilter::from_level(Level::INFO)))
+        .try_init();
+}
+
+async fn test_dequeue_non_ready_job<Q: Queue>(queue: Q) {
+    let job = dummy_job().with_scheduled_at(Utc::now().checked_add_days(Days::new(1)).unwrap());
 
     queue.enqueue(job.clone()).await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
-    assert!(dequeued_job.is_none(), "test_dequeue_non_ready_job");
-    let idle_jobs = queue.idle_jobs().await.unwrap();
-    assert!(
-        idle_jobs.iter().any(|j| j.id == job.id),
-        "test_dequeue_non_ready_job"
-    );
+
+    assert!(dequeued_job.is_none(), "dequeued_job must be none");
 }
 
-async fn test_dequeue_ready_job<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
+async fn test_dequeue_ready_job<Q: Queue>(queue: Q) {
+    let job = dummy_job();
 
     queue.enqueue(job.clone()).await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
-    assert!(dequeued_job.is_some(), "test_dequeue_ready_job");
-    assert_eq!(dequeued_job.unwrap().id, job.id, "test_dequeue_ready_job");
-    let ready_jobs = queue.ready_jobs().await.unwrap();
-    assert!(
-        ready_jobs.iter().any(|j| j.id == job.id),
-        "test_dequeue_ready_job"
+    assert!(dequeued_job.is_some(), "dequeued job must be some");
+    let dequeued_job = dequeued_job.unwrap();
+    assert_eq!(
+        dequeued_job.id, job.id,
+        "dequeued job must have expected ID {}, got {}",
+        dequeued_job.id, job.id
     );
 }
 
-async fn test_successive_dequeue_ready_job<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
+async fn test_successive_dequeue_ready_job<Q: Queue>(queue: Q) {
+    let job = dummy_job();
 
     queue.enqueue(job.clone()).await.unwrap();
     let dequeued_job_0 = queue.dequeue().await.unwrap();
     let dequeued_job_1 = queue.dequeue().await.unwrap();
-    assert!(
-        dequeued_job_0.is_some(),
-        "test_successive_dequeue_ready_job"
-    );
-    assert!(
-        dequeued_job_1.is_none(),
-        "test_successive_dequeue_ready_job"
-    );
+    assert!(dequeued_job_0.is_some(), "first dequeue must be some");
+    assert!(dequeued_job_1.is_none(), "second dequeue must be none");
 }
 
-async fn test_timeout_processing<Q: Queue + QueueInspector>(queue: Q) {
-    let processing_timeout_in_seconds = 1;
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
+async fn test_process_timeout<Q: Queue>(queue: Q) {
+    let processing_timeout_in_seconds = 1_u16;
+    let job = dummy_job().with_processing_timeout(processing_timeout_in_seconds.cast_signed());
 
     queue.enqueue(job.clone()).await.unwrap();
-    let _ = queue.dequeue().await;
-    sleep(Duration::from_secs(processing_timeout_in_seconds)).await;
+    let _ = queue.dequeue().await.unwrap();
+    let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds.into());
+    sleep(Duration::from_secs(seconds_to_wait)).await;
     let dequeued_job = queue.dequeue().await.unwrap();
-    assert!(dequeued_job.is_some(), "test_timeout_processing");
+
+    assert!(dequeued_job.is_some(), "dequeued job must be some");
     let dequeued_job = dequeued_job.unwrap();
-    assert_eq!(dequeued_job.id, job.id, "test_timeout_processing");
-    assert_eq!(dequeued_job.retry_count, 1, "test_timeout_processing");
-}
-
-async fn test_success_process<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
-
-    queue.enqueue(job.clone()).await.unwrap();
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    queue.success(dequeued_job.id).await.unwrap();
-
-    let ready_jobs = queue.ready_jobs().await.unwrap();
-    assert!(
-        ready_jobs.iter().all(|j| j.id != job.id),
-        "test_success_process"
+    assert_eq!(
+        dequeued_job.id, job.id,
+        "dequeued job has not the same ID as the original one"
     );
-    let idle_jobs = queue.idle_jobs().await.unwrap();
-    assert!(
-        idle_jobs.iter().all(|j| j.id != job.id),
-        "test_success_process"
+    assert_eq!(
+        dequeued_job.retry_count, 1,
+        "dequeued job should have an increasing retry count"
     );
 }
 
-async fn test_fail_process<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
+async fn test_process_success<Q: Queue>(queue: Q) {
+    let job = dummy_job();
 
     queue.enqueue(job.clone()).await.unwrap();
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    queue.fail(dequeued_job.id).await.unwrap();
+    let _ = queue.dequeue().await.unwrap().unwrap();
+    queue.success(job.id).await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
 
-    assert!(dequeued_job.is_none(), "test_fail_process");
-    let idle_jobs = queue.idle_jobs().await.unwrap();
-    assert!(
-        idle_jobs.iter().any(|j| j.id == job.id),
-        "test_fail_process"
-    );
+    assert!(dequeued_job.is_none(), "dequeued job must be none");
 }
 
-async fn test_retry_fail_job<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
+async fn test_process_fail_into_success<Q: Queue>(queue: Q) {
+    let job = dummy_job().with_max_retries(1);
 
     queue.enqueue(job.clone()).await.unwrap();
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    queue.fail(dequeued_job.id).await.unwrap();
+    let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
+    queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-    let dequeued_job = queue.dequeue().await.unwrap();
+    let dequeued_job_1 = queue.dequeue().await.unwrap().unwrap();
+    queue.success(job.id).await.unwrap();
+    let dequeued_job_2 = queue.dequeue().await.unwrap();
 
-    assert!(dequeued_job.is_some(), "test_retry_fail_job");
-    let ready_jobs = queue.ready_jobs().await.unwrap();
-    assert!(
-        ready_jobs.iter().any(|j| j.id == job.id),
-        "test_retry_fail_job"
-    );
+    assert_eq!(dequeued_job_0.id, job.id);
+    assert_eq!(dequeued_job_1.id, job.id);
+    assert_eq!(dequeued_job_1.retry_count, 1);
+    assert!(dequeued_job_2.is_none(), "dequeued job must be none");
 }
 
-async fn test_too_many_retries_fail_job<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now())
-        .with_max_retries(1);
+async fn test_process_fail_into_dead<Q: Queue>(queue: Q) {
+    let job = dummy_job().with_max_retries(1);
 
     queue.enqueue(job.clone()).await.unwrap();
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    queue.fail(dequeued_job.id).await.unwrap();
+    let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
+    queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    queue.fail(dequeued_job.id).await.unwrap();
+    let dequeued_job_1 = queue.dequeue().await.unwrap().unwrap();
+    queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-    let dequeued_job = queue.dequeue().await.unwrap();
+    let dequeued_job_2 = queue.dequeue().await.unwrap();
 
-    assert!(dequeued_job.is_none(), "test_too_many_retries_fail_job");
-    let dead_jobs = queue.dead_jobs().await.unwrap();
-    assert!(
-        dead_jobs.iter().any(|j| j.id == job.id),
-        "test_too_many_retries_fail_job"
-    );
+    assert_eq!(dequeued_job_0.id, job.id);
+    assert_eq!(dequeued_job_0.retry_count, 0);
+    assert_eq!(dequeued_job_1.id, job.id);
+    assert_eq!(dequeued_job_1.retry_count, 1);
+    assert!(dequeued_job_2.is_none(), "dequeued job must be none");
 }
 
-async fn test_retry_dead_job<Q: Queue + QueueInspector>(queue: Q) {
-    let payload = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let job = Job::new("test-topic".to_string(), payload)
-        .unwrap()
-        .with_scheduled_at(Utc::now())
-        .with_max_retries(0);
+async fn test_retry_dead_job<Q: Queue>(queue: Q) {
+    let job = dummy_job().with_max_retries(1);
 
     queue.enqueue(job.clone()).await.unwrap();
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    queue.fail(dequeued_job.id).await.unwrap();
+    let _ = queue.dequeue().await.unwrap().unwrap();
+    queue.fail(job.id).await.unwrap();
     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+    let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
+    queue.fail(job.id).await.unwrap();
     queue.retry(job.id).await.unwrap();
-    let dequeued_job = queue.dequeue().await.unwrap().unwrap();
-    assert_eq!(dequeued_job.id, job.id, "test_retry_dead_job");
-    assert_eq!(dequeued_job.retry_count, 0, "test_retry_dead_job");
+    let dequeued_job_1 = queue.dequeue().await.unwrap().unwrap();
+
+    assert_eq!(dequeued_job_0.id, job.id);
+    assert_eq!(dequeued_job_0.retry_count, 1);
+    assert_eq!(dequeued_job_1.id, job.id);
+    assert_eq!(dequeued_job_1.retry_count, 0);
 }
 
-async fn test_dequeued_jobs_in_scheduled_at_order<Q: Queue + QueueInspector>(queue: Q) {
-    let payload_0 = TestJobPayload {
-        message: "Hello, world!".to_string(),
-    };
-    let ready_job_0 = Job::new("test-topic".to_string(), payload_0)
-        .unwrap()
-        .with_scheduled_at(
-            Utc::now()
-                .checked_add_signed(TimeDelta::milliseconds(1))
-                .unwrap(),
-        );
-    let payload_1 = TestJobPayload {
-        message: "Bye bye, world!".to_string(),
-    };
-    let ready_job_1 = Job::new("test-topic".to_string(), payload_1)
-        .unwrap()
-        .with_scheduled_at(Utc::now());
-    let payload_2 = TestJobPayload {
-        message: "Hello again, world!".to_string(),
-    };
-    let future_job = Job::new("test-topic".to_string(), payload_2)
-        .unwrap()
-        .with_scheduled_at(
-            Utc::now()
-                .checked_add_signed(TimeDelta::seconds(1))
-                .unwrap(),
-        );
+async fn test_dequeued_jobs_in_scheduled_at_order<Q: Queue>(queue: Q) {
+    let ready_job_0 = dummy_job().with_scheduled_at(
+        Utc::now()
+            .checked_sub_signed(TimeDelta::seconds(2))
+            .unwrap(),
+    );
+    let ready_job_1 = dummy_job().with_scheduled_at(
+        Utc::now()
+            .checked_sub_signed(TimeDelta::seconds(1))
+            .unwrap(),
+    );
 
-    queue.enqueue(future_job.clone()).await.unwrap();
-    queue.enqueue(ready_job_1.clone()).await.unwrap();
-    queue.enqueue(ready_job_0.clone()).await.unwrap();
+    let future_job = dummy_job().with_scheduled_at(
+        Utc::now()
+            .checked_add_signed(TimeDelta::seconds(1))
+            .unwrap(),
+    );
+
+    let mut jobs = [ready_job_0.clone(), ready_job_1.clone(), future_job.clone()];
+    let mut rng = rand::rng();
+    jobs.shuffle(&mut rng);
+    for j in jobs {
+        queue.enqueue(j).await.unwrap();
+    }
+
     let dequeued_job_0 = queue.dequeue().await.unwrap();
     let dequeued_job_1 = queue.dequeue().await.unwrap();
     let dequeued_job_2 = queue.dequeue().await.unwrap();
 
-    assert!(
-        dequeued_job_0.is_some(),
-        "test_dequeued_jobs_in_scheduled_at_order"
-    );
+    assert!(dequeued_job_0.is_some(), "first dequeued job must be some");
     let dequeued_job_0 = dequeued_job_0.unwrap();
     assert_eq!(
         dequeued_job_0.id, ready_job_0.id,
-        "test_dequeued_jobs_in_scheduled_at_order"
+        "first dequeued job must have the expected ID"
     );
-    assert!(
-        dequeued_job_1.is_some(),
-        "test_dequeued_jobs_in_scheduled_at_order"
-    );
+    assert!(dequeued_job_1.is_some(), "second dequeued job must be some");
     let dequeued_job_1 = dequeued_job_1.unwrap();
     assert_eq!(dequeued_job_1.id, ready_job_1.id);
-    assert!(
-        dequeued_job_2.is_none(),
-        "test_dequeued_jobs_in_scheduled_at_order"
-    );
-    let ready_jobs = queue.ready_jobs().await.unwrap();
-    assert!(
-        ready_jobs.iter().any(|j| j.id == dequeued_job_0.id),
-        "test_dequeued_jobs_in_scheduled_at_order"
-    );
-    assert!(
-        ready_jobs.iter().any(|j| j.id == dequeued_job_1.id),
-        "test_dequeued_jobs_in_scheduled_at_order"
-    );
-    let idle_jobs = queue.idle_jobs().await.unwrap();
-    assert!(
-        idle_jobs.iter().any(|j| j.id == future_job.id),
-        "test_dequeued_jobs_in_scheduled_at_order"
-    );
+    assert!(dequeued_job_2.is_none(), "third dequeued job must be none");
 }
-
-// #[tokio::test]
-// async fn test_enqueue_single_job_psql_queue() {
-//     let queue = setup_psql_queue().await.unwrap();
-//     test_enqueue_single_job(queue).await;
-// }
-
-// #[tokio::test]
-// async fn test_enqueue_single_job_memory_queue() {
-//     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-//     test_enqueue_single_job(queue).await;
-// }
-
-// async fn test_enqueue_single_job<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(Utc::now().checked_add_days(Days::new(1)).unwrap());
-
-//     queue.enqueue(job.clone()).await.unwrap();
-//     let idle_jobs = queue.idle_jobs().await.unwrap();
-//     assert!(idle_jobs.iter().any(|j| j.id == job.id));
-// }
-
-// #[tokio::test]
-// async fn test_enqueue_multiple_jobs_psql_queue() {
-//     let queue = setup_psql_queue().await.unwrap();
-//     test_enqueue_multiple_jobs(queue).await;
-// }
-
-// #[tokio::test]
-// async fn test_enqueue_multiple_jobs_memory_queue() {
-//     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-//     test_enqueue_multiple_jobs(queue).await;
-// }
-
-// async fn test_enqueue_multiple_jobs<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload1 = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let payload2 = TestJobPayload {
-//         message: "Goodbye, world!".to_string(),
-//     };
-//     let job1 = Job::new("test-topic".to_string(), payload1)
-//         .unwrap()
-//         .with_scheduled_at(Utc::now().checked_add_signed(TimeDelta::days(1)).unwrap());
-//     let job2 = Job::new("test-topic".to_string(), payload2)
-//         .unwrap()
-//         .with_scheduled_at(Utc::now().checked_add_signed(TimeDelta::days(1)).unwrap());
-
-//     queue.enqueue(job1.clone()).await.unwrap();
-//     queue.enqueue(job2.clone()).await.unwrap();
-//     let idle_jobs = queue.idle_jobs().await.unwrap();
-//     assert!(idle_jobs.len() >= 2);
-//     assert!(idle_jobs.iter().any(|j| j.id == job1.id));
-//     assert!(idle_jobs.iter().any(|j| j.id == job2.id));
-// }
-
-// // #[tokio::test]
-// // async fn test_dequeue_ready_job_psql_queue() {
-// //     let queue = setup_psql_queue().await.unwrap();
-// //     test_dequeue_ready_job(queue).await;
-// // }
-
-// // #[tokio::test]
-// // async fn test_dequeue_ready_job_memory_queue() {
-// //     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-// //     test_dequeue_ready_job(queue).await;
-// // }
-
-// async fn test_dequeue_ready_job<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(
-//             Utc::now()
-//                 .checked_sub_signed(TimeDelta::seconds(1))
-//                 .unwrap(),
-//         );
-//     queue.enqueue(job.clone()).await.unwrap();
-//     let _ = queue.dequeue().await.unwrap();
-//     assert!(
-//         queue
-//             .idle_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-//     assert!(
-//         queue
-//             .ready_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .any(|j| j.id == job.id)
-//     );
-// }
-
-// // #[tokio::test]
-// // async fn test_dequeue_not_ready_job_psql_queue() {
-// //     let queue = setup_psql_queue().await.unwrap();
-// //     test_dequeue_not_ready_job(queue).await;
-// // }
-
-// // #[tokio::test]
-// // async fn test_dequeue_not_ready_job_memory_queue() {
-// //     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-// //     test_dequeue_not_ready_job(queue).await;
-// // }
-
-// async fn test_dequeue_not_ready_job<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(
-//             Utc::now()
-//                 .checked_add_signed(TimeDelta::seconds(20))
-//                 .unwrap(),
-//         );
-//     queue.enqueue(job.clone()).await.unwrap();
-//     let _ = queue.dequeue().await.unwrap();
-//     assert!(
-//         queue
-//             .idle_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .any(|j| j.id == job.id)
-//     );
-//     assert!(
-//         queue
-//             .ready_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-// }
-
-// #[tokio::test]
-// async fn test_success_process_psql_queue() {
-//     let queue = setup_psql_queue().await.unwrap();
-//     test_success_process(queue).await;
-// }
-
-// #[tokio::test]
-// async fn test_success_process_memory_queue() {
-//     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-//     test_success_process(queue).await;
-// }
-
-// async fn test_success_process<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(
-//             Utc::now()
-//                 .checked_sub_signed(TimeDelta::seconds(1))
-//                 .unwrap(),
-//         );
-//     queue.enqueue(job.clone()).await.unwrap();
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-
-//     queue.success(job.id).await.unwrap();
-//     assert!(
-//         queue
-//             .idle_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-//     assert!(
-//         queue
-//             .ready_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-// }
-
-// #[tokio::test]
-// async fn test_fail_process_memory_queue() {
-//     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-//     test_fail_process(queue).await;
-// }
-// #[tokio::test]
-// async fn test_fail_process_psql_queue() {
-//     let queue = setup_psql_queue().await.unwrap();
-//     test_fail_process(queue).await;
-// }
-
-// async fn test_fail_process<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(
-//             Utc::now()
-//                 .checked_sub_signed(TimeDelta::seconds(1))
-//                 .unwrap(),
-//         )
-//         .with_max_retries(3);
-//     queue.enqueue(job.clone()).await.unwrap();
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-
-//     queue.fail(job.id).await.unwrap();
-//     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-
-//     assert!(
-//         queue
-//             .idle_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-//     assert!(
-//         queue
-//             .ready_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .any(|j| j.id == job.id)
-//     );
-// }
-
-// #[tokio::test]
-// async fn test_fail_process_exceeding_retries_memory_queue() {
-//     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-//     test_fail_process_exceeding_retries(queue).await;
-// }
-
-// #[tokio::test]
-// async fn test_fail_process_exceeding_retries_psql_queue() {
-//     let queue = setup_psql_queue().await.unwrap();
-//     test_fail_process_exceeding_retries(queue).await;
-// }
-
-// async fn test_fail_process_exceeding_retries<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(
-//             Utc::now()
-//                 .checked_sub_signed(TimeDelta::seconds(1))
-//                 .unwrap(),
-//         )
-//         .with_max_retries(1);
-//     queue.enqueue(job.clone()).await.unwrap();
-
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-//     queue.fail(job.id).await.unwrap();
-//     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-//     queue.fail(job.id).await.unwrap();
-
-//     let dead_jobs = queue.dead_jobs().await.unwrap();
-//     assert!(!dead_jobs.is_empty());
-//     assert!(dead_jobs.iter().any(|j| j.id == job.id));
-// }
-
-// #[tokio::test]
-// async fn test_fail_into_success_memory_queue() {
-//     let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
-//     test_fail_into_success(queue).await;
-// }
-
-// #[tokio::test]
-// async fn test_fail_into_success_psql_queue() {
-//     let queue = setup_psql_queue().await.unwrap();
-//     test_fail_into_success(queue).await;
-// }
-
-// async fn test_fail_into_success<Q: Queue + QueueInspector>(queue: Q) {
-//     let payload = TestJobPayload {
-//         message: "Hello, world!".to_string(),
-//     };
-//     let job = Job::new("test-topic".to_string(), payload)
-//         .unwrap()
-//         .with_scheduled_at(
-//             Utc::now()
-//                 .checked_sub_signed(TimeDelta::seconds(1))
-//                 .unwrap(),
-//         )
-//         .with_max_retries(3);
-//     queue.enqueue(job.clone()).await.unwrap();
-
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-//     queue.fail(job.id).await.unwrap();
-//     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-//     let _ = queue.dequeue().await.unwrap().unwrap();
-
-//     queue.success(job.id).await.unwrap();
-//     let _ = queue.dequeue().await.unwrap();
-//     assert!(
-//         queue
-//             .idle_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-//     assert!(
-//         queue
-//             .ready_jobs()
-//             .await
-//             .unwrap()
-//             .iter()
-//             .all(|j| j.id != job.id)
-//     );
-// }

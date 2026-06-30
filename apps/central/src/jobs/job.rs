@@ -7,7 +7,10 @@ pub struct Job {
     pub id: uuid::Uuid,
     pub topic: String,
     pub payload: String,
+    pub processing_timeout_seconds: i16,
     pub scheduled_at: chrono::DateTime<Utc>,
+    pub dequeued_at: Option<chrono::DateTime<Utc>>,
+    pub processing_timeout_at: Option<chrono::DateTime<Utc>>,
     pub retry_count: i16,
     pub max_retries: i16,
 }
@@ -24,7 +27,10 @@ impl Job {
             id,
             topic,
             payload: serialized_payload,
+            processing_timeout_seconds: 5,
             scheduled_at: Utc::now(),
+            dequeued_at: None,
+            processing_timeout_at: None,
             retry_count: 0,
             max_retries: 3,
         })
@@ -40,14 +46,8 @@ impl Job {
         self
     }
 
-    pub fn schedule_retry(&mut self, scheduled_at: chrono::DateTime<Utc>) -> &mut Self {
-        self.retry_count += 1;
-        self.scheduled_at = scheduled_at;
-        self
-    }
-
-    pub fn reset_retries(&mut self) -> &mut Self {
-        self.retry_count = 0;
+    pub fn with_processing_timeout(mut self, processing_timeout: i16) -> Self {
+        self.processing_timeout_seconds = processing_timeout;
         self
     }
 }
