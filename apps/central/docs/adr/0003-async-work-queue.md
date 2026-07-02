@@ -9,14 +9,16 @@ The server binary instantiates:
 
 Each **bounded context** (e.g. users) defines its unique job topic, its job types and payloads and its child processor. Jobs are enqueued by the bounded context **Notifier** using the single work queue. The child processor is setup with the topic in the root processor.
 
-The queue manages jobs with a PostgreSQL database, jobs are stored in database when enqueued, the worker is in charge of polling for ready jobs.
+The queue stores jobs when enqueued and manage their lifecycle, the worker is in charge of polling for ready jobs.
 
 The design allows for an `at least once delivery` by adding dedicated `success` and `fail` registration methods for a job in the queue.
 Each job is created with a specific `max retries`, once reach, the job is considered **dead** and will not be picked up automatically. A dead job can be retried manually.
 
-The PostgreSQL backing is non optimal compared to other technologies but it has been chosen as a pragmatic approach. Another queue can be implemented with a more suited technology when needed.
+## Implementations
+
+- A PostgreSQL backed queue is implemented in `psqlqueue.rs` and is used by default. It uses a single table to store jobs and their lifecycle.
+- A memory queue is implemented in `memqueue.rs` and is used for testing purposes. It uses a single `HashMap` to store jobs and their lifecycle.
 
 ## Identified optimizations for larger scale
 
-1. Add a `(dead, scheduled_at)` composite index for the `dequeue` query when it becomes a bottleneck.
-2. Move the queue system to a more performant system such as RabbitMQ or Redis.
+1. Move the queue system to a more performant system such as RabbitMQ or Redis.
