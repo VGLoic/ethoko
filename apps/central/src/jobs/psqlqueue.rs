@@ -232,7 +232,7 @@ impl Queue for PsqlQueue {
         sqlx::query(
             r#"
             UPDATE "ethoko_job"
-            SET status = 'completed'
+            SET status = 'successful'
             WHERE id = $1 AND status = 'processing'
             "#,
         )
@@ -479,7 +479,7 @@ impl QueueInspector for PsqlQueue {
         Ok(jobs)
     }
 
-    async fn completed_jobs(&self) -> Result<Vec<Job>, QueueError> {
+    async fn successful_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = sqlx::query_as::<_, Job>(
             r#"
             SELECT
@@ -496,13 +496,13 @@ impl QueueInspector for PsqlQueue {
                 created_at,
                 updated_at
             FROM "ethoko_job"
-            WHERE status = 'completed'
+            WHERE status = 'successful'
             "#,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| {
-            anyhow::anyhow!(e).context("failed to fetch completed jobs from psql queue")
+            anyhow::anyhow!(e).context("failed to fetch successful jobs from psql queue")
         })?;
 
         Ok(jobs)

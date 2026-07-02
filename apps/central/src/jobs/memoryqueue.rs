@@ -12,7 +12,7 @@ use crate::jobs::{
 
 #[derive(Debug, Clone)]
 /// An in-memory queue for jobs
-/// It defines a hash map protected by Mutext for storing the jobs in their different states: pending, processing, completed or dead.
+/// It defines a hash map protected by Mutext for storing the jobs in their different states: pending, processing, successful or dead.
 pub struct InMemoryQueue {
     retry_delay_seconds: i64,
     jobs: Arc<Mutex<HashMap<uuid::Uuid, Job>>>,
@@ -158,7 +158,7 @@ impl Queue for InMemoryQueue {
             )
             .into());
         }
-        successful_job.status = JobStatus::Completed;
+        successful_job.status = JobStatus::Successful;
         successful_job.updated_at = Utc::now();
 
         info!("Job {id} successfully handled");
@@ -251,13 +251,13 @@ impl QueueInspector for InMemoryQueue {
             .collect())
     }
 
-    async fn completed_jobs(&self) -> Result<Vec<Job>, QueueError> {
+    async fn successful_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = self.jobs.lock().map_err(|e| {
             anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         Ok(jobs
             .values()
-            .filter(|j| j.status == JobStatus::Completed)
+            .filter(|j| j.status == JobStatus::Successful)
             .cloned()
             .collect())
     }

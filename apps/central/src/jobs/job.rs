@@ -7,7 +7,7 @@ use sqlx::prelude::FromRow;
 pub enum JobStatus {
     Pending,
     Processing,
-    Completed,
+    Successful,
     Dead,
 }
 

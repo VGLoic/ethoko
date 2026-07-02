@@ -1,6 +1,6 @@
 -- Add migration script here
 
-CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'dead');
+CREATE TYPE job_status AS ENUM ('pending', 'processing', 'successful', 'dead');
 
 CREATE TABLE "ethoko_job" (
     id                         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),

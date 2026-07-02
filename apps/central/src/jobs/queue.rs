@@ -9,7 +9,7 @@ use crate::jobs::job::{Job, JobRequest};
 /// 1. using `enequeue`, a job is enqueued as `pending` with a specified scheduling time,
 /// 2. later on, a worker will call `dequeue`, getting the first ready to be picked up job. Job transitions to `processing` and the worker is in charge of processing it,
 /// 3. once processing successes or fails, the worker is in charge of registering the result using the methods `success` or `fail`.
-///    In case of success, the job transitions to `completed`.
+///    In case of success, the job transitions to `successful`.
 ///    In case of failure, the job transitions to `pending` if it has not reached its max retries, else it transitions to `dead`.
 ///
 /// When a job is in `processing`, it has a timeout. If the worker does not register the result before the timeout, the job transitions back to `pending` or `dead depending on its retry count.
@@ -38,10 +38,10 @@ pub trait QueueInspector: Send + Sync + 'static {
     async fn pending_jobs(&self) -> Result<Vec<Job>, QueueError>;
     /// Get processing jobs
     async fn processing_jobs(&self) -> Result<Vec<Job>, QueueError>;
+    /// Get successful jobs
+    async fn successful_jobs(&self) -> Result<Vec<Job>, QueueError>;
     /// Get dead jobs
     async fn dead_jobs(&self) -> Result<Vec<Job>, QueueError>;
-    /// Get completed jobs
-    async fn completed_jobs(&self) -> Result<Vec<Job>, QueueError>;
 }
 
 #[derive(Debug, Error)]
