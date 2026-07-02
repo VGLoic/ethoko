@@ -49,7 +49,7 @@ impl From<JobRequest> for Job {
 impl Queue for InMemoryQueue {
     async fn enqueue(&self, job_request: JobRequest) -> Result<Job, QueueError> {
         let mut jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during enqueue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during enqueue")
         })?;
         let job = Job::from(job_request);
         debug!("Job {} enqueued", job.id);
@@ -60,7 +60,7 @@ impl Queue for InMemoryQueue {
 
     async fn dequeue(&self) -> Result<Option<Job>, QueueError> {
         let mut jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         let now = Utc::now();
 
@@ -147,19 +147,19 @@ impl Queue for InMemoryQueue {
 
     async fn success(&self, id: uuid::Uuid) -> Result<(), QueueError> {
         let mut jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
-        let successfull_job = jobs
+        let successful_job = jobs
             .get_mut(&id)
             .ok_or_else(|| anyhow::anyhow!("Job {id} not found"))?;
-        if successfull_job.status != JobStatus::Processing {
+        if successful_job.status != JobStatus::Processing {
             return Err(anyhow::anyhow!(
                 "Job {id} is not in processing state, cannot mark as success"
             )
             .into());
         }
-        successfull_job.status = JobStatus::Completed;
-        successfull_job.updated_at = Utc::now();
+        successful_job.status = JobStatus::Completed;
+        successful_job.updated_at = Utc::now();
 
         info!("Job {id} successfully handled");
         Ok(())
@@ -167,7 +167,7 @@ impl Queue for InMemoryQueue {
 
     async fn fail(&self, id: uuid::Uuid) -> Result<(), QueueError> {
         let mut jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
 
         let job = jobs
@@ -208,7 +208,7 @@ impl Queue for InMemoryQueue {
 
     async fn retry(&self, id: uuid::Uuid) -> Result<(), QueueError> {
         let mut jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         let job = jobs
             .get_mut(&id)
@@ -231,7 +231,7 @@ impl Queue for InMemoryQueue {
 impl QueueInspector for InMemoryQueue {
     async fn pending_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         Ok(jobs
             .values()
@@ -242,7 +242,7 @@ impl QueueInspector for InMemoryQueue {
 
     async fn processing_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         Ok(jobs
             .values()
@@ -253,7 +253,7 @@ impl QueueInspector for InMemoryQueue {
 
     async fn completed_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         Ok(jobs
             .values()
@@ -264,7 +264,7 @@ impl QueueInspector for InMemoryQueue {
 
     async fn dead_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = self.jobs.lock().map_err(|e| {
-            anyhow::anyhow!("{e}").context("failed to aquire jobs lock during dequeue")
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
         })?;
         Ok(jobs
             .values()
