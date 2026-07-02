@@ -34,14 +34,17 @@ impl PsqlQueue {
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE dead = FALSE AND now() >= processing_timeout_at
+            WHERE status = 'processing' AND now() >= processing_timeout_at
             "#,
         )
         .fetch_all(&mut *transaction)
@@ -57,8 +60,8 @@ impl PsqlQueue {
                 sqlx::query(
                     r#"
                     UPDATE "ethoko_job"
-                    SET dead = TRUE
-                    WHERE id = $1 AND dead = FALSE
+                    SET status = 'dead'
+                    WHERE id = $1 AND status = 'processing'
                     "#,
                 )
                 .bind(timeout_job.id)
@@ -83,6 +86,7 @@ impl PsqlQueue {
                     r#"
                     UPDATE "ethoko_job"
                     SET
+                        status = 'pending',
                         scheduled_at = $3,
                         dequeued_at = NULL,
                         processing_timeout_at = NULL,
@@ -126,12 +130,15 @@ impl Queue for PsqlQueue {
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             "#,
         )
         .bind(job_request.topic)
@@ -162,14 +169,17 @@ impl Queue for PsqlQueue {
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE dead = FALSE AND scheduled_at <= now() AND dequeued_at IS NULL
+            WHERE status = 'pending' AND scheduled_at <= now()
             ORDER BY scheduled_at ASC
             LIMIT 1 FOR UPDATE SKIP LOCKED
             "#,
@@ -195,9 +205,10 @@ impl Queue for PsqlQueue {
             r#"
             UPDATE "ethoko_job"
             SET
+                status = 'processing',
                 dequeued_at = $2,
                 processing_timeout_at = $3
-            WHERE id = $1
+            WHERE id = $1 and status = 'pending'
             "#,
         )
         .bind(job.id)
@@ -220,8 +231,9 @@ impl Queue for PsqlQueue {
     async fn success(&self, id: uuid::Uuid) -> Result<(), QueueError> {
         sqlx::query(
             r#"
-            DELETE FROM "ethoko_job"
-            WHERE id = $1 AND dead = FALSE
+            UPDATE "ethoko_job"
+            SET status = 'completed'
+            WHERE id = $1 AND status = 'processing'
             "#,
         )
         .bind(id)
@@ -248,14 +260,17 @@ impl Queue for PsqlQueue {
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE id = $1 AND dead = FALSE
+            WHERE id = $1 AND status = 'processing'
             "#,
         )
         .bind(id)
@@ -268,8 +283,8 @@ impl Queue for PsqlQueue {
             sqlx::query(
                 r#"
                 UPDATE "ethoko_job"
-                SET dead = TRUE
-                WHERE id = $1 AND dead = FALSE
+                SET status = 'dead'
+                WHERE id = $1 AND status = 'processing'
                 "#,
             )
             .bind(job.id)
@@ -290,11 +305,12 @@ impl Queue for PsqlQueue {
                 r#"
                 UPDATE "ethoko_job"
                 SET
+                    status = 'pending',
                     scheduled_at = $1,
                     retry_count = retry_count + 1,
                     dequeued_at = NULL,
                     processing_timeout_at = NULL
-                WHERE id = $2 AND dead = FALSE
+                WHERE id = $2 AND status = 'processing'
                 "#,
             )
             .bind(scheduled_at)
@@ -327,14 +343,17 @@ impl Queue for PsqlQueue {
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE id = $1 AND dead = TRUE
+            WHERE id = $1 AND status = 'dead'
             "#,
         )
         .bind(id)
@@ -353,8 +372,8 @@ impl Queue for PsqlQueue {
                 retry_count = 0,
                 dequeued_at = NULL,
                 processing_timeout_at = NULL,
-                dead = FALSE
-            WHERE id = $2 AND dead = TRUE
+                status = 'pending'
+            WHERE id = $2 AND status = 'dead'
             "#,
         )
         .bind(Utc::now())
@@ -377,50 +396,58 @@ impl Queue for PsqlQueue {
 
 #[async_trait::async_trait]
 impl QueueInspector for PsqlQueue {
-    async fn idle_jobs(&self) -> Result<Vec<Job>, QueueError> {
+    async fn pending_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = sqlx::query_as::<_, Job>(
             r#"
             SELECT
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE dead = FALSE AND scheduled_at > now()
+            WHERE status = 'pending'
             "#,
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch idle jobs from psql queue"))?;
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch pending jobs from psql queue"))?;
 
         Ok(jobs)
     }
 
-    async fn ready_jobs(&self) -> Result<Vec<Job>, QueueError> {
+    async fn processing_jobs(&self) -> Result<Vec<Job>, QueueError> {
         let jobs = sqlx::query_as::<_, Job>(
             r#"
             SELECT
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE dead = FALSE AND scheduled_at <= now()
+            WHERE status = 'processing'
             "#,
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch ready jobs from psql queue"))?;
+        .map_err(|e| {
+            anyhow::anyhow!(e).context("failed to fetch processing jobs from psql queue")
+        })?;
 
         Ok(jobs)
     }
@@ -432,19 +459,51 @@ impl QueueInspector for PsqlQueue {
                 id,
                 topic,
                 payload,
+                status,
                 scheduled_at,
                 dequeued_at,
                 processing_timeout_at,
                 retry_count,
                 processing_timeout_seconds,
-                max_retries
+                max_retries,
+                created_at,
+                updated_at
             FROM "ethoko_job"
-            WHERE dead = TRUE
+            WHERE status = 'dead'
             "#,
         )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to fetch dead jobs from psql queue"))?;
+
+        Ok(jobs)
+    }
+
+    async fn completed_jobs(&self) -> Result<Vec<Job>, QueueError> {
+        let jobs = sqlx::query_as::<_, Job>(
+            r#"
+            SELECT
+                id,
+                topic,
+                payload,
+                status,
+                scheduled_at,
+                dequeued_at,
+                processing_timeout_at,
+                retry_count,
+                processing_timeout_seconds,
+                max_retries,
+                created_at,
+                updated_at
+            FROM "ethoko_job"
+            WHERE status = 'completed'
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(e).context("failed to fetch completed jobs from psql queue")
+        })?;
 
         Ok(jobs)
     }
