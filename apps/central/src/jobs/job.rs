@@ -27,6 +27,9 @@ pub struct Job {
     pub updated_at: chrono::DateTime<Utc>,
 }
 
+const DEFAULT_PROCESSING_TIMEOUT_SECONDS: i16 = 5;
+const DEFAULT_MAX_RETRIES: i16 = 3;
+
 #[derive(Debug, Clone)]
 pub struct JobRequest {
     pub topic: String,
@@ -46,9 +49,9 @@ impl JobRequest {
         Ok(Self {
             topic,
             payload: serialized_payload,
-            processing_timeout_seconds: 5,
+            processing_timeout_seconds: DEFAULT_PROCESSING_TIMEOUT_SECONDS,
             scheduled_at: Utc::now(),
-            max_retries: 3,
+            max_retries: DEFAULT_MAX_RETRIES,
         })
     }
 
