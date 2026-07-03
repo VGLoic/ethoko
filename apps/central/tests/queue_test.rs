@@ -75,6 +75,20 @@ async fn test_memory_process_timeout() {
 }
 
 #[sqlx::test]
+async fn test_psql_process_timeout_into_dead(pool: Pool<Postgres>) {
+    setup();
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
+    test_process_timeout_into_dead(queue).await;
+}
+
+#[tokio::test]
+async fn test_memory_process_timeout_into_dead() {
+    setup();
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
+    test_process_timeout_into_dead(queue).await;
+}
+
+#[sqlx::test]
 async fn test_psql_process_success(pool: Pool<Postgres>) {
     setup();
     let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
@@ -219,6 +233,23 @@ async fn test_process_timeout<Q: Queue>(queue: Q) {
         dequeued_job.retry_count, 1,
         "dequeued job should have an increasing retry count"
     );
+}
+
+async fn test_process_timeout_into_dead<Q: Queue>(queue: Q) {
+    let processing_timeout_in_seconds = 1_u16;
+    let job_request = dummy_job()
+        .with_processing_timeout(processing_timeout_in_seconds)
+        .with_max_retries(1);
+
+    let _ = queue.enqueue(job_request).await.unwrap();
+    let _ = queue.dequeue().await.unwrap();
+    let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds);
+    sleep(Duration::from_secs(seconds_to_wait.into())).await;
+    let _ = queue.dequeue().await.unwrap();
+    sleep(Duration::from_secs(seconds_to_wait.into())).await;
+    let dequeued_job = queue.dequeue().await.unwrap();
+
+    assert!(dequeued_job.is_none(), "dequeued job must be none");
 }
 
 async fn test_process_success<Q: Queue>(queue: Q) {
