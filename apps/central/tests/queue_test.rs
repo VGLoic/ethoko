@@ -165,10 +165,11 @@ fn dummy_job() -> JobRequest {
     JobRequest::new("test-topic".to_string(), payload)
         .unwrap()
         // We substract a few milliseconds because the PSQL queue does not pick up the job otherwise
-        // The dequeue query contains a "<=" so it is strange, there may be something related to testing that creates issue
+        // The dequeue query contains a "<=" so it is strange
+        // There may be a clock issue between the database and the application, but it is not clear
         .with_scheduled_at(
             Utc::now()
-                .checked_sub_signed(TimeDelta::seconds(1))
+                .checked_sub_signed(TimeDelta::milliseconds(1))
                 .unwrap(),
         )
 }
