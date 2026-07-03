@@ -222,6 +222,7 @@ async fn test_process_timeout<Q: Queue>(queue: Q) {
     let _ = queue.dequeue().await.unwrap();
     let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds);
     sleep(Duration::from_secs(seconds_to_wait.into())).await;
+    queue.cleanup_timeout_jobs().await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
 
     assert!(dequeued_job.is_some(), "dequeued job must be some");
@@ -246,8 +247,10 @@ async fn test_process_timeout_into_dead<Q: Queue>(queue: Q) {
     let _ = queue.dequeue().await.unwrap();
     let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds);
     sleep(Duration::from_secs(seconds_to_wait.into())).await;
+    queue.cleanup_timeout_jobs().await.unwrap();
     let _ = queue.dequeue().await.unwrap();
     sleep(Duration::from_secs(seconds_to_wait.into())).await;
+    queue.cleanup_timeout_jobs().await.unwrap();
     let dequeued_job = queue.dequeue().await.unwrap();
 
     assert!(dequeued_job.is_none(), "dequeued job must be none");

@@ -8,28 +8,21 @@ use crate::jobs::{processor::JobProcessor, queue::Queue};
 pub struct Worker<Q: Queue, Processor: JobProcessor> {
     queue: Q,
     processor: Processor,
-    cancellation_token: CancellationToken,
     polling_interval_milliseconds: u64,
 }
 
 impl<Q: Queue, Processor: JobProcessor> Worker<Q, Processor> {
-    pub fn new(
-        queue: Q,
-        processor: Processor,
-        cancellation_token: CancellationToken,
-        polling_interval_milliseconds: u64,
-    ) -> Self {
+    pub fn new(queue: Q, processor: Processor, polling_interval_milliseconds: u64) -> Self {
         Worker {
             queue,
             processor,
-            cancellation_token,
             polling_interval_milliseconds,
         }
     }
 
-    pub async fn run(&self) -> Result<(), anyhow::Error> {
+    pub async fn run(&self, cancellation_token: CancellationToken) -> Result<(), anyhow::Error> {
         loop {
-            if self.cancellation_token.is_cancelled() {
+            if cancellation_token.is_cancelled() {
                 debug!("Received instruction to close");
                 break;
             }

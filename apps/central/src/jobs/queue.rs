@@ -29,6 +29,9 @@ pub trait Queue: Send + Sync + 'static {
     /// Retry a dead job
     /// Job is moved from dead jobs to ready jobs
     async fn retry(&self, id: uuid::Uuid) -> Result<(), QueueError>;
+    /// Cleanup jobs that have timed out while processing
+    /// A timeout is considered as a failure, so the job is retried if it has not reached its max retries, else it is put in the DLQ
+    async fn cleanup_timeout_jobs(&self) -> Result<(), QueueError>;
 }
 
 #[async_trait::async_trait]

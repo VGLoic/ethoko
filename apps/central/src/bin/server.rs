@@ -58,13 +58,23 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Successfully ran migrations");
 
+    let cancellation_token = CancellationToken::new();
     let job_queue = jobs::psqlqueue::PsqlQueue::new(3, pool.clone());
+
+    let job_queue_token = cancellation_token.clone();
+    let job_queue_runner = job_queue.clone();
+    let job_queue_handle = tokio::spawn(async move {
+        if let Err(e) = job_queue_runner.run(job_queue_token, 5).await {
+            error!("Job queue error: {e:?}")
+        }
+        info!("Gracefully exiting job queue handle")
+    });
+
     let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
     let users_job_processor = users::notifier::job_processor::UsersJobProcessor;
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
     let users_service = users::service::UsersServiceImpl::new(users_repository, users_notifier);
 
-    let cancellation_token = CancellationToken::new();
     let job_worker_queue = job_queue.clone();
     let job_worker_token = cancellation_token.clone();
     let job_worker_handle = tokio::spawn(async {
@@ -72,14 +82,9 @@ async fn main() -> Result<(), anyhow::Error> {
             USERS_JOB_TOPIC.to_string(),
             Box::new(users_job_processor) as Box<dyn JobProcessor>,
         )]));
-        let worker = jobs::polling_worker::Worker::new(
-            job_worker_queue,
-            root_processor,
-            job_worker_token,
-            1_000,
-        );
+        let worker = jobs::polling_worker::Worker::new(job_worker_queue, root_processor, 1_000);
 
-        if let Err(e) = worker.run().await {
+        if let Err(e) = worker.run(job_worker_token).await {
             error!("Worker error: {e:?}")
         }
         info!("Gracefully exiting job worker handle")
@@ -107,6 +112,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     if let Err(e) = job_worker_handle.await {
         error!("Error during job worker handler graceful shutdown: {e:?}");
+    }
+    if let Err(e) = job_queue_handle.await {
+        error!("Error during job queue handler graceful shutdown: {e:?}");
     }
 
     Ok(())

@@ -4,6 +4,7 @@ use crate::jobs::{
 };
 use chrono::{TimeDelta, Utc};
 use sqlx::{Pool, Postgres};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 #[derive(Debug, Clone)]
@@ -22,94 +23,25 @@ impl PsqlQueue {
 }
 
 impl PsqlQueue {
-    async fn cleanup_timeout_jobs(&self) -> Result<(), QueueError> {
-        let mut transaction =
-            self.pool.begin().await.map_err(|e| {
-                anyhow::anyhow!(e).context("failed to start transaction for cleanup")
-            })?;
-
-        let timeout_jobs = sqlx::query_as::<_, Job>(
-            r#"
-            SELECT
-                id,
-                topic,
-                payload,
-                status,
-                scheduled_at,
-                dequeued_at,
-                processing_timeout_at,
-                retry_count,
-                processing_timeout_seconds,
-                max_retries,
-                created_at,
-                updated_at
-            FROM "ethoko_job"
-            WHERE status = 'processing' AND now() >= processing_timeout_at
-            "#,
-        )
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch timeout jobs from psql queue"))?;
-
-        for timeout_job in timeout_jobs {
-            if timeout_job.retry_count >= timeout_job.max_retries {
-                warn!(
-                    "Job {} has timed out and has retried too much, ending up in DLQ",
-                    timeout_job.id
-                );
-                sqlx::query(
-                    r#"
-                    UPDATE "ethoko_job"
-                    SET status = 'dead'
-                    WHERE id = $1 AND status = 'processing'
-                    "#,
-                )
-                .bind(timeout_job.id)
-                .execute(&mut *transaction)
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(e).context("failed to update job into dead letter queue")
-                })?;
-            } else {
-                warn!(
-                    "Job {} has timed out and is scheduled for retry with retry #{}",
-                    timeout_job.id, timeout_job.retry_count
-                );
-                let scheduled_at = timeout_job
-                    .dequeued_at
-                    .unwrap_or(Utc::now())
-                    .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds.into()))
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("failed to compute scheduled_at for retry in clean up")
-                    })?;
-                sqlx::query(
-                    r#"
-                    UPDATE "ethoko_job"
-                    SET
-                        status = 'pending',
-                        scheduled_at = $3,
-                        dequeued_at = NULL,
-                        processing_timeout_at = NULL,
-                        retry_count = retry_count + 1
-                    WHERE id = $1 AND processing_timeout_at = $2
-                    "#,
-                )
-                .bind(timeout_job.id)
-                .bind(timeout_job.processing_timeout_at)
-                .bind(scheduled_at)
-                .execute(&mut *transaction)
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(e).context("failed to update timeout job for retry")
-                })?;
+    pub async fn run(
+        &self,
+        cancellation_token: CancellationToken,
+        timeout_polling_interval_seconds: u16,
+    ) -> Result<(), QueueError> {
+        loop {
+            if cancellation_token.is_cancelled() {
+                debug!("Received instruction to close");
+                break;
             }
+            if let Err(e) = self.cleanup_timeout_jobs().await {
+                warn!("Failed to cleanup timeout jobs: {e:?}");
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(
+                timeout_polling_interval_seconds.into(),
+            ))
+            .await;
         }
-
-        transaction
-            .commit()
-            .await
-            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction for cleanup"))?;
-
+        debug!("PsqlQueue cleanup loop exiting");
         Ok(())
     }
 }
@@ -155,8 +87,6 @@ impl Queue for PsqlQueue {
     }
 
     async fn dequeue(&self) -> Result<Option<Job>, QueueError> {
-        self.cleanup_timeout_jobs().await?;
-
         let mut transaction = self
             .pool
             .begin()
@@ -390,6 +320,97 @@ impl Queue for PsqlQueue {
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction for retry"))?;
 
         debug!("Job {} retried from DLQ", id);
+        Ok(())
+    }
+
+    async fn cleanup_timeout_jobs(&self) -> Result<(), QueueError> {
+        let mut transaction =
+            self.pool.begin().await.map_err(|e| {
+                anyhow::anyhow!(e).context("failed to start transaction for cleanup")
+            })?;
+
+        let timeout_jobs = sqlx::query_as::<_, Job>(
+            r#"
+            SELECT
+                id,
+                topic,
+                payload,
+                status,
+                scheduled_at,
+                dequeued_at,
+                processing_timeout_at,
+                retry_count,
+                processing_timeout_seconds,
+                max_retries,
+                created_at,
+                updated_at
+            FROM "ethoko_job"
+            WHERE status = 'processing' AND now() >= processing_timeout_at
+            "#,
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch timeout jobs from psql queue"))?;
+
+        for timeout_job in timeout_jobs {
+            if timeout_job.retry_count >= timeout_job.max_retries {
+                warn!(
+                    "Job {} has timed out and has retried too much, ending up in DLQ",
+                    timeout_job.id
+                );
+                sqlx::query(
+                    r#"
+                    UPDATE "ethoko_job"
+                    SET status = 'dead'
+                    WHERE id = $1 AND status = 'processing'
+                    "#,
+                )
+                .bind(timeout_job.id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(e).context("failed to update job into dead letter queue")
+                })?;
+            } else {
+                warn!(
+                    "Job {} has timed out and is scheduled for retry with retry #{}",
+                    timeout_job.id, timeout_job.retry_count
+                );
+                let scheduled_at = timeout_job
+                    .dequeued_at
+                    .unwrap_or(Utc::now())
+                    .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds.into()))
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("failed to compute scheduled_at for retry in clean up")
+                    })?;
+                sqlx::query(
+                    r#"
+                    UPDATE "ethoko_job"
+                    SET
+                        status = 'pending',
+                        scheduled_at = $3,
+                        dequeued_at = NULL,
+                        processing_timeout_at = NULL,
+                        retry_count = retry_count + 1
+                    WHERE id = $1 AND processing_timeout_at = $2
+                    "#,
+                )
+                .bind(timeout_job.id)
+                .bind(timeout_job.processing_timeout_at)
+                .bind(scheduled_at)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(e).context("failed to update timeout job for retry")
+                })?;
+            }
+        }
+
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction for cleanup"))?;
+
         Ok(())
     }
 }

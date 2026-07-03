@@ -64,53 +64,6 @@ impl Queue for InMemoryQueue {
         })?;
         let now = Utc::now();
 
-        // Moving timeout `processing` jobs from processing to `pending`
-        let timeout_ids = jobs
-            .values()
-            .filter(|j| {
-                j.status == JobStatus::Processing
-                    && j.processing_timeout_at.is_some_and(|t| now >= t)
-            })
-            .map(|j| j.id)
-            .collect::<Vec<uuid::Uuid>>();
-        debug!(
-            "moving {} timed out processing jobs to pending_jobs",
-            timeout_ids.len()
-        );
-        for id in timeout_ids {
-            let job = jobs.get_mut(&id);
-            if let Some(j) = job {
-                if j.retry_count >= j.max_retries {
-                    warn!(
-                        "Job {} has timed out and has retried too much, ending up in DLQ",
-                        j.id
-                    );
-                    j.status = JobStatus::Dead;
-                    j.updated_at = Utc::now();
-                } else {
-                    warn!(
-                        "Job {} has timed out and is scheduled for retry with retry #{}",
-                        j.id, j.retry_count
-                    );
-                    let scheduled_at = j
-                        .dequeued_at
-                        .unwrap_or(Utc::now())
-                        .checked_add_signed(chrono::Duration::seconds(
-                            self.retry_delay_seconds.into(),
-                        ))
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("failed to compute scheduled_at for retry")
-                        })?;
-                    j.scheduled_at = scheduled_at;
-                    j.retry_count += 1;
-                    j.dequeued_at = None;
-                    j.processing_timeout_at = None;
-                    j.status = JobStatus::Pending;
-                    j.updated_at = Utc::now();
-                }
-            }
-        }
-
         let dequeued_job_id = jobs
             .values()
             .filter(|j| j.status == JobStatus::Pending && j.scheduled_at <= Utc::now())
@@ -225,6 +178,61 @@ impl Queue for InMemoryQueue {
         job.status = JobStatus::Pending;
         job.updated_at = Utc::now();
         info!("Job {} retried from DLQ", job.id);
+        Ok(())
+    }
+
+    async fn cleanup_timeout_jobs(&self) -> Result<(), QueueError> {
+        let mut jobs = self.jobs.lock().map_err(|e| {
+            anyhow::anyhow!("{e}").context("failed to acquire jobs lock during dequeue")
+        })?;
+        let now = Utc::now();
+
+        // Moving timeout `processing` jobs from processing to `pending`
+        let timeout_ids = jobs
+            .values()
+            .filter(|j| {
+                j.status == JobStatus::Processing
+                    && j.processing_timeout_at.is_some_and(|t| now >= t)
+            })
+            .map(|j| j.id)
+            .collect::<Vec<uuid::Uuid>>();
+        debug!(
+            "moving {} timed out processing jobs to pending_jobs",
+            timeout_ids.len()
+        );
+        for id in timeout_ids {
+            let job = jobs.get_mut(&id);
+            if let Some(j) = job {
+                if j.retry_count >= j.max_retries {
+                    warn!(
+                        "Job {} has timed out and has retried too much, ending up in DLQ",
+                        j.id
+                    );
+                    j.status = JobStatus::Dead;
+                    j.updated_at = Utc::now();
+                } else {
+                    warn!(
+                        "Job {} has timed out and is scheduled for retry with retry #{}",
+                        j.id, j.retry_count
+                    );
+                    let scheduled_at = j
+                        .dequeued_at
+                        .unwrap_or(Utc::now())
+                        .checked_add_signed(chrono::Duration::seconds(
+                            self.retry_delay_seconds.into(),
+                        ))
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("failed to compute scheduled_at for retry")
+                        })?;
+                    j.scheduled_at = scheduled_at;
+                    j.retry_count += 1;
+                    j.dequeued_at = None;
+                    j.processing_timeout_at = None;
+                    j.status = JobStatus::Pending;
+                    j.updated_at = Utc::now();
+                }
+            }
+        }
         Ok(())
     }
 }
