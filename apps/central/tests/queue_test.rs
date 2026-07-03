@@ -16,131 +16,131 @@ struct TestJobPayload {
     pub message: String,
 }
 
-const RETRY_DELAY_SECONDS: u64 = 1;
+const RETRY_DELAY_SECONDS: u16 = 1;
 
 #[sqlx::test]
 async fn test_psql_dequeue_non_ready_job(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_dequeue_non_ready_job(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_dequeue_non_ready_job() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_dequeue_non_ready_job(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_dequeue_ready_job(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_dequeue_ready_job(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_dequeue_ready_job() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_dequeue_ready_job(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_successive_dequeue_ready_job(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_successive_dequeue_ready_job(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_successive_dequeue_ready_job() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_successive_dequeue_ready_job(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_process_timeout(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_process_timeout(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_process_timeout() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_process_timeout(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_process_success(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_process_success(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_process_success() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_process_success(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_process_fail_into_success(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_process_fail_into_success(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_process_fail_into_success() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_process_fail_into_success(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_process_fail_into_dead(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_process_fail_into_dead(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_process_fail_into_dead() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_process_fail_into_dead(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_retry_dead_job(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_retry_dead_job(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_retry_dead_job() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_retry_dead_job(queue).await;
 }
 
 #[sqlx::test]
 async fn test_psql_dequeued_jobs_in_scheduled_at_order(pool: Pool<Postgres>) {
     setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS.cast_signed(), pool);
+    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
     test_dequeued_jobs_in_scheduled_at_order(queue).await;
 }
 
 #[tokio::test]
 async fn test_memory_dequeued_jobs_in_scheduled_at_order() {
     setup();
-    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS.cast_signed());
+    let queue = InMemoryQueue::new(RETRY_DELAY_SECONDS);
     test_dequeued_jobs_in_scheduled_at_order(queue).await;
 }
 
@@ -201,13 +201,12 @@ async fn test_successive_dequeue_ready_job<Q: Queue>(queue: Q) {
 
 async fn test_process_timeout<Q: Queue>(queue: Q) {
     let processing_timeout_in_seconds = 1_u16;
-    let job_request =
-        dummy_job().with_processing_timeout(processing_timeout_in_seconds.cast_signed());
+    let job_request = dummy_job().with_processing_timeout(processing_timeout_in_seconds);
 
     let job = queue.enqueue(job_request).await.unwrap();
     let _ = queue.dequeue().await.unwrap();
-    let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds.into());
-    sleep(Duration::from_secs(seconds_to_wait)).await;
+    let seconds_to_wait = RETRY_DELAY_SECONDS.max(processing_timeout_in_seconds);
+    sleep(Duration::from_secs(seconds_to_wait.into())).await;
     let dequeued_job = queue.dequeue().await.unwrap();
 
     assert!(dequeued_job.is_some(), "dequeued job must be some");
@@ -239,7 +238,7 @@ async fn test_process_fail_into_success<Q: Queue>(queue: Q) {
     let job = queue.enqueue(job_request).await.unwrap();
     let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS.into())).await;
     let dequeued_job_1 = queue.dequeue().await.unwrap().unwrap();
     queue.success(job.id).await.unwrap();
     let dequeued_job_2 = queue.dequeue().await.unwrap();
@@ -256,10 +255,10 @@ async fn test_process_fail_into_dead<Q: Queue>(queue: Q) {
     let job = queue.enqueue(job_request).await.unwrap();
     let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS.into())).await;
     let dequeued_job_1 = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS.into())).await;
     let dequeued_job_2 = queue.dequeue().await.unwrap();
 
     assert_eq!(dequeued_job_0.id, job.id);
@@ -275,7 +274,7 @@ async fn test_retry_dead_job<Q: Queue>(queue: Q) {
     let job = queue.enqueue(job_request).await.unwrap();
     let _ = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
-    sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+    sleep(Duration::from_secs(RETRY_DELAY_SECONDS.into())).await;
     let dequeued_job_0 = queue.dequeue().await.unwrap().unwrap();
     queue.fail(job.id).await.unwrap();
     queue.retry(job.id).await.unwrap();

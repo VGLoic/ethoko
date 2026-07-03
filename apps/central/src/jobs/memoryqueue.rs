@@ -14,11 +14,11 @@ use crate::jobs::{
 /// An in-memory queue for jobs
 /// It defines a hash map protected by Mutext for storing the jobs in their different states: pending, processing, successful or dead.
 pub struct InMemoryQueue {
-    retry_delay_seconds: i64,
+    retry_delay_seconds: u16,
     jobs: Arc<Mutex<HashMap<uuid::Uuid, Job>>>,
 }
 impl InMemoryQueue {
-    pub fn new(retry_delay_seconds: i64) -> Self {
+    pub fn new(retry_delay_seconds: u16) -> Self {
         Self {
             retry_delay_seconds,
             jobs: Arc::new(Mutex::new(HashMap::new())),
@@ -37,7 +37,7 @@ impl From<JobRequest> for Job {
             scheduled_at: value.scheduled_at,
             dequeued_at: None,
             processing_timeout_at: None,
-            retry_count: 0,
+            retry_count: 0.into(),
             max_retries: value.max_retries,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -95,7 +95,9 @@ impl Queue for InMemoryQueue {
                     let scheduled_at = j
                         .dequeued_at
                         .unwrap_or(Utc::now())
-                        .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds))
+                        .checked_add_signed(chrono::Duration::seconds(
+                            self.retry_delay_seconds.into(),
+                        ))
                         .ok_or_else(|| {
                             anyhow::anyhow!("failed to compute scheduled_at for retry")
                         })?;
@@ -193,7 +195,7 @@ impl Queue for InMemoryQueue {
             let scheduled_at = job
                 .dequeued_at
                 .unwrap_or(Utc::now())
-                .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds))
+                .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds.into()))
                 .ok_or_else(|| anyhow::anyhow!("failed to compute scheduled_at for retry"))?;
             job.scheduled_at = scheduled_at;
             job.retry_count += 1;
@@ -217,7 +219,7 @@ impl Queue for InMemoryQueue {
             return Err(anyhow::anyhow!("Job {id} is not in dead state, cannot retry").into());
         }
         job.scheduled_at = Utc::now();
-        job.retry_count = 0;
+        job.retry_count = 0.into();
         job.dequeued_at = None;
         job.processing_timeout_at = None;
         job.status = JobStatus::Pending;

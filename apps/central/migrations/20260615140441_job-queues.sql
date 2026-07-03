@@ -8,11 +8,11 @@ CREATE TABLE "ethoko_job" (
     payload                    TEXT         NOT NULL,
     status                     job_status   NOT NULL DEFAULT 'pending',
     scheduled_at               TIMESTAMPTZ  NOT NULL,
-    retry_count                INT2         NOT NULL DEFAULT 0,
-    processing_timeout_seconds INT2         NOT NULL,
+    retry_count                INT4         NOT NULL DEFAULT 0,
+    processing_timeout_seconds INT4         NOT NULL,
     dequeued_at                TIMESTAMPTZ,
     processing_timeout_at      TIMESTAMPTZ,
-    max_retries                INT2         NOT NULL,
+    max_retries                INT4         NOT NULL,
     created_at                 TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at                 TIMESTAMPTZ  NOT NULL DEFAULT now()
 );

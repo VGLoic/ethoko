@@ -8,12 +8,12 @@ use tracing::{debug, warn};
 
 #[derive(Debug, Clone)]
 pub struct PsqlQueue {
-    retry_delay_seconds: i64,
+    retry_delay_seconds: u16,
     pool: Pool<Postgres>,
 }
 
 impl PsqlQueue {
-    pub fn new(retry_delay_seconds: i64, pool: Pool<Postgres>) -> Self {
+    pub fn new(retry_delay_seconds: u16, pool: Pool<Postgres>) -> Self {
         Self {
             retry_delay_seconds,
             pool,
@@ -78,7 +78,7 @@ impl PsqlQueue {
                 let scheduled_at = timeout_job
                     .dequeued_at
                     .unwrap_or(Utc::now())
-                    .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds))
+                    .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds.into()))
                     .ok_or_else(|| {
                         anyhow::anyhow!("failed to compute scheduled_at for retry in clean up")
                     })?;
@@ -299,7 +299,7 @@ impl Queue for PsqlQueue {
                 job.id, job.retry_count
             );
             let scheduled_at = Utc::now()
-                .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds))
+                .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds.into()))
                 .ok_or_else(|| anyhow::anyhow!("failed to compute scheduled_at for retry"))?;
             sqlx::query(
                 r#"
