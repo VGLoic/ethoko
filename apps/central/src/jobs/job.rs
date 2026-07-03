@@ -20,9 +20,9 @@ impl std::fmt::Display for U16 {
     }
 }
 
-impl Into<i64> for U16 {
-    fn into(self) -> i64 {
-        self.0.into()
+impl From<U16> for i64 {
+    fn from(value: U16) -> Self {
+        value.0.into()
     }
 }
 
