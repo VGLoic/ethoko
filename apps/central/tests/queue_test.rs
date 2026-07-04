@@ -162,16 +162,7 @@ fn dummy_job() -> JobRequest {
     let payload = TestJobPayload {
         message: "Hello, world!".to_string(),
     };
-    JobRequest::new("test-topic".to_string(), payload)
-        .unwrap()
-        // We substract a few milliseconds because the PSQL queue does not pick up the job otherwise
-        // The dequeue query contains a "<=" so it is strange
-        // There may be a clock issue between the database and the application, but it is not clear
-        .with_scheduled_at(
-            Utc::now()
-                .checked_sub_signed(TimeDelta::milliseconds(10))
-                .unwrap(),
-        )
+    JobRequest::new("test-topic".to_string(), payload).unwrap()
 }
 
 fn setup() {
@@ -345,31 +336,9 @@ async fn test_dequeued_jobs_in_scheduled_at_order<Q: Queue>(queue: Q) {
         let job = queue.enqueue(j).await.unwrap();
         jobs.push(job);
     }
-
-    println!("Job scheduled_at values:");
-    for j in &jobs {
-        println!("Job ID: {}, scheduled_at: {}", j.id, j.scheduled_at);
-    }
-    println!("Expected scheduled_at values:");
-    println!("Ready job 0 scheduled_at: {}", scheduled_at_0);
-    println!("Ready job 1 scheduled_at: {}", scheduled_at_1);
-    println!("Future job scheduled_at: {}", future_scheduled_at);
-
-    let ready_job_0 = jobs
-        .iter()
-        .find(|j| j.scheduled_at == scheduled_at_0)
-        .cloned()
-        .unwrap();
-    let ready_job_1 = jobs
-        .iter()
-        .find(|j| j.scheduled_at == scheduled_at_1)
-        .cloned()
-        .unwrap();
-    let _future_job = jobs
-        .iter()
-        .find(|j| j.scheduled_at == future_scheduled_at)
-        .cloned()
-        .unwrap();
+    jobs.sort_by_key(|a| a.scheduled_at);
+    let ready_job_0 = jobs[0].clone();
+    let ready_job_1 = jobs[1].clone();
 
     let dequeued_job_0 = queue.dequeue().await.unwrap();
     let dequeued_job_1 = queue.dequeue().await.unwrap();

@@ -2,7 +2,7 @@ use crate::jobs::{
     job::{Job, JobRequest},
     queue::{Queue, QueueError, QueueInspector},
 };
-use chrono::{TimeDelta, Utc};
+use chrono::{SubsecRound, TimeDelta, Utc};
 use sqlx::{Pool, Postgres};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
@@ -46,6 +46,8 @@ impl PsqlQueue {
     }
 }
 
+const TRUNCATE_SUBSECS: u16 = 3;
+
 #[async_trait::async_trait]
 impl Queue for PsqlQueue {
     async fn enqueue(&self, job_request: JobRequest) -> Result<Job, QueueError> {
@@ -75,7 +77,7 @@ impl Queue for PsqlQueue {
         )
         .bind(job_request.topic)
         .bind(job_request.payload)
-        .bind(job_request.scheduled_at)
+        .bind(job_request.scheduled_at.trunc_subsecs(TRUNCATE_SUBSECS))
         .bind(job_request.processing_timeout_seconds)
         .bind(job_request.max_retries)
         .fetch_one(&self.pool)
@@ -142,8 +144,11 @@ impl Queue for PsqlQueue {
             "#,
         )
         .bind(job.id)
-        .bind(job.dequeued_at)
-        .bind(job.processing_timeout_at)
+        .bind(job.dequeued_at.map(|dt| dt.trunc_subsecs(TRUNCATE_SUBSECS)))
+        .bind(
+            job.processing_timeout_at
+                .map(|dt| dt.trunc_subsecs(TRUNCATE_SUBSECS)),
+        )
         .execute(&mut *transaction)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to update dequeued_at for dequeued_job"))?;
@@ -243,7 +248,7 @@ impl Queue for PsqlQueue {
                 WHERE id = $2 AND status = 'processing'
                 "#,
             )
-            .bind(scheduled_at)
+            .bind(scheduled_at.trunc_subsecs(TRUNCATE_SUBSECS))
             .bind(job.id)
             .execute(&mut *transaction)
             .await
@@ -306,7 +311,7 @@ impl Queue for PsqlQueue {
             WHERE id = $2 AND status = 'dead'
             "#,
         )
-        .bind(Utc::now())
+        .bind(Utc::now().trunc_subsecs(TRUNCATE_SUBSECS))
         .bind(job.id)
         .execute(&mut *transaction)
         .await
@@ -396,8 +401,12 @@ impl Queue for PsqlQueue {
                     "#,
                 )
                 .bind(timeout_job.id)
-                .bind(timeout_job.processing_timeout_at)
-                .bind(scheduled_at)
+                .bind(
+                    timeout_job
+                        .processing_timeout_at
+                        .map(|dt| dt.trunc_subsecs(TRUNCATE_SUBSECS)),
+                )
+                .bind(scheduled_at.trunc_subsecs(TRUNCATE_SUBSECS))
                 .execute(&mut *transaction)
                 .await
                 .map_err(|e| {
