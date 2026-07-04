@@ -346,6 +346,15 @@ async fn test_dequeued_jobs_in_scheduled_at_order<Q: Queue>(queue: Q) {
         jobs.push(job);
     }
 
+    println!("Job scheduled_at values:");
+    for j in &jobs {
+        println!("Job ID: {}, scheduled_at: {}", j.id, j.scheduled_at);
+    }
+    println!("Expected scheduled_at values:");
+    println!("Ready job 0 scheduled_at: {}", scheduled_at_0);
+    println!("Ready job 1 scheduled_at: {}", scheduled_at_1);
+    println!("Future job scheduled_at: {}", future_scheduled_at);
+
     let ready_job_0 = jobs
         .iter()
         .find(|j| j.scheduled_at == scheduled_at_0)
