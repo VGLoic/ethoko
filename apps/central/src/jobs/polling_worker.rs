@@ -30,16 +30,27 @@ impl<Q: Queue, Processor: JobProcessor> Worker<Q, Processor> {
                 Ok(Some(job)) => {
                     info!("Processing job: {:?}", job.id);
 
-                    match self.processor.process_job(&job).await {
-                        Ok(()) => {
-                            if let Err(e) = self.queue.success(job.id).await {
-                                error!("Failed to register success for job {}: {e:?}", job.id);
+                    tokio::select! {
+                        process_result = self.processor.process_job(&job) => {
+                            match process_result {
+                                Ok(()) => {
+                                    if let Err(e) = self.queue.success(job.id).await {
+                                        error!("Failed to register success for job {}: {e:?}", job.id);
+                                    }
+                                }
+                                Err(_e) => {
+                                    if let Err(e) = self.queue.fail(job.id).await {
+                                        error!("Failed to register failure for job: {:?}: {e:?}", job.id);
+                                    }
+                                }
                             }
                         }
-                        Err(_e) => {
-                            if let Err(e) = self.queue.fail(job.id).await {
-                                error!("Failed to register failure for job: {:?}: {e:?}", job.id);
-                            }
+                        _ = sleep(Duration::from_secs(job.processing_timeout_seconds.into())) => {
+                            error!("Job {} processing timed out", job.id);
+                        }
+                        _ = cancellation_token.cancelled() => {
+                            debug!("Received instruction to close during job processing");
+                            break;
                         }
                     }
                 }

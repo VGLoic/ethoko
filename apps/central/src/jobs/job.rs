@@ -26,6 +26,12 @@ impl From<U16> for i64 {
     }
 }
 
+impl From<U16> for u64 {
+    fn from(value: U16) -> Self {
+        value.0.cast_unsigned().into()
+    }
+}
+
 impl std::ops::Add<u16> for U16 {
     type Output = Self;
 
