@@ -169,7 +169,7 @@ fn dummy_job() -> JobRequest {
         // There may be a clock issue between the database and the application, but it is not clear
         .with_scheduled_at(
             Utc::now()
-                .checked_sub_signed(TimeDelta::milliseconds(1))
+                .checked_sub_signed(TimeDelta::milliseconds(10))
                 .unwrap(),
         )
 }
