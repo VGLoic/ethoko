@@ -1,13 +1,24 @@
-use ethoko_central::{config::Config, httpserver::serve_http_server, users};
+use ethoko_central::{
+    config::Config,
+    httpserver::serve_http_server,
+    jobs::{memoryqueue::InMemoryQueue, processor::JobProcessor, rootprocessor::RootProcessor},
+    users::{self, notifier::USERS_JOB_TOPIC},
+};
 use sqlx::postgres::PgPoolOptions;
-use std::{net::SocketAddr, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tracing::{Level, error, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::common::{manual_worker::ManualWorker, users_processor::FakeUserJobProcessor};
+mod manual_worker;
+mod users_processor;
 
 #[allow(dead_code)]
 pub struct InstanceState {
     pub reqwest_client: reqwest::Client,
     pub server_url: String,
+    pub users_processor: FakeUserJobProcessor,
+    pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
 }
 
 pub fn default_test_config() -> Config {
@@ -45,9 +56,20 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         return Err(anyhow::anyhow!(err));
     };
 
-    let users_notifier = users::notifier::UsersNotifierImpl;
+    let job_queue = InMemoryQueue::new(2);
+
+    let users_notifier = users::notifier::UsersNotifierImpl::new(job_queue.clone());
+    let users_job_processor = FakeUserJobProcessor::default();
     let users_repository = users::repository::PsqlAccountsRepository::new(pool);
     let users_service = users::service::UsersServiceImpl::new(users_repository, users_notifier);
+
+    let job_worker_queue = job_queue.clone();
+    let job_worker_users_job_processor = users_job_processor.clone();
+    let root_processor = RootProcessor::new(HashMap::from([(
+        USERS_JOB_TOPIC.to_string(),
+        Box::new(job_worker_users_job_processor) as Box<dyn JobProcessor>,
+    )]));
+    let job_worker = ManualWorker::new(job_worker_queue, root_processor);
 
     let port = config.port;
 
@@ -66,10 +88,16 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         listener.local_addr().unwrap().port()
     );
 
-    tokio::spawn(async move { serve_http_server(listener, users_service).await.unwrap() });
+    tokio::spawn(async move {
+        if let Err(e) = serve_http_server(listener, users_service).await {
+            error!("Error during http server graceful shutdown: {e:?}");
+        }
+    });
 
     Ok(InstanceState {
         server_url,
+        job_worker,
+        users_processor: users_job_processor,
         reqwest_client: reqwest::Client::new(),
     })
 }

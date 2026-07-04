@@ -25,7 +25,7 @@ until [[ $(docker inspect --format='{{json .State.Health.Status}}' integration-d
     fi
 done
 
-cargo test --tests
+DATABASE_URL=postgresql://admin:admin@localhost:5433/central cargo test --tests
 test_exit_status=$?
 
 echo "Removing docker container and volume"

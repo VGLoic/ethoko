@@ -45,8 +45,9 @@ docker compose -f compose.integration.yaml up
 
 Once the database is up, integration tests can be run:
 ```bash
-cargo test --tests
+DATABASE_URL=postgresql://admin:admin@localhost:5433/central cargo test --tests
 ```
+Note that the `DATABASE_URL` environment variable is required as some tests are using the [sqlx test feature](https://docs.rs/sqlx/latest/sqlx/attr.test.html).
 
 Alternatively, a script has been added in order to wrap the tests with the database container mounting and unmounting:
 ```bash

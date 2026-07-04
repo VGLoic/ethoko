@@ -33,6 +33,10 @@ async fn test_signup() {
     let response_body: users_response::UserResponse = response.json().await.unwrap();
     assert_eq!(response_body.email, email);
     assert_eq!(response_body.handle, handle);
+
+    instance_state.job_worker.consume_jobs().await.unwrap();
+
+    assert!(instance_state.users_processor.has_email(&email))
 }
 
 #[tokio::test]
