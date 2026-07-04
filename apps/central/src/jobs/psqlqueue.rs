@@ -125,12 +125,13 @@ impl Queue for PsqlQueue {
             Some(job) => job,
         };
         let now = Utc::now();
-        job.dequeued_at = Some(now);
+        job.dequeued_at = Some(now.trunc_subsecs(TRUNCATE_SUBSECS));
         job.processing_timeout_at = Some(
             now.checked_add_signed(TimeDelta::seconds(job.processing_timeout_seconds.into()))
                 .ok_or(anyhow::anyhow!(
                     "failed to obtain processing timeout datetime"
-                ))?,
+                ))?
+                .trunc_subsecs(TRUNCATE_SUBSECS),
         );
 
         sqlx::query(
@@ -144,11 +145,8 @@ impl Queue for PsqlQueue {
             "#,
         )
         .bind(job.id)
-        .bind(job.dequeued_at.map(|dt| dt.trunc_subsecs(TRUNCATE_SUBSECS)))
-        .bind(
-            job.processing_timeout_at
-                .map(|dt| dt.trunc_subsecs(TRUNCATE_SUBSECS)),
-        )
+        .bind(job.dequeued_at)
+        .bind(job.processing_timeout_at)
         .execute(&mut *transaction)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to update dequeued_at for dequeued_job"))?;
@@ -401,11 +399,7 @@ impl Queue for PsqlQueue {
                     "#,
                 )
                 .bind(timeout_job.id)
-                .bind(
-                    timeout_job
-                        .processing_timeout_at
-                        .map(|dt| dt.trunc_subsecs(TRUNCATE_SUBSECS)),
-                )
+                .bind(timeout_job.processing_timeout_at)
                 .bind(scheduled_at.trunc_subsecs(TRUNCATE_SUBSECS))
                 .execute(&mut *transaction)
                 .await
