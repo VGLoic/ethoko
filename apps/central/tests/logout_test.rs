@@ -1,7 +1,6 @@
 use axum::http::StatusCode;
-use ethoko_central::auth::{requests::login_email::LoginEmailBody, users_response};
 mod common;
-use common::{TestConfigBuilder, setup_instance};
+use common::{AuthActions, TestConfigBuilder, setup_instance};
 
 #[tokio::test]
 async fn test_logout_200() {
@@ -11,20 +10,7 @@ async fn test_logout_200() {
 
     let (user, password) = instance_state.signup_user().await;
 
-    let token = instance_state
-        .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
-        .json(&LoginEmailBody {
-            email: user.email.to_string(),
-            password: password.as_str().to_string(),
-        })
-        .send()
-        .await
-        .unwrap()
-        .json::<users_response::LoginResponse>()
-        .await
-        .unwrap()
-        .token;
+    let token = instance_state.login_user(&user.email, &password).await;
 
     let logout_response = instance_state
         .reqwest_client
@@ -62,20 +48,7 @@ async fn test_logout_revoke_token() {
 
     let (user, password) = instance_state.signup_user().await;
 
-    let token = instance_state
-        .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
-        .json(&LoginEmailBody {
-            email: user.email.to_string(),
-            password: password.as_str().to_string(),
-        })
-        .send()
-        .await
-        .unwrap()
-        .json::<users_response::LoginResponse>()
-        .await
-        .unwrap()
-        .token;
+    let token = instance_state.login_user(&user.email, &password).await;
 
     let logout_response = instance_state
         .reqwest_client

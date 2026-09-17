@@ -5,7 +5,7 @@ use ethoko_central::{
     auth::requests::verify_email::VerifyEmailBody, externalcom::email::EmailTemplate,
 };
 mod common;
-use common::{TestConfigBuilder, setup_instance};
+use common::{AuthActions, TestConfigBuilder, setup_instance};
 
 #[tokio::test]
 async fn test_resend_verification_email_200() {

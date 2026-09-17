@@ -4,7 +4,7 @@ use ethoko_central::{
     newtypes::password::Password,
 };
 mod common;
-use common::{TestConfigBuilder, setup_instance};
+use common::{AuthActions, TestConfigBuilder, setup_instance};
 use fake::{Fake, Faker};
 
 #[tokio::test]

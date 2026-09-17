@@ -1,20 +1,22 @@
 use ethoko_central::{
-    auth::{self, requests::signup_email::SignupEmailBody, users_response::UserResponse},
+    auth,
     config::{Config, OtpConfig},
     httpserver::serve_http_server,
     jobs::{memoryqueue::InMemoryQueue, processor::JobProcessor, rootprocessor::RootProcessor},
-    newtypes::{email::Email, handle::Handle, password::Password},
     router::app_router,
 };
-use fake::{Fake, Faker};
 use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tracing::{Level, error, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::common::{fake_email_service::FakeEmailService, manual_worker::ManualWorker};
+mod auth_actions;
 mod fake_email_service;
 mod manual_worker;
+
+#[allow(unused_imports)]
+pub use auth_actions::AuthActions;
 
 #[allow(dead_code)]
 pub struct InstanceState {
@@ -22,35 +24,6 @@ pub struct InstanceState {
     pub server_url: String,
     pub email_service: FakeEmailService,
     pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
-}
-
-impl InstanceState {
-    #[allow(dead_code)]
-    pub async fn signup_user(&self) -> (UserResponse, Password) {
-        let email = Faker.fake::<Email>();
-        let handle = Faker.fake::<Handle>();
-        let password = Faker.fake::<Password>();
-
-        let signup_body = SignupEmailBody {
-            email: email.to_string(),
-            handle: handle.to_string(),
-            password: password.as_str().to_owned(),
-        };
-        let user = self
-            .reqwest_client
-            .post(format!("{}/auth/signup/email", &self.server_url))
-            .json(&signup_body)
-            .send()
-            .await
-            .unwrap()
-            .json::<UserResponse>()
-            .await
-            .unwrap();
-
-        self.job_worker.consume_jobs().await.unwrap();
-
-        (user, password)
-    }
 }
 
 pub struct TestConfigBuilder {
