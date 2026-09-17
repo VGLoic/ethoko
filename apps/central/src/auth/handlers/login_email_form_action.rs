@@ -73,28 +73,26 @@ pub async fn handle_login_email_email_form_action(
         }
     };
 
-    // REMIND ME
-    let (_user, opaque_token_value) =
-        match app_state.auth_service.login_with_email(login_request).await {
-            Ok((user, opaque_token_value)) => (user, opaque_token_value),
-            Err(e) => match e {
-                LoginEmailError::InvalidCredentials => {
-                    error!("Login error: {:?}", e);
-                    return Ok(LoginActionResponse::Error(LoginTemplate::new(Some(
-                        "Invalid email or password".to_string(),
-                    ))));
-                }
-                LoginEmailError::UserNotFound => {
-                    error!("Login error: {:?}", e);
-                    return Ok(LoginActionResponse::Error(LoginTemplate::new(Some(
-                        "Invalid email or password".to_string(),
-                    ))));
-                }
-                LoginEmailError::Unknown(_err) => {
-                    return Err(TemplateError::InternalServerError);
-                }
-            },
-        };
+    let opaque_token_value = match app_state.auth_service.login_with_email(login_request).await {
+        Ok(opaque_token_value) => opaque_token_value,
+        Err(e) => match e {
+            LoginEmailError::InvalidCredentials => {
+                error!("Login error: {:?}", e);
+                return Ok(LoginActionResponse::Error(LoginTemplate::new(Some(
+                    "Invalid email or password".to_string(),
+                ))));
+            }
+            LoginEmailError::UserNotFound => {
+                error!("Login error: {:?}", e);
+                return Ok(LoginActionResponse::Error(LoginTemplate::new(Some(
+                    "Invalid email or password".to_string(),
+                ))));
+            }
+            LoginEmailError::Unknown(_err) => {
+                return Err(TemplateError::InternalServerError);
+            }
+        },
+    };
 
     Ok(LoginActionResponse::Success(opaque_token_value))
 }

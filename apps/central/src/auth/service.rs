@@ -74,7 +74,7 @@ pub trait AuthService: Send + Sync + 'static {
     async fn login_with_email(
         &self,
         request: LoginEmailRequest,
-    ) -> Result<(User, OpaqueTokenValue), LoginEmailError>;
+    ) -> Result<OpaqueTokenValue, LoginEmailError>;
 
     /// Fetches a user by their session token hash.
     /// The resolution will only succeed if the underlying token is valid and associated with an existing user.
@@ -213,7 +213,7 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
     async fn login_with_email(
         &self,
         request: LoginEmailRequest,
-    ) -> Result<(User, OpaqueTokenValue), LoginEmailError> {
+    ) -> Result<OpaqueTokenValue, LoginEmailError> {
         let (user, auth_credential) = self
             .repository
             .get_auth_credential_by_email(&request.email)
@@ -243,7 +243,7 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
 
         info!("User logged in: {}", user.email);
 
-        Ok((user, opaque_session_token_value))
+        Ok(opaque_session_token_value)
     }
 
     async fn get_user_by_session_token(

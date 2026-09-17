@@ -16,7 +16,7 @@ pub async fn handle_login_email(
 ) -> Result<(StatusCode, Json<LoginResponse>), ApiError> {
     let request = LoginEmailRequest::new(body.email, body.password)?;
 
-    let (_user, opaque_token_value) = state.auth_service.login_with_email(request).await?;
+    let opaque_token_value = state.auth_service.login_with_email(request).await?;
 
     Ok((
         StatusCode::OK,
