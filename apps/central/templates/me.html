@@ -1,0 +1,21 @@
+{% extends "_layout.html" %}
+
+{%- block title -%}
+    {#-
+        In here you can see how to use the language URL component to select the text to display.
+    -#}
+    Dashboard
+{%- endblock -%}
+
+{%- block content -%}
+    <h1>Dashboard</h1>
+    <div>
+        <p>Email: {{ email }}</p>
+        <p>Handle: {{ handle }}</p>
+    </div>
+    <div>
+        <form action="/auth/pages/logout" method="post">
+            <button type="submit">Logout</button>
+        </form>
+    </div>
+{%- endblock -%}

@@ -1,3 +1,4 @@
+mod authenticated_user;
 mod handlers;
 mod models;
 mod notifier;

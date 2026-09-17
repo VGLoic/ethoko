@@ -6,9 +6,8 @@ use crate::{
         models::{
             auth_credential::AuthCredential,
             requests::{
-                email_signup::EmailSignupError,
-                resend_verification_otp::ResendVerificationOtpError,
-                verify_email::VerifyEmailError,
+                login_email::LoginEmailError, resend_verification_otp::ResendVerificationOtpError,
+                signup_email::SignupEmailError, verify_email::VerifyEmailError,
             },
             user::User,
         },
@@ -30,12 +29,12 @@ pub const AUTH_JOB_TOPIC: &str = "auth";
 pub trait AuthNotifier: Send + Sync + 'static {
     /// Triggers a notification when user signed up with email
     /// # Errors
-    /// * `EmailSignupError::Unknown` for any errors that may occur during the process.
+    /// * `SignupEmailError::Unknown` for any errors that may occur during the process.
     async fn user_signed_up_with_email(
         &self,
         user: &User,
         auth_credential: &AuthCredential,
-    ) -> Result<(), EmailSignupError>;
+    ) -> Result<(), SignupEmailError>;
 
     /// Triggers a notification when user verified their email
     /// # Errors
@@ -49,6 +48,11 @@ pub trait AuthNotifier: Send + Sync + 'static {
         &self,
         user: &User,
     ) -> Result<(), ResendVerificationOtpError>;
+
+    /// Triggers a notification when user logged in
+    /// # Errors
+    /// * `LoginEmailError::Unknown` for any errors that may occur during the process.
+    async fn user_logged_in(&self, user: &User) -> Result<(), LoginEmailError>;
 }
 
 #[derive(Clone)]
@@ -68,7 +72,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         &self,
         user: &User,
         _auth_credential: &AuthCredential,
-    ) -> Result<(), EmailSignupError> {
+    ) -> Result<(), SignupEmailError> {
         debug!(
             "sending notification for user signed up with email: {}",
             user.email
@@ -80,7 +84,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());
         self.queue.enqueue(job).await.map_err(|e| match e {
-            QueueError::Unknown(err) => EmailSignupError::Unknown(
+            QueueError::Unknown(err) => SignupEmailError::Unknown(
                 err.context("Error enqueuing job for user signed up with email"),
             ),
         })?;
@@ -130,12 +134,19 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         );
         Ok(())
     }
+
+    async fn user_logged_in(&self, user: &User) -> Result<(), LoginEmailError> {
+        debug!("sending notification for user logged in: {}", user.email);
+
+        info!("sent notification for user logged in: {}", user.email);
+        Ok(())
+    }
 }
 
-impl From<QueueError> for EmailSignupError {
+impl From<QueueError> for SignupEmailError {
     fn from(value: QueueError) -> Self {
         match value {
-            QueueError::Unknown(e) => EmailSignupError::Unknown(e),
+            QueueError::Unknown(e) => SignupEmailError::Unknown(e),
         }
     }
 }

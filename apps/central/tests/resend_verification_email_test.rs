@@ -2,36 +2,10 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use ethoko_central::{
-    auth::requests::{email_signup::SignupEmailBody, verify_email::VerifyEmailBody},
-    externalcom::email::EmailTemplate,
-    newtypes::{email::Email, handle::Handle, password::Password},
+    auth::requests::verify_email::VerifyEmailBody, externalcom::email::EmailTemplate,
 };
 mod common;
-use common::{TestConfigBuilder, setup_instance};
-use fake::{Fake, Faker};
-
-async fn setup_user(instance_state: &common::InstanceState) -> (Email, Handle, Password) {
-    let email = Faker.fake::<Email>();
-    let handle = Faker.fake::<Handle>();
-    let password = Faker.fake::<Password>();
-
-    let signup_body = SignupEmailBody {
-        email: email.to_string(),
-        handle: handle.to_string(),
-        password: password.as_str().to_owned(),
-    };
-    let _ = instance_state
-        .reqwest_client
-        .post(format!("{}/auth/signup/email", &instance_state.server_url))
-        .json(&signup_body)
-        .send()
-        .await
-        .unwrap();
-
-    instance_state.job_worker.consume_jobs().await.unwrap();
-
-    (email, handle, password)
-}
+use common::{AuthActions, TestConfigBuilder, setup_instance};
 
 #[tokio::test]
 async fn test_resend_verification_email_200() {
@@ -39,10 +13,7 @@ async fn test_resend_verification_email_200() {
         .await
         .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
-
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
+    let (user, _password) = instance_state.signup_user().await;
 
     // Wait for 4 seconds to ensure the cooldown period has passed
     tokio::time::sleep(Duration::from_secs(4)).await;
@@ -53,7 +24,7 @@ async fn test_resend_verification_email_200() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -61,7 +32,7 @@ async fn test_resend_verification_email_200() {
     // Process the second OTP email sending
     instance_state.job_worker.consume_jobs().await.unwrap();
 
-    let emails_sent = instance_state.email_service.get_emails_sent_to(&email);
+    let emails_sent = instance_state.email_service.get_emails_sent_to(&user.email);
     let second_otp = emails_sent
         .get(1)
         .map(|t| match t {
@@ -73,7 +44,7 @@ async fn test_resend_verification_email_200() {
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
         .json(&VerifyEmailBody {
-            email: email.to_string(),
+            email: user.email.to_string(),
             otp: second_otp,
         })
         .send()
@@ -131,12 +102,9 @@ async fn test_resend_verification_email_user_already_verified_400() {
         .await
         .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
+    let (user, _password) = instance_state.signup_user().await;
 
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
-
-    let emails_sent = instance_state.email_service.get_emails_sent_to(&email);
+    let emails_sent = instance_state.email_service.get_emails_sent_to(&user.email);
     let first_otp = emails_sent
         .first()
         .map(|t| match t {
@@ -148,7 +116,7 @@ async fn test_resend_verification_email_user_already_verified_400() {
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
         .json(&VerifyEmailBody {
-            email: email.to_string(),
+            email: user.email.to_string(),
             otp: first_otp,
         })
         .send()
@@ -163,7 +131,7 @@ async fn test_resend_verification_email_user_already_verified_400() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -184,10 +152,7 @@ async fn test_resend_verification_email_cooldown_not_elapsed_400() {
         .await
         .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
-
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
+    let (user, _password) = instance_state.signup_user().await;
 
     let resend_response = instance_state
         .reqwest_client
@@ -195,7 +160,7 @@ async fn test_resend_verification_email_cooldown_not_elapsed_400() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -221,10 +186,7 @@ async fn test_resend_verification_email_rate_limit_429() {
     .await
     .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
-
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
+    let (user, _password) = instance_state.signup_user().await;
 
     // Wait for 4 seconds to ensure the cooldown period has passed and rate limiting bucket has been filled up again
     tokio::time::sleep(Duration::from_secs(4)).await;
@@ -235,7 +197,7 @@ async fn test_resend_verification_email_rate_limit_429() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -245,7 +207,7 @@ async fn test_resend_verification_email_rate_limit_429() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -255,7 +217,7 @@ async fn test_resend_verification_email_rate_limit_429() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();

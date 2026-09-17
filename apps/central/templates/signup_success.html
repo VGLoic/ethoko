@@ -1,0 +1,17 @@
+{% extends "_layout.html" %}
+
+{%- block title -%}
+    {#-
+        In here you can see how to use the language URL component to select the text to display.
+    -#}
+    Signup success
+{%- endblock -%}
+
+{%- block content -%}
+    <h1>Signup success</h1>
+    <div>
+        <p>Email: {{ email }}</p>
+        <p>Handle: {{ handle }}</p>
+        <p>Thank you! An email has been sent to your address for verification.</p>
+    </div>
+{%- endblock -%}

@@ -1,0 +1,36 @@
+{% extends "_layout.html" %}
+
+{%- block title -%}
+    {#-
+        In here you can see how to use the language URL component to select the text to display.
+    -#}
+    Signup
+{%- endblock -%}
+
+{%- block content -%}
+    <h1>Signup to Ethoko Central</h1>
+    <div>
+        <form method="post" action="/auth/pages/signup/email">
+            <div>
+                <label for="handle">Handle:</label>
+                <input type="text" id="handle" name="handle" required>
+            </div>
+            <div>
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div>
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div>
+                <label for="password_confirmation">Password Confirmation:</label>
+                <input type="password" id="password_confirmation" name="password_confirmation" required>
+            </div>
+            <button type="submit">Sign Up</button>
+        </form>
+    </div>
+    {% if let Some(e) = err %}
+        <p style="color: red;">{{ e }}</p>
+    {% endif %}
+{%- endblock -%}
