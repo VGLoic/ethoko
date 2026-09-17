@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "cargo run --bin central-server",
+    "dev": "cargo run --bin=central-server",
     "build": "cargo build ",
     "check-types": "cargo check",
     "check-format": "cargo fmt --check",
