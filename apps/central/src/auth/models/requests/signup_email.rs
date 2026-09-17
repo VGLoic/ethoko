@@ -18,14 +18,14 @@ pub struct SignupEmailBody {
     pub password: String,
 }
 
-pub struct EmailSignupRequest {
+pub struct SignupEmailRequest {
     pub email: Email,
     pub handle: Handle,
     pub password_hash: String,
 }
 
 #[derive(Debug, Error)]
-pub enum EmailSignupRequestError {
+pub enum SignupEmailRequestError {
     #[error("Invalid email")]
     InvalidEmail(EmailError),
     #[error("Invalid handle")]
@@ -36,23 +36,23 @@ pub enum EmailSignupRequestError {
     Unknown(#[from] anyhow::Error),
 }
 
-impl EmailSignupRequest {
-    /// Creates a new `EmailSignupRequest` after validating the formats and hashing the password.
+impl SignupEmailRequest {
+    /// Creates a new `SignupEmailRequest` after validating the formats and hashing the password.
     ///
     /// # Errors
-    /// `EmailSignupRequestError::InvalidEmail` if the email format is invalid.
-    /// `EmailSignupRequestError::InvalidHandle` if the handle format is invalid
-    /// `EmailSignupRequestError::InvalidPassword` if the password format is invalid
-    /// `EmailSignupRequestError::Unknown` for any other errors that may occur during the process.
+    /// `SignupEmailRequestError::InvalidEmail` if the email format is invalid.
+    /// `SignupEmailRequestError::InvalidHandle` if the handle format is invalid
+    /// `SignupEmailRequestError::InvalidPassword` if the password format is invalid
+    /// `SignupEmailRequestError::Unknown` for any other errors that may occur during the process.
     pub fn new(
         email: String,
         handle: String,
         password: String,
-    ) -> Result<Self, EmailSignupRequestError> {
-        let email = Email::new(&email).map_err(EmailSignupRequestError::InvalidEmail)?;
-        let handle = Handle::new(&handle).map_err(EmailSignupRequestError::InvalidHandle)?;
+    ) -> Result<Self, SignupEmailRequestError> {
+        let email = Email::new(&email).map_err(SignupEmailRequestError::InvalidEmail)?;
+        let handle = Handle::new(&handle).map_err(SignupEmailRequestError::InvalidHandle)?;
         let password =
-            Password::new(&password).map_err(EmailSignupRequestError::InvalidPassword)?;
+            Password::new(&password).map_err(SignupEmailRequestError::InvalidPassword)?;
 
         let password_hash = password_hasher::hash_password(&password)?;
 
@@ -65,7 +65,7 @@ impl EmailSignupRequest {
 }
 
 #[derive(Debug, Error)]
-pub enum EmailSignupError {
+pub enum SignupEmailError {
     #[error("Email {0} already exists")]
     EmailAlreadyExists(String),
     #[error("Handle {0} already exists")]
@@ -86,7 +86,7 @@ mod tests {
         let handle = Faker.fake::<Handle>();
         let password = Faker.fake::<Password>();
 
-        let result = EmailSignupRequest::new(
+        let result = SignupEmailRequest::new(
             email.to_string(),
             handle.to_string(),
             password.as_str().to_string(),
@@ -99,14 +99,14 @@ mod tests {
         let invalid_email = "invalid-email".to_string();
         let handle = Faker.fake::<Handle>();
         let password = Faker.fake::<Password>();
-        let result = EmailSignupRequest::new(
+        let result = SignupEmailRequest::new(
             invalid_email,
             handle.to_string(),
             password.as_str().to_string(),
         );
         assert!(matches!(
             result,
-            Err(EmailSignupRequestError::InvalidEmail(_))
+            Err(SignupEmailRequestError::InvalidEmail(_))
         ));
     }
 
@@ -115,14 +115,14 @@ mod tests {
         let email = Faker.fake::<Email>();
         let invalid_handle = "invalid@handle".to_string();
         let password = Faker.fake::<Password>();
-        let result = EmailSignupRequest::new(
+        let result = SignupEmailRequest::new(
             email.to_string(),
             invalid_handle,
             password.as_str().to_string(),
         );
         assert!(matches!(
             result,
-            Err(EmailSignupRequestError::InvalidHandle(_))
+            Err(SignupEmailRequestError::InvalidHandle(_))
         ));
     }
 
@@ -132,10 +132,10 @@ mod tests {
         let handle = Faker.fake::<Handle>();
         let invalid_password = "invalid-password".to_string();
         let result =
-            EmailSignupRequest::new(email.to_string(), handle.to_string(), invalid_password);
+            SignupEmailRequest::new(email.to_string(), handle.to_string(), invalid_password);
         assert!(matches!(
             result,
-            Err(EmailSignupRequestError::InvalidPassword(_))
+            Err(SignupEmailRequestError::InvalidPassword(_))
         ));
     }
 }

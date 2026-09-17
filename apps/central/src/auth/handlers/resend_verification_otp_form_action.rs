@@ -54,7 +54,7 @@ impl IntoResponse for ResendVerificationOtpActionResponse {
 pub struct ResendVerificationOtpFormData {
     pub email: String,
 }
-pub async fn handle_resend_verification_otp_action(
+pub async fn handle_resend_verification_otp_form_action(
     State(state): State<AppState>,
     Form(form): Form<ResendVerificationOtpFormData>,
 ) -> Result<ResendVerificationOtpActionResponse, TemplateError> {
