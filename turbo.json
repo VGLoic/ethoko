@@ -17,7 +17,9 @@
         "SEPOLIA_MNEMONIC",
         "ETHERSCAN_API_KEY",
         /* CI detection for prompt behavior */
-        "CI"
+        "CI",
+        /* Vite-provided build-time flags (react-router) */
+        "DEV"
       ]
     },
     "lint": {

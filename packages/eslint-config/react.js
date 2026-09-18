@@ -3,11 +3,19 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 import pluginReact from "eslint-plugin-react";
 import css from "@eslint/css";
+import eslintConfigPrettier from "eslint-config-prettier";
+import turboPlugin from "eslint-plugin-turbo";
+import onlyWarn from "eslint-plugin-only-warn";
 import { defineConfig } from "eslint/config";
 
 const JS_FILES = ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"];
 
-export default defineConfig([
+/**
+ * A shared ESLint configuration for React/Vite web applications.
+ *
+ * @type {import("eslint").Linter.Config[]}
+ * */
+export const config = defineConfig([
   {
     files: JS_FILES,
     plugins: { js },
@@ -20,6 +28,13 @@ export default defineConfig([
       ...tseslint.configs.recommended,
       pluginReact.configs.flat.recommended,
     ],
+  },
+  {
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
   },
   {
     files: ["**/*.css"],
@@ -43,5 +58,22 @@ export default defineConfig([
         { argsIgnorePattern: "^_" },
       ],
     },
+  },
+  eslintConfigPrettier,
+  {
+    plugins: {
+      turbo: turboPlugin,
+    },
+    rules: {
+      "turbo/no-undeclared-env-vars": "warn",
+    },
+  },
+  {
+    plugins: {
+      onlyWarn,
+    },
+  },
+  {
+    ignores: ["dist/**", "artifacts/**", "node_modules/**", "out/**", "lib/**", "generated/**"],
   },
 ]);
