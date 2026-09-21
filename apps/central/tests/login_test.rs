@@ -22,7 +22,7 @@ async fn test_login_200() {
 
     let login_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
         .json(&login_body)
         .send()
         .await
@@ -43,7 +43,7 @@ async fn test_login_token_valid() {
 
     let token = instance_state
         .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
         .json(&LoginEmailBody {
             email: user.email.to_string(),
             password: password.as_str().to_string(),
@@ -80,7 +80,7 @@ async fn test_login_400_invalid_email() {
 
     let login_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
         .json(&login_body)
         .send()
         .await
@@ -102,7 +102,7 @@ async fn test_login_400_invalid_password() {
 
     let login_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
         .json(&login_body)
         .send()
         .await
@@ -126,7 +126,7 @@ async fn test_login_401_user_not_found() {
 
     let login_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
         .json(&login_body)
         .send()
         .await
@@ -151,7 +151,7 @@ async fn test_login_401_invalid_password() {
 
     let login_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/login", &instance_state.server_url))
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
         .json(&login_body)
         .send()
         .await

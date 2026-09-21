@@ -88,22 +88,25 @@ struct RsEmailVerificationCodeVariables {
 }
 
 pub struct ResendEmailService {
-    app_url: String,
+    web_app_url: String,
     client: Resend,
 }
 
 impl ResendEmailService {
-    pub fn new(app_url: String, api_key: String) -> Self {
+    pub fn new(web_app_url: String, api_key: String) -> Self {
         let client = Resend::new(&api_key);
-        Self { app_url, client }
+        Self {
+            web_app_url,
+            client,
+        }
     }
 
     fn map_to_resend_template(&self, template: EmailTemplate) -> RsEmailVerificationTemplate {
         match template {
             EmailTemplate::EmailVerificationCode(payload) => {
                 let verification_url = format!(
-                    "{}/auth/pages/verify-email?email={}&otp={}",
-                    self.app_url,
+                    "{}/verify-email?email={}&otp={}",
+                    self.web_app_url,
                     payload.email,
                     payload.otp.show()
                 );

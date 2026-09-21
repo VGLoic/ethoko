@@ -9,6 +9,8 @@ use tracing::Level;
 pub struct Config {
     /// Self URL of the server, e.g. `https://example.com`
     pub self_url: String,
+    /// URL of the web application, e.g. `https://app.example.com`
+    pub web_app_url: String,
     /// Server port
     pub port: u16,
     /// Database URL, in the format `postgresql://user:password@host:port/database`
@@ -50,6 +52,14 @@ impl Config {
             Err(e) => {
                 errors.push(e);
                 "http://localhost:3000".into()
+            }
+        };
+
+        let web_app_url = match parse_required_env_variable::<String>("WEB_APP_URL") {
+            Ok(v) => v,
+            Err(e) => {
+                errors.push(e);
+                "http://localhost:3001".into()
             }
         };
 
@@ -106,6 +116,7 @@ impl Config {
 
         Ok(Config {
             self_url,
+            web_app_url,
             port,
             database_url,
             log_level,

@@ -46,7 +46,7 @@ impl AuthActions for InstanceState {
 
     async fn login_user(&self, email: &Email, password: &Password) -> String {
         self.reqwest_client
-            .post(format!("{}/auth/login", &self.server_url))
+            .post(format!("{}/auth/login/email", &self.server_url))
             .json(&LoginEmailBody {
                 email: email.to_string(),
                 password: password.as_str().to_string(),
