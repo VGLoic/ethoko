@@ -1,7 +1,7 @@
 import type { Route } from "./+types/home";
-import { getSession } from "~/server/sessions.server";
+import { getSessionTokenOrRedirect } from "~/server/auth.server";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
-import { Form, redirect } from "react-router";
+import { Form } from "react-router";
 
 export function meta(_args: Route.MetaArgs) {
   return [
@@ -11,18 +11,9 @@ export function meta(_args: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const session = await getSession(request.headers.get("Cookie"));
-
-  const token = session.get("token");
-  if (!token) {
-    return redirect("/login");
-  }
+  const { token } = await getSessionTokenOrRedirect(request.headers);
 
   const user = await ethokoCentralClient.me({ token });
-
-  if (!user) {
-    return redirect("/login");
-  }
 
   return { user };
 }
