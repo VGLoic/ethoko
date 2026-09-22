@@ -174,13 +174,39 @@ async fn not_found() -> impl IntoResponse {
 // ################## ERRORS ##################
 // ############################################
 
+#[derive(Serialize, Deserialize, Debug)]
+
+pub struct UnprocessableEntityError {
+    pub code: String,
+    pub reason: String,
+}
+
+impl UnprocessableEntityError {
+    pub fn new(code: String, reason: String) -> Self {
+        Self { code, reason }
+    }
+
+    pub fn new_body_validation(field: String, reason: String) -> Self {
+        Self {
+            code: "ETKAG01".to_string(),
+            reason: format!("invalid submitted field \"{field}\": {reason}"),
+        }
+    }
+}
+
+impl From<UnprocessableEntityError> for ApiError {
+    fn from(err: UnprocessableEntityError) -> Self {
+        ApiError::UnprocessableEntity(err)
+    }
+}
+
 #[derive(Debug)]
 pub enum ApiError {
     NotFound,
     InternalServerError(anyhow::Error),
-    UnprocessableEntity(String),
+    UnprocessableEntity(UnprocessableEntityError),
     BadRequest(String),
-    Unauthorized(String),
+    Unauthorized(anyhow::Error),
 }
 
 impl From<anyhow::Error> for ApiError {
@@ -197,14 +223,13 @@ impl IntoResponse for ApiError {
                 error!("Internal server error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
             }
-            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
-            Self::Unauthorized(msg) => {
-                warn!("Unauthorized access attempt: {}", msg);
+            Self::Unauthorized(error) => {
+                warn!("Unauthorized access attempt: {:?}", error);
                 StatusCode::UNAUTHORIZED.into_response()
             }
-            Self::UnprocessableEntity(msg) => {
-                warn!("Unprocessable entity: {}", msg);
-                (StatusCode::UNPROCESSABLE_ENTITY, "Unprocessable entity").into_response()
+            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
+            Self::UnprocessableEntity(err) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, Json(err)).into_response()
             }
         }
     }

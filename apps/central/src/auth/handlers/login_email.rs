@@ -1,26 +1,24 @@
 use crate::{
-    auth::{
-        models::requests::login_email::{
-            LoginEmailBody, LoginEmailError, LoginEmailRequest, LoginEmailRequestError,
-        },
-        users_response::LoginResponse,
+    auth::models::requests::login_email::{
+        HttpLoginEmailBody, HttpLoginEmailResponse, LoginEmailError, LoginEmailRequest,
+        LoginEmailRequestError,
     },
     newtypes::{email::EmailError, password::PasswordError},
-    router::{ApiError, AppState},
+    router::{ApiError, AppState, UnprocessableEntityError},
 };
 use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_login_email(
     State(state): State<AppState>,
-    Json(body): Json<LoginEmailBody>,
-) -> Result<(StatusCode, Json<LoginResponse>), ApiError> {
+    Json(body): Json<HttpLoginEmailBody>,
+) -> Result<(StatusCode, Json<HttpLoginEmailResponse>), ApiError> {
     let request = LoginEmailRequest::new(body.email, body.password)?;
 
     let opaque_token_value = state.auth_service.login_with_email(request).await?;
 
     Ok((
         StatusCode::OK,
-        Json(LoginResponse {
+        Json(HttpLoginEmailResponse {
             token: opaque_token_value.as_str().to_string(),
         }),
     ))
@@ -29,12 +27,16 @@ pub async fn handle_login_email(
 impl From<LoginEmailError> for ApiError {
     fn from(err: LoginEmailError) -> Self {
         match err {
-            LoginEmailError::UserNotFound => {
-                ApiError::Unauthorized("Invalid credentials".to_string())
-            }
-            LoginEmailError::InvalidCredentials => {
-                ApiError::Unauthorized("Invalid credentials".to_string())
-            }
+            LoginEmailError::UserNotFound => UnprocessableEntityError::new(
+                "ETKAL01".to_string(),
+                "invalid credentials".to_string(),
+            )
+            .into(),
+            LoginEmailError::InvalidCredentials => UnprocessableEntityError::new(
+                "ETKAL01".to_string(),
+                "invalid credentials".to_string(),
+            )
+            .into(),
             LoginEmailError::Unknown(e) => ApiError::InternalServerError(e),
         }
     }
@@ -43,18 +45,14 @@ impl From<LoginEmailError> for ApiError {
 impl From<LoginEmailRequestError> for ApiError {
     fn from(err: LoginEmailRequestError) -> Self {
         match err {
-                LoginEmailRequestError::InvalidEmail(e) => {
-                    ApiError::BadRequest(match e {
-                        EmailError::Empty => "\"email\": empty value not allowed".to_string(),
-                        EmailError::InvalidFormat => "\"email\": invalid format".to_string(),
-                    })
-                },
-                LoginEmailRequestError::InvalidPassword(e) => {
-                    ApiError::BadRequest(match e {
-                        PasswordError::Empty => "\"password\": empty value not allowed".to_string(),
-                        PasswordError::InvalidFormat => "\"password\": invalid format, expected at least 8 characters, including uppercase, lowercase, digit and special character".to_string(),
-                    })
-                }
+                LoginEmailRequestError::InvalidEmail(e) => UnprocessableEntityError::new_body_validation("email".to_string(), match e {
+                    EmailError::Empty => "empty value not allowed".to_string(),
+                    EmailError::InvalidFormat => "invalid format".to_string(),
+                }).into(),
+                LoginEmailRequestError::InvalidPassword(e) => UnprocessableEntityError::new_body_validation("password".to_string(), match e {
+                    PasswordError::Empty => "empty value not allowed".to_string(),
+                    PasswordError::InvalidFormat => "invalid format, expected at least 8 characters, including uppercase, lowercase, digit and special character".to_string(),
+                }).into()
             }
     }
 }

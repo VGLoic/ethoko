@@ -1,7 +1,10 @@
 use ethoko_central::{
-    auth::requests::login_email::LoginEmailBody, auth::requests::signup_email::SignupEmailBody,
-    auth::users_response::LoginResponse, auth::users_response::UserResponse,
-    newtypes::email::Email, newtypes::handle::Handle, newtypes::password::Password,
+    auth::http_responses::UserResponse,
+    auth::requests::login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
+    auth::requests::signup_email::HttpSignupEmailBody,
+    newtypes::email::Email,
+    newtypes::handle::Handle,
+    newtypes::password::Password,
 };
 use fake::{Fake, Faker};
 
@@ -23,7 +26,7 @@ impl AuthActions for InstanceState {
         let handle = Faker.fake::<Handle>();
         let password = Faker.fake::<Password>();
 
-        let signup_body = SignupEmailBody {
+        let signup_body = HttpSignupEmailBody {
             email: email.to_string(),
             handle: handle.to_string(),
             password: password.as_str().to_owned(),
@@ -47,14 +50,14 @@ impl AuthActions for InstanceState {
     async fn login_user(&self, email: &Email, password: &Password) -> String {
         self.reqwest_client
             .post(format!("{}/auth/login/email", &self.server_url))
-            .json(&LoginEmailBody {
+            .json(&HttpLoginEmailBody {
                 email: email.to_string(),
                 password: password.as_str().to_string(),
             })
             .send()
             .await
             .unwrap()
-            .json::<LoginResponse>()
+            .json::<HttpLoginEmailResponse>()
             .await
             .unwrap()
             .token

@@ -6,13 +6,6 @@ use crate::newtypes::{
     password::{Password, PasswordError},
 };
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LoginEmailBody {
-    pub email: String,
-    pub password: String,
-}
-
 pub struct LoginEmailRequest {
     pub email: Email,
     pub password: Password,
@@ -42,4 +35,17 @@ pub enum LoginEmailError {
     InvalidCredentials,
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpLoginEmailBody {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpLoginEmailResponse {
+    pub token: String,
 }

@@ -24,23 +24,31 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .await
             .map_err(|e| match e.reason() {
                 TypedHeaderRejectionReason::Missing => {
-                    ApiError::Unauthorized("Authorization header missing".to_string())
+                    ApiError::Unauthorized(anyhow::anyhow!("Authorization header missing"))
                 }
-                TypedHeaderRejectionReason::Error(err) => ApiError::Unauthorized(err.to_string()),
-                _other => ApiError::Unauthorized(
-                    "Unknown error while extracting authorization header".to_string(),
+                TypedHeaderRejectionReason::Error(err) => ApiError::Unauthorized(
+                    anyhow::anyhow!("{err}").context("Error while extracting authorization header"),
                 ),
+                _other => ApiError::Unauthorized(anyhow::anyhow!(
+                    "Unknown error while extracting authorization header"
+                )),
             })?;
 
         let opaque_session_token_value = OpaqueTokenValue::new(bearer.token().to_string())
-            .map_err(|e| ApiError::Unauthorized(e.to_string()))?;
+            .map_err(|e| {
+                ApiError::Unauthorized(e.context("Error while creating opaque session token value"))
+            })?;
         let session_token_hash = opaque_session_token_value.hash();
 
         let user = state
             .auth_service
             .get_user_by_session_token(&session_token_hash)
             .await
-            .map_err(|e| ApiError::Unauthorized(e.to_string()))?;
+            .map_err(|e| {
+                ApiError::Unauthorized(
+                    anyhow::Error::new(e).context("Error while fetching user by session token"),
+                )
+            })?;
 
         Ok(AuthenticatedUser {
             user,

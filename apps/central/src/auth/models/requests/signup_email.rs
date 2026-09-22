@@ -12,7 +12,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SignupEmailBody {
+pub struct HttpSignupEmailBody {
     pub email: String,
     pub handle: String,
     pub password: String,

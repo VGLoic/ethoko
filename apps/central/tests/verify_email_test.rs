@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use ethoko_central::{
-    auth::requests::verify_email::VerifyEmailBody, externalcom::email::EmailTemplate,
+    auth::requests::verify_email::HttpVerifyEmailBody, externalcom::email::EmailTemplate,
+    router::UnprocessableEntityError,
 };
 mod common;
 use common::{AuthActions, TestConfigBuilder, setup_instance};
@@ -24,7 +25,7 @@ async fn test_verify_email_200_valid_otp() {
         })
         .expect("Expected an OTP email to be sent");
 
-    let verify_email_body = VerifyEmailBody {
+    let verify_email_body = HttpVerifyEmailBody {
         email: user.email.to_string(),
         otp: otp.to_string(),
     };
@@ -41,7 +42,7 @@ async fn test_verify_email_200_valid_otp() {
 }
 
 #[tokio::test]
-async fn test_verify_email_400_already_verified() {
+async fn test_verify_email_422_already_verified() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -57,7 +58,7 @@ async fn test_verify_email_400_already_verified() {
         })
         .expect("Expected an OTP email to be sent");
 
-    let verify_email_body = VerifyEmailBody {
+    let verify_email_body = HttpVerifyEmailBody {
         email: user.email.to_string(),
         otp: otp.to_string(),
     };
@@ -82,18 +83,20 @@ async fn test_verify_email_400_already_verified() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = response.json::<UnprocessableEntityError>().await.unwrap();
+    assert_eq!(error.code, "ETKAVE01");
 }
 
 #[tokio::test]
-async fn test_verify_email_400_invalid_otp() {
+async fn test_verify_email_422_invalid_otp() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
 
     let (user, _password) = instance_state.signup_user().await;
 
-    let verify_email_body = VerifyEmailBody {
+    let verify_email_body = HttpVerifyEmailBody {
         email: user.email.to_string(),
         otp: "invalid-otp".to_string(),
     };
@@ -106,11 +109,13 @@ async fn test_verify_email_400_invalid_otp() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = response.json::<UnprocessableEntityError>().await.unwrap();
+    assert_eq!(error.code, "ETKAVE02");
 }
 
 #[tokio::test]
-async fn test_verify_email_400_invalid_email() {
+async fn test_verify_email_422_invalid_email() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -126,7 +131,7 @@ async fn test_verify_email_400_invalid_email() {
         })
         .expect("Expected an OTP email to be sent");
 
-    let verify_email_body = VerifyEmailBody {
+    let verify_email_body = HttpVerifyEmailBody {
         email: "invalid-email".to_string(),
         otp: otp.to_string(),
     };
@@ -139,11 +144,13 @@ async fn test_verify_email_400_invalid_email() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = response.json::<UnprocessableEntityError>().await.unwrap();
+    assert_eq!(error.code, "ETKAG01");
 }
 
 #[tokio::test]
-async fn test_verify_email_400_expired_otp() {
+async fn test_verify_email_422_expired_otp() {
     let instance_state = setup_instance(&TestConfigBuilder::new().with_otp_ttl(3).build())
         .await
         .unwrap();
@@ -162,7 +169,7 @@ async fn test_verify_email_400_expired_otp() {
     // Simulate OTP expiration by advancing the time in the email service
     tokio::time::sleep(Duration::from_secs(3)).await; // Wait for OTP to expire (3 seconds)
 
-    let verify_email_body = VerifyEmailBody {
+    let verify_email_body = HttpVerifyEmailBody {
         email: user.email.to_string(),
         otp: otp.to_string(),
     };
@@ -175,5 +182,7 @@ async fn test_verify_email_400_expired_otp() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = response.json::<UnprocessableEntityError>().await.unwrap();
+    assert_eq!(error.code, "ETKAVE03");
 }

@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, http::StatusCode};
 
 use crate::{
-    auth::{authenticated_user::AuthenticatedUser, users_response::UserResponse},
+    auth::{authenticated_user::AuthenticatedUser, http_responses::UserResponse},
     router::{ApiError, AppState},
 };
 pub async fn handle_me(

@@ -25,9 +25,3 @@ impl From<User> for UserResponse {
         }
     }
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LoginResponse {
-    pub token: String,
-}

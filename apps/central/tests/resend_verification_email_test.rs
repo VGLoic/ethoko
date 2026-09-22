@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use ethoko_central::{
-    auth::requests::verify_email::VerifyEmailBody, externalcom::email::EmailTemplate,
+    auth::requests::verify_email::HttpVerifyEmailBody, externalcom::email::EmailTemplate,
+    router::UnprocessableEntityError,
 };
 mod common;
 use common::{AuthActions, TestConfigBuilder, setup_instance};
@@ -43,7 +44,7 @@ async fn test_resend_verification_email_200() {
     let verify_email_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
-        .json(&VerifyEmailBody {
+        .json(&HttpVerifyEmailBody {
             email: user.email.to_string(),
             otp: second_otp,
         })
@@ -73,7 +74,12 @@ async fn test_resend_verification_email_invalid_email_400() {
         .await
         .unwrap();
 
-    assert_eq!(resend_response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = resend_response
+        .json::<UnprocessableEntityError>()
+        .await
+        .unwrap();
+    assert_eq!(error.code, "ETKAG01");
 }
 
 #[tokio::test]
@@ -97,7 +103,7 @@ async fn test_resend_verification_email_user_not_found_404() {
 }
 
 #[tokio::test]
-async fn test_resend_verification_email_user_already_verified_400() {
+async fn test_resend_verification_email_user_already_verified_422() {
     let instance_state = setup_instance(&TestConfigBuilder::new().build())
         .await
         .unwrap();
@@ -115,7 +121,7 @@ async fn test_resend_verification_email_user_already_verified_400() {
     let verify_email_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
-        .json(&VerifyEmailBody {
+        .json(&HttpVerifyEmailBody {
             email: user.email.to_string(),
             otp: first_otp,
         })
@@ -136,18 +142,16 @@ async fn test_resend_verification_email_user_already_verified_400() {
         .await
         .unwrap();
 
-    assert_eq!(resend_response.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        resend_response
-            .text()
-            .await
-            .unwrap()
-            .contains("user already verified")
-    );
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = resend_response
+        .json::<UnprocessableEntityError>()
+        .await
+        .unwrap();
+    assert_eq!(error.code, "ETKARV01");
 }
 
 #[tokio::test]
-async fn test_resend_verification_email_cooldown_not_elapsed_400() {
+async fn test_resend_verification_email_cooldown_not_elapsed_422() {
     let instance_state = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(10).build())
         .await
         .unwrap();
@@ -165,14 +169,12 @@ async fn test_resend_verification_email_cooldown_not_elapsed_400() {
         .await
         .unwrap();
 
-    assert_eq!(resend_response.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        resend_response
-            .text()
-            .await
-            .unwrap()
-            .contains("cooldown period has not elapsed yet for requesting a new verification code")
-    );
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = resend_response
+        .json::<UnprocessableEntityError>()
+        .await
+        .unwrap();
+    assert_eq!(error.code, "ETKARV02");
 }
 
 #[tokio::test]
