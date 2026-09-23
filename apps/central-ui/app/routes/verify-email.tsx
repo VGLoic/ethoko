@@ -44,23 +44,44 @@ export async function action({ request }: Route.ActionArgs) {
         intent: VERIFY_EMAIL_INTENT,
         success: false,
         errors: {
-          reason: null,
-          email: parsingErrors.properties?.email?.errors?.join(", ") ?? null,
-          otp: parsingErrors.properties?.otp?.errors?.join(", ") ?? null,
+          email: parsingErrors.properties?.email?.errors?.join(", "),
+          otp: parsingErrors.properties?.otp?.errors?.join(", "),
         },
       };
     }
 
     try {
-      await ethokoCentralClient.verifyEmail({
+      const verifyEmailResult = await ethokoCentralClient.verifyEmail({
         token,
         otp: parsingResult.data.otp,
         email: parsingResult.data.email,
       });
-      return {
-        intent: VERIFY_EMAIL_INTENT,
-        success: true,
-      };
+      if (verifyEmailResult.variant === "success") {
+        return {
+          intent: VERIFY_EMAIL_INTENT,
+          success: true,
+        };
+      }
+      if (verifyEmailResult.variant === "unprocessable-entity") {
+        const errorReason =
+          verifyEmailResult.reason === "email-already-verified"
+            ? "The email associated with this account is already verified."
+            : verifyEmailResult.reason === "invalid-otp"
+              ? "The provided code is invalid. Request a new one."
+              : verifyEmailResult.reason === "expired-otp"
+                ? "The provided code has expired. Request a new one."
+                : verifyEmailResult.reason === "unknown"
+                  ? "An unknown error occurred."
+                  : `Unknown reason ${verifyEmailResult.reason satisfies never}`;
+        return {
+          intent: VERIFY_EMAIL_INTENT,
+          success: false,
+          errors: {
+            reason: errorReason,
+          },
+        };
+      }
+      throw new Error(`Unknown variant ${verifyEmailResult satisfies never}`);
     } catch (error) {
       console.error("Email verification error:", error);
       return {
@@ -68,8 +89,6 @@ export async function action({ request }: Route.ActionArgs) {
         success: false,
         errors: {
           reason: "An error occurred during email verification.",
-          email: null,
-          otp: null,
         },
       };
     }
@@ -87,7 +106,6 @@ export async function action({ request }: Route.ActionArgs) {
         intent: RESEND_VERIFICATION_INTENT,
         success: false,
         errors: {
-          reason: null,
           email: parsingErrors.properties?.email?.errors?.join(", ") ?? null,
         },
       };
@@ -100,19 +118,38 @@ export async function action({ request }: Route.ActionArgs) {
         success: false,
         errors: {
           reason: "User is not authenticated.",
-          email: undefined,
         },
       };
     }
     try {
-      await ethokoCentralClient.resendVerificationEmail({
+      const resendResult = await ethokoCentralClient.resendVerificationEmail({
         token,
         email: parsingResult.data.email,
       });
-      return {
-        intent: RESEND_VERIFICATION_INTENT,
-        success: true,
-      };
+      if (resendResult.variant === "success") {
+        return {
+          intent: RESEND_VERIFICATION_INTENT,
+          success: true,
+        };
+      }
+      if (resendResult.variant === "unprocessable-entity") {
+        const errorReason =
+          resendResult.reason === "email-already-verified"
+            ? "The email has already been verified."
+            : resendResult.reason === "cooldown-period-not-elapsed"
+              ? "A code has been requested recently, please wait before trying again."
+              : resendResult.reason === "unknown"
+                ? "An unknown error occurred."
+                : `Unknown reason ${resendResult.reason satisfies never}`;
+        return {
+          intent: RESEND_VERIFICATION_INTENT,
+          success: false,
+          errors: {
+            reason: errorReason,
+          },
+        };
+      }
+      throw new Error(`Unknown variant ${resendResult satisfies never}`);
     } catch (error) {
       console.error("Resend verification email error:", error);
       return {
@@ -120,7 +157,6 @@ export async function action({ request }: Route.ActionArgs) {
         success: false,
         errors: {
           reason: "An error occurred while resending the verification email.",
-          email: undefined,
         },
       };
     }
@@ -150,9 +186,6 @@ export default function VerifyEmail({
   return (
     <main className="flex flex-col items-center justify-center min-h-screen gap-16">
       <h1>Verify Email</h1>
-      {actionData?.errors?.reason && (
-        <p className="text-red-500">{actionData.errors.reason}</p>
-      )}
       <Form method="post" className="flex flex-col gap-4">
         <input type="hidden" name="email" value={loaderData.email} />
         {actionData?.errors?.email && (
@@ -161,7 +194,7 @@ export default function VerifyEmail({
         <input type="hidden" name="intent" value={VERIFY_EMAIL_INTENT} />
         <label>
           OTP:
-          <input name="otp" value={loaderData.otp ?? ""} />
+          <input name="otp" defaultValue={loaderData.otp ?? ""} />
           {actionData?.errors?.otp && (
             <p className="text-red-500">{actionData.errors.otp}</p>
           )}
@@ -173,6 +206,10 @@ export default function VerifyEmail({
         <button type="submit">Verify Email</button>
       </Form>
       <Form method="post" className="flex flex-col gap-4">
+        {actionData?.intent === RESEND_VERIFICATION_INTENT &&
+          actionData?.errors?.reason && (
+            <p className="text-red-500">{actionData.errors.reason}</p>
+          )}
         <input type="hidden" name="email" value={loaderData.email} />
         <input type="hidden" name="intent" value={RESEND_VERIFICATION_INTENT} />
         <button type="submit">Resend Verification Email</button>

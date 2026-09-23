@@ -1,7 +1,7 @@
 import type { Route } from "./+types/home";
 import { getSessionTokenOrRedirect } from "~/server/auth.server";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 
 export function meta(_args: Route.MetaArgs) {
   return [
@@ -32,7 +32,16 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
         <div className="flex flex-row items-center gap-4">
           <div className="font-bold">Email Verified:</div>
-          <div>{loaderData.user.emailVerified ? "Yes" : "No"}</div>
+          {loaderData.user.emailVerified ? (
+            <div>Yes</div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <p>No</p>
+              <Link to={`verify-email?email=${loaderData.user.email}`}>
+                Verify Email
+              </Link>
+            </div>
+          )}
         </div>
       </div>
       <div>

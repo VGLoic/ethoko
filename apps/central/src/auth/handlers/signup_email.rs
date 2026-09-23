@@ -52,11 +52,11 @@ impl From<SignupEmailRequestError> for ApiError {
                 }).into()
             },
             SignupEmailRequestError::InvalidHandle(e) => {
-                UnprocessableEntityError::new_body_validation("handle".to_string(), match e {
-                    HandleError::Empty => "empty value not allowed".to_string(),
-                    HandleError::InvalidFormat => "invalid format, expected only alphanumeric characters and hyphens, length between 4 and 31".to_string(),
-                    HandleError::InvalidSpecificHandle => "value is not allowed".to_string(),
-                }).into()
+                match e {
+                    HandleError::Empty => UnprocessableEntityError::new_body_validation("handle".to_string(), "empty value not allowed".to_string()).into(),
+                    HandleError::InvalidFormat => UnprocessableEntityError::new_body_validation("handle".to_string(),"invalid format, expected only alphanumeric characters and hyphens, length between 4 and 31".to_string()).into(),
+                    HandleError::InvalidSpecificHandle => UnprocessableEntityError::new("ETKAS02".to_string(), "The provided handle is not allowed.".to_string()).into(),
+                }
             },
             SignupEmailRequestError::InvalidPassword(e) => {
                 UnprocessableEntityError::new_body_validation("password".to_string(), match e {

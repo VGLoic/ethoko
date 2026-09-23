@@ -35,9 +35,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!signupRequestParsingResult.success) {
     const errors = z.treeifyError(signupRequestParsingResult.error);
     return {
-      success: false,
       errors: {
-        reason: null,
         email: errors.properties?.email?.errors.join(", "),
         password: errors.properties?.password?.errors.join(", "),
       },
@@ -45,37 +43,42 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   try {
-    const loginResponse = await ethokoCentralClient.login({
+    const loginResult = await ethokoCentralClient.login({
       email: signupRequestParsingResult.data.email,
       password: signupRequestParsingResult.data.password,
     });
 
-    session.set("token", loginResponse.token);
-    return redirect("/", {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+    if (loginResult.variant === "success") {
+      session.set("token", loginResult.data.token);
+      return redirect("/", {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    }
+    if (loginResult.variant === "unprocessable-entity") {
+      if (loginResult.reason === "invalid-credentials") {
+        return {
+          errors: {
+            reason: "Invalid email or password",
+          },
+        };
+      }
+      if (loginResult.reason === "unknown") {
+        throw loginResult.reason;
+      }
+      throw new Error(`unknown variant ${loginResult.reason satisfies never}`);
+    }
+    throw new Error(`Unknown variant ${loginResult satisfies never}`);
   } catch (error) {
     console.error("Login error:", error);
     return {
-      success: false,
       errors: {
         reason: "An error occurred during login.",
-        email: undefined,
-        password: undefined,
       },
     };
   }
 }
 
 export default function Login({ actionData }: Route.ComponentProps) {
-  if (actionData?.success) {
-    return (
-      <main>
-        <p>Log in successful!</p>
-      </main>
-    );
-  }
-
   return (
     <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
       <h1 className="flex justify-center">Log In to Ethoko Central</h1>

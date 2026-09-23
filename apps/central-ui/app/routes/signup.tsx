@@ -30,7 +30,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!signupRequestParsingResult.success) {
     const errors = z.treeifyError(signupRequestParsingResult.error);
     return {
-      success: false,
+      success: false as const,
       errors: {
         reason: null,
         email: errors.properties?.email?.errors.join(", "),
@@ -43,23 +43,46 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   try {
-    const signedUpUser = await ethokoCentralClient.signup({
+    const signupResult = await ethokoCentralClient.signup({
       email: signupRequestParsingResult.data.email,
       handle: signupRequestParsingResult.data.handle,
       password: signupRequestParsingResult.data.password,
     });
 
-    return { success: true, user: signedUpUser };
+    if (signupResult.variant === "success") {
+      return { success: true as const, user: signupResult.data };
+    }
+    if (signupResult.variant === "unprocessable-entity") {
+      if (signupResult.reason === "email-already-registered") {
+        return {
+          success: false as const,
+          errors: {
+            reason: null,
+            email: "An account with this email already exist",
+          },
+        };
+      }
+      if (signupResult.reason === "handle-already-registered") {
+        return {
+          success: false as const,
+          errors: {
+            reason: null,
+            handle: "This handle is not available",
+          },
+        };
+      }
+      if (signupResult.reason === "unknown") {
+        throw signupResult.reason;
+      }
+      throw new Error(`unknown reason ${signupResult.reason satisfies never}`);
+    }
+    throw new Error(`Unknown variant ${signupResult satisfies never}`);
   } catch (error) {
     console.error("Signup error:", error);
     return {
-      success: false,
+      success: false as const,
       errors: {
         reason: "An error occurred during signup.",
-        email: undefined,
-        handle: undefined,
-        password: undefined,
-        passwordConfirmation: undefined,
       },
     };
   }
