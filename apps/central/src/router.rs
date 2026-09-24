@@ -229,6 +229,7 @@ impl IntoResponse for ApiError {
             }
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
             Self::UnprocessableEntity(err) => {
+                warn!(code = err.code, reason = err.reason);
                 (StatusCode::UNPROCESSABLE_ENTITY, Json(err)).into_response()
             }
         }
