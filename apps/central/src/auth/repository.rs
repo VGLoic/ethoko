@@ -1,13 +1,18 @@
 use crate::{
-    auth::models::{
-        auth_credential::AuthCredential,
-        otp_request::{OtpPurpose, OtpRequest},
-        requests::{
-            email_signup::{EmailSignupError, EmailSignupRequest},
-            send_email_verification_otp::SendEmailVerificationOtpError,
-            verify_email::{VerifyEmailError, VerifyEmailRequest},
+    auth::{
+        models::{
+            auth_credential::AuthCredential,
+            opaque_token::{OpaqueToken, OpaqueTokenCreatePayload},
+            otp_request::{OtpPurpose, OtpRequest},
+            queries::{GetUserByEmailError, GetUserBySessionTokenError},
+            requests::{
+                send_email_verification_otp::SendEmailVerificationOtpError,
+                signup_email::{SignupEmailError, SignupEmailRequest},
+                verify_email::{VerifyEmailError, VerifyEmailRequest},
+            },
+            user::User,
         },
-        user::User,
+        requests::{login_email::LoginEmailError, logout::LogoutError},
     },
     config::OtpConfig,
     newtypes::email::Email,
@@ -23,13 +28,13 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// - A new user is created with the provided email and handle, the email is marked as not verified.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
-    /// * `EmailSignupError::EmailAlreadyExists` if the email is already registered.
-    /// * `EmailSignupError::HandleAlreadyExists` if the handle is already taken.
-    /// * `EmailSignupError::Unknown` for any other errors that may occur during the process.
+    /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
+    /// * `SignupEmailError::HandleAlreadyExists` if the handle is already taken.
+    /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
     async fn signup_with_email(
         &self,
-        request: EmailSignupRequest,
-    ) -> Result<(User, AuthCredential), EmailSignupError>;
+        request: SignupEmailRequest,
+    ) -> Result<(User, AuthCredential), SignupEmailError>;
 
     /// Registers a new email verification OTP for the user.
     /// - A new OTP is created for the user with the provided OTP hash.
@@ -64,9 +69,9 @@ pub trait AuthRepository: Send + Sync + 'static {
 
     /// Gets a user by their email address.
     /// # Errors
-    /// * `GetUserError::NotFound` if the user is not found
-    /// * `GetUserError::Unknown` for any other errors that may occur during the process.
-    async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserError>;
+    /// * `GetUserByEmailError::NotFound` if the user is not found
+    /// * `GetUserByEmailError::Unknown` for any other errors that may occur during the process.
+    async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError>;
 
     /// Gets the last OTP request for a user by their user ID.
     /// # Errors
@@ -75,11 +80,53 @@ pub trait AuthRepository: Send + Sync + 'static {
         &self,
         user_id: uuid::Uuid,
     ) -> Result<Option<OtpRequest>, GetLastOtpRequestError>;
+
+    /// Gets the user and auth credential for a user by their email address.
+    /// # Errors
+    /// * `GetAuthCredentialError::UserNotFound` if the underlying user is not found
+    /// * `GetAuthCredentialError::Unknown` for any other errors that may occur during the process.
+    async fn get_auth_credential_by_email(
+        &self,
+        email: &Email,
+    ) -> Result<(User, AuthCredential), GetAuthCredentialError>;
+
+    /// Records an opaque session token for the specified user.
+    /// # Errors
+    /// * `LoginEmailError::NotFound` if the user is not found
+    /// * `LoginEmailError::Unknown` for any errors that may occur during the process.
+    async fn record_session_token(
+        &self,
+        user_id: uuid::Uuid,
+        session_token_payload: OpaqueTokenCreatePayload,
+    ) -> Result<OpaqueToken, LoginEmailError>;
+
+    /// Gets a user by their opaque token hash.
+    /// Updates the last_used_at of the opaque token to now.
+    /// # Errors
+    /// * `GetUserBySessionTokenError::UserNotFound` if the user is not found
+    /// * `GetUserBySessionTokenError::TokenNotFound` if the token is not found
+    /// * `GetUserBySessionTokenError::TokenRevoked` if the token has been revoked
+    /// * `GetUserBySessionTokenError::TokenExpired` if the token has expired
+    /// * `GetUserBySessionTokenError::Unknown` for any other errors that may occur during the process.
+    async fn get_user_by_session_token(
+        &self,
+        token_hash: &[u8; 32],
+    ) -> Result<User, GetUserBySessionTokenError>;
+
+    /// Revokes a session token for the specified user by their user ID and token hash.
+    /// # Errors
+    /// * `LogoutError::TokenNotFound` if the token is not found.
+    /// * `LogoutError::Unknown` for any other errors that may occur during the process.
+    async fn revoke_session_token(
+        &self,
+        user_id: uuid::Uuid,
+        token_hash: &[u8; 32],
+    ) -> Result<(), LogoutError>;
 }
 
 #[derive(Error, Debug)]
-pub enum GetUserError {
-    #[error("User not found")]
+pub enum GetAuthCredentialError {
+    #[error("Auth credential not found")]
     NotFound,
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
@@ -111,8 +158,8 @@ const UNIQUE_HANDLE_CONSTRAINT_NAME: &str = "unique_handle";
 impl AuthRepository for PsqlAuthRepository {
     async fn signup_with_email(
         &self,
-        request: EmailSignupRequest,
-    ) -> Result<(User, AuthCredential), EmailSignupError> {
+        request: SignupEmailRequest,
+    ) -> Result<(User, AuthCredential), SignupEmailError> {
         let mut transaction = self
             .pool
             .begin()
@@ -145,9 +192,9 @@ impl AuthRepository for PsqlAuthRepository {
                 && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
             {
                 if db_err.message().contains(UNIQUE_EMAIL_CONSTRAINT_NAME) {
-                    return EmailSignupError::EmailAlreadyExists(request.email.to_string());
+                    return SignupEmailError::EmailAlreadyExists(request.email.to_string());
                 } else if db_err.message().contains(UNIQUE_HANDLE_CONSTRAINT_NAME) {
-                    return EmailSignupError::HandleAlreadyExists(request.handle.to_string());
+                    return SignupEmailError::HandleAlreadyExists(request.handle.to_string());
                 }
             }
             anyhow::anyhow!(e).context("failed to create user").into()
@@ -324,14 +371,14 @@ impl AuthRepository for PsqlAuthRepository {
         Ok(updated_user)
     }
 
-    async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserError> {
+    async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError> {
         let user = get_user_by_email(email, &self.pool)
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user by email"))?;
 
         match user {
             Some(user) => Ok(user),
-            None => Err(GetUserError::NotFound),
+            None => Err(GetUserByEmailError::NotFound),
         }
     }
 
@@ -346,6 +393,171 @@ impl AuthRepository for PsqlAuthRepository {
                     .context("failed to fetch last otp request")
                     .into()
             })
+    }
+
+    async fn get_auth_credential_by_email(
+        &self,
+        email: &Email,
+    ) -> Result<(User, AuthCredential), GetAuthCredentialError> {
+        let user = get_user_by_email(email, &self.pool)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user by email"))?
+            .ok_or(GetAuthCredentialError::NotFound)?;
+        let auth_credential = sqlx::query_as::<_, AuthCredential>(
+            r#"
+            SELECT
+                id,
+                user_id,
+                password_hash,
+                created_at,
+                updated_at
+            FROM auth_credential
+            WHERE user_id = (
+                SELECT id
+                FROM ethoko_user
+                WHERE email = $1
+            )
+            "#,
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch auth credential by email"))?;
+
+        match auth_credential {
+            Some(auth_credential) => Ok((user, auth_credential)),
+            None => Err(GetAuthCredentialError::NotFound),
+        }
+    }
+
+    async fn record_session_token(
+        &self,
+        user_id: uuid::Uuid,
+        session_token_payload: OpaqueTokenCreatePayload,
+    ) -> Result<OpaqueToken, LoginEmailError> {
+        let opaque_token = sqlx::query_as::<_, OpaqueToken>(
+            r#"
+            INSERT INTO opaque_token (
+                user_id,
+                kind,
+                token_hash,
+                scopes,
+                expires_at
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING
+                id,
+                user_id,
+                kind,
+                token_hash,
+                scopes,
+                created_at,
+                updated_at,
+                expires_at,
+                revoked_at,
+                last_used_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(session_token_payload.kind)
+        .bind(session_token_payload.token_hash)
+        .bind(session_token_payload.scopes)
+        .bind(session_token_payload.expires_at)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to record session token"))?;
+
+        Ok(opaque_token)
+    }
+
+    async fn get_user_by_session_token(
+        &self,
+        token_hash: &[u8; 32],
+    ) -> Result<User, GetUserBySessionTokenError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to begin transaction"))?;
+
+        let opaque_token = sqlx::query_as::<_, OpaqueToken>(
+            r#"
+            UPDATE opaque_token
+            SET last_used_at = NOW()
+            WHERE token_hash = $1 AND kind = 'session'
+            RETURNING
+                id,
+                user_id,
+                kind,
+                token_hash,
+                scopes,
+                created_at,
+                updated_at,
+                expires_at,
+                revoked_at,
+                last_used_at
+            "#,
+        )
+        .bind(token_hash)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch opaque token by token hash"))?
+        .ok_or(GetUserBySessionTokenError::TokenNotFound)?;
+
+        if opaque_token.revoked_at.is_some() {
+            return Err(GetUserBySessionTokenError::TokenRevoked);
+        }
+        if opaque_token.expires_at <= chrono::Utc::now() {
+            return Err(GetUserBySessionTokenError::TokenExpired);
+        }
+
+        let user = get_user_by_id(opaque_token.user_id, &mut *transaction)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user by ID"))?
+            .ok_or(GetUserBySessionTokenError::UserNotFound)?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+
+        Ok(user)
+    }
+
+    async fn revoke_session_token(
+        &self,
+        user_id: uuid::Uuid,
+        token_hash: &[u8; 32],
+    ) -> Result<(), LogoutError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to begin transaction"))?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE opaque_token
+            SET revoked_at = NOW()
+            WHERE user_id = $1 AND token_hash = $2 AND kind = 'session'
+            "#,
+        )
+        .bind(user_id)
+        .bind(token_hash)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to revoke session token"))?;
+
+        if result.rows_affected() == 0 {
+            return Err(LogoutError::TokenNotFound);
+        }
+
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+
+        Ok(())
     }
 }
 

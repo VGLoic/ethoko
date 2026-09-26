@@ -1,0 +1,54 @@
+import type { Route } from "./+types/home";
+import { getSessionTokenOrRedirect } from "~/server/auth.server";
+import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
+import { Form, Link } from "react-router";
+
+export function meta(_args: Route.MetaArgs) {
+  return [
+    { title: "Ethoko Central Home" },
+    { name: "description", content: "Welcome to Ethoko Central!" },
+  ];
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const { token } = await getSessionTokenOrRedirect(request.headers);
+
+  const user = await ethokoCentralClient.me({ token });
+
+  return { user };
+}
+
+export default function Home({ loaderData }: Route.ComponentProps) {
+  return (
+    <main className="flex flex-col items-center justify-center pt-16 pb-4 gap-16">
+      <div className="flex flex-col items-center gap-8">
+        <div className="flex flex-row items-center gap-4">
+          <div className="font-bold">Email:</div>
+          <div>{loaderData.user.email}</div>
+        </div>
+        <div className="flex flex-row items-center gap-4">
+          <div className="font-bold">Handle:</div>
+          <div>{loaderData.user.handle}</div>
+        </div>
+        <div className="flex flex-row items-center gap-4">
+          <div className="font-bold">Email Verified:</div>
+          {loaderData.user.emailVerified ? (
+            <div>Yes</div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <p>No</p>
+              <Link to={`verify-email?email=${loaderData.user.email}`}>
+                Verify Email
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+      <div>
+        <Form method="post" action="/logout">
+          <button type="submit">Logout</button>
+        </Form>
+      </div>
+    </main>
+  );
+}

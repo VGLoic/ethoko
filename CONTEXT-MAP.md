@@ -5,9 +5,21 @@ Ethoko is a warehouse for smart-contract compilation artifacts. The repository s
 ## Contexts
 
 - [`packages/cli-beacon/CONTEXT.md`](./packages/cli-beacon/CONTEXT.md) — the standalone CLI: artifact discovery, mapping, push/pull, typings generation, local cache.
-- [`apps/central/CONTEXT.md`](./apps/central/CONTEXT.md) — Ethoko Central, the hosted backend service (in development).
+- [`apps/central/CONTEXT.md`](./apps/central/CONTEXT.md) — **Ethoko Central API**, the hosted backend service and source of truth for Central domain/application logic.
+- [`apps/central-ui/CONTEXT.md`](./apps/central-ui/CONTEXT.md) — **Ethoko Central UI**, a React Router application with a thin BFF/server layer for browser flows.
 
-`apps/*` other than `central` are integration apps that exercise the CLI against real Hardhat/Foundry codebases; they don't introduce vocabulary.
+`apps/*` other than `central` and `central-ui` are integration apps that exercise the CLI against real Hardhat/Foundry codebases; they don't introduce vocabulary.
+
+## Central boundary notes
+
+- **Ethoko Central API** (`apps/central`) is the core backend. It owns business/domain logic and remains the authority for creating, storing, and verifying opaque tokens.
+- **Ethoko Central UI** (`apps/central-ui`) consumes the Central API and currently does not call storage providers directly.
+- The Central UI's server layer acts as a thin BFF for UI concerns (for example cookie/session handling and light UI-oriented orchestration/aggregation as needed).
+- Central API consumers currently include: Central UI, CLI clients, and direct API users.
+- Current auth shape (early, expected to evolve):
+  - UI: cookie managed by Central UI, containing a session opaque token issued/verified by Central API.
+  - CLI: device opaque token via an interactive device authorization flow.
+  - Direct API users: PAT.
 
 ## Shared language
 

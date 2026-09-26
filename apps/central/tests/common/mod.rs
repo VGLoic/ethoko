@@ -11,8 +11,12 @@ use tracing::{Level, error, level_filters::LevelFilter};
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::common::{fake_email_service::FakeEmailService, manual_worker::ManualWorker};
+mod auth_actions;
 mod fake_email_service;
 mod manual_worker;
+
+#[allow(unused_imports)]
+pub use auth_actions::AuthActions;
 
 #[allow(dead_code)]
 pub struct InstanceState {
@@ -32,6 +36,7 @@ impl TestConfigBuilder {
         Self {
             config: Config {
                 self_url: "http://localhost".into(),
+                web_app_url: "http://localhost:5173".into(),
                 port: 0,
                 database_url: "postgresql://admin:admin@localhost:5433/central".into(),
                 log_level: Level::INFO,

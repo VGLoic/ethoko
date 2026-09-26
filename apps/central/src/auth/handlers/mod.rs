@@ -1,6 +1,6 @@
-pub mod email_signup;
-mod html_templates;
+pub mod login_email;
+pub mod logout;
+pub mod me;
 pub mod resend_verification_otp;
-pub mod resend_verification_otp_action;
+pub mod signup_email;
 pub mod verify_email;
-pub mod verify_email_action;

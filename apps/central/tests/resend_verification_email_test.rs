@@ -2,36 +2,11 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use ethoko_central::{
-    auth::requests::{email_signup::SignupEmailBody, verify_email::VerifyEmailBody},
-    externalcom::email::EmailTemplate,
-    newtypes::{email::Email, handle::Handle, password::Password},
+    auth::requests::verify_email::HttpVerifyEmailBody, externalcom::email::EmailTemplate,
+    router::UnprocessableEntityError,
 };
 mod common;
-use common::{TestConfigBuilder, setup_instance};
-use fake::{Fake, Faker};
-
-async fn setup_user(instance_state: &common::InstanceState) -> (Email, Handle, Password) {
-    let email = Faker.fake::<Email>();
-    let handle = Faker.fake::<Handle>();
-    let password = Faker.fake::<Password>();
-
-    let signup_body = SignupEmailBody {
-        email: email.to_string(),
-        handle: handle.to_string(),
-        password: password.as_str().to_owned(),
-    };
-    let _ = instance_state
-        .reqwest_client
-        .post(format!("{}/auth/signup/email", &instance_state.server_url))
-        .json(&signup_body)
-        .send()
-        .await
-        .unwrap();
-
-    instance_state.job_worker.consume_jobs().await.unwrap();
-
-    (email, handle, password)
-}
+use common::{AuthActions, TestConfigBuilder, setup_instance};
 
 #[tokio::test]
 async fn test_resend_verification_email_200() {
@@ -39,10 +14,7 @@ async fn test_resend_verification_email_200() {
         .await
         .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
-
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
+    let (user, _password) = instance_state.signup_user().await;
 
     // Wait for 4 seconds to ensure the cooldown period has passed
     tokio::time::sleep(Duration::from_secs(4)).await;
@@ -53,7 +25,7 @@ async fn test_resend_verification_email_200() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -61,7 +33,7 @@ async fn test_resend_verification_email_200() {
     // Process the second OTP email sending
     instance_state.job_worker.consume_jobs().await.unwrap();
 
-    let emails_sent = instance_state.email_service.get_emails_sent_to(&email);
+    let emails_sent = instance_state.email_service.get_emails_sent_to(&user.email);
     let second_otp = emails_sent
         .get(1)
         .map(|t| match t {
@@ -72,8 +44,8 @@ async fn test_resend_verification_email_200() {
     let verify_email_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
-        .json(&VerifyEmailBody {
-            email: email.to_string(),
+        .json(&HttpVerifyEmailBody {
+            email: user.email.to_string(),
             otp: second_otp,
         })
         .send()
@@ -102,7 +74,12 @@ async fn test_resend_verification_email_invalid_email_400() {
         .await
         .unwrap();
 
-    assert_eq!(resend_response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = resend_response
+        .json::<UnprocessableEntityError>()
+        .await
+        .unwrap();
+    assert_eq!(error.code, "ETKAG01");
 }
 
 #[tokio::test]
@@ -126,17 +103,14 @@ async fn test_resend_verification_email_user_not_found_404() {
 }
 
 #[tokio::test]
-async fn test_resend_verification_email_user_already_verified_400() {
+async fn test_resend_verification_email_user_already_verified_422() {
     let instance_state = setup_instance(&TestConfigBuilder::new().build())
         .await
         .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
+    let (user, _password) = instance_state.signup_user().await;
 
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
-
-    let emails_sent = instance_state.email_service.get_emails_sent_to(&email);
+    let emails_sent = instance_state.email_service.get_emails_sent_to(&user.email);
     let first_otp = emails_sent
         .first()
         .map(|t| match t {
@@ -147,8 +121,8 @@ async fn test_resend_verification_email_user_already_verified_400() {
     let verify_email_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
-        .json(&VerifyEmailBody {
-            email: email.to_string(),
+        .json(&HttpVerifyEmailBody {
+            email: user.email.to_string(),
             otp: first_otp,
         })
         .send()
@@ -163,31 +137,26 @@ async fn test_resend_verification_email_user_already_verified_400() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
 
-    assert_eq!(resend_response.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        resend_response
-            .text()
-            .await
-            .unwrap()
-            .contains("user already verified")
-    );
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = resend_response
+        .json::<UnprocessableEntityError>()
+        .await
+        .unwrap();
+    assert_eq!(error.code, "ETKARV01");
 }
 
 #[tokio::test]
-async fn test_resend_verification_email_cooldown_not_elapsed_400() {
+async fn test_resend_verification_email_cooldown_not_elapsed_422() {
     let instance_state = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(10).build())
         .await
         .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
-
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
+    let (user, _password) = instance_state.signup_user().await;
 
     let resend_response = instance_state
         .reqwest_client
@@ -195,19 +164,17 @@ async fn test_resend_verification_email_cooldown_not_elapsed_400() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
 
-    assert_eq!(resend_response.status(), StatusCode::BAD_REQUEST);
-    assert!(
-        resend_response
-            .text()
-            .await
-            .unwrap()
-            .contains("cooldown period has not elapsed yet for requesting a new verification code")
-    );
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = resend_response
+        .json::<UnprocessableEntityError>()
+        .await
+        .unwrap();
+    assert_eq!(error.code, "ETKARV02");
 }
 
 #[tokio::test]
@@ -221,10 +188,7 @@ async fn test_resend_verification_email_rate_limit_429() {
     .await
     .unwrap();
 
-    let (email, _handle, _password) = setup_user(&instance_state).await;
-
-    // Process the first OTP email sending
-    instance_state.job_worker.consume_jobs().await.unwrap();
+    let (user, _password) = instance_state.signup_user().await;
 
     // Wait for 4 seconds to ensure the cooldown period has passed and rate limiting bucket has been filled up again
     tokio::time::sleep(Duration::from_secs(4)).await;
@@ -235,7 +199,7 @@ async fn test_resend_verification_email_rate_limit_429() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -245,7 +209,7 @@ async fn test_resend_verification_email_rate_limit_429() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
@@ -255,7 +219,7 @@ async fn test_resend_verification_email_rate_limit_429() {
             "{}/auth/resend-verification-otp",
             &instance_state.server_url
         ))
-        .json(&serde_json::json!({ "email": email.to_string() }))
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();

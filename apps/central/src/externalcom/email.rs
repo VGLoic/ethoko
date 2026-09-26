@@ -3,7 +3,7 @@ use resend_rs::{
     Resend, types::CreateEmailBaseOptions, types::EmailTemplate as ResendEmailTemplate,
 };
 use std::collections::HashMap;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 pub enum EmailTemplate {
@@ -88,26 +88,25 @@ struct RsEmailVerificationCodeVariables {
 }
 
 pub struct ResendEmailService {
-    app_url: String,
+    web_app_url: String,
     client: Resend,
 }
 
 impl ResendEmailService {
-    pub fn new(app_url: String, api_key: String) -> Self {
-        error!(
-            "Creating ResendEmailService with app_url: {} and api_key: {}",
-            app_url, api_key
-        );
+    pub fn new(web_app_url: String, api_key: String) -> Self {
         let client = Resend::new(&api_key);
-        Self { app_url, client }
+        Self {
+            web_app_url,
+            client,
+        }
     }
 
     fn map_to_resend_template(&self, template: EmailTemplate) -> RsEmailVerificationTemplate {
         match template {
             EmailTemplate::EmailVerificationCode(payload) => {
                 let verification_url = format!(
-                    "{}/auth/verify-email?email={}&otp={}",
-                    self.app_url,
+                    "{}/verify-email?email={}&otp={}",
+                    self.web_app_url,
                     payload.email,
                     payload.otp.show()
                 );

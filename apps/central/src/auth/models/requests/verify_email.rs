@@ -8,7 +8,7 @@ use crate::newtypes::{
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VerifyEmailBody {
+pub struct HttpVerifyEmailBody {
     pub email: String,
     pub otp: String,
 }

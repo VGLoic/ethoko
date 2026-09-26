@@ -1,6 +1,6 @@
 use crate::newtypes::{email::Email, handle::Handle};
 
-#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow, sqlx::Decode)]
 pub struct User {
     pub id: uuid::Uuid,
     pub email: Email,

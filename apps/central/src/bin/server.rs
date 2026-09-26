@@ -73,7 +73,7 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     let email_service =
-        ResendEmailService::new(config.self_url.clone(), config.resend_api_key.clone());
+        ResendEmailService::new(config.web_app_url.clone(), config.resend_api_key.clone());
 
     let auth_repository = auth::PsqlAuthRepository::new(pool);
     let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());

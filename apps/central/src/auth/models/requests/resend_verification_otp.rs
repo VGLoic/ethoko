@@ -5,7 +5,7 @@ use crate::newtypes::email::{Email, EmailError};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResendVerificationOtpBody {
+pub struct HttpResendVerificationOtpBody {
     pub email: String,
 }
 
