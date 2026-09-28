@@ -1,8 +1,6 @@
 import z from "zod";
 import type { Route } from "./+types/verify-email";
 import { OtpSchema } from "~/server/newtypes.server";
-import { getSession } from "~/server/sessions.server";
-import { getSessionTokenOrRedirect } from "~/server/auth.server";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 import { Form } from "react-router";
 
@@ -31,7 +29,6 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = formData.get("intent");
 
   if (intent === VERIFY_EMAIL_INTENT) {
-    const { token } = await getSessionTokenOrRedirect(request.headers);
     const parsingResult = z
       .object({
         email: z.email(),
@@ -52,7 +49,6 @@ export async function action({ request }: Route.ActionArgs) {
 
     try {
       const verifyEmailResult = await ethokoCentralClient.verifyEmail({
-        token,
         otp: parsingResult.data.otp,
         email: parsingResult.data.email,
       });
@@ -110,20 +106,8 @@ export async function action({ request }: Route.ActionArgs) {
         },
       };
     }
-    const session = await getSession(request.headers.get("Cookie"));
-    const token = session.get("token");
-    if (!token) {
-      return {
-        intent: RESEND_VERIFICATION_INTENT,
-        success: false,
-        errors: {
-          reason: "User is not authenticated.",
-        },
-      };
-    }
     try {
       const resendResult = await ethokoCentralClient.resendVerificationEmail({
-        token,
         email: parsingResult.data.email,
       });
       if (resendResult.variant === "success") {

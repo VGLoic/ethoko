@@ -5,7 +5,10 @@ use ethoko_central::{
     router::UnprocessableEntityError,
 };
 mod common;
-use common::{AuthActions, TestConfigBuilder, setup_instance};
+use common::{
+    AuthActions, TestConfigBuilder, central_ui_bff_principal_headers,
+    central_ui_bff_with_user_principal_headers, setup_instance,
+};
 use fake::{Fake, Faker};
 
 #[tokio::test]
@@ -24,6 +27,7 @@ async fn test_login_200() {
     let login_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&login_body)
         .send()
         .await
@@ -45,6 +49,7 @@ async fn test_login_token_valid() {
     let token = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&HttpLoginEmailBody {
             email: user.email.to_string(),
             password: password.as_str().to_string(),
@@ -60,12 +65,69 @@ async fn test_login_token_valid() {
     let me_response = instance_state
         .reqwest_client
         .get(format!("{}/auth/me", &instance_state.server_url))
-        .bearer_auth(token)
+        .headers(central_ui_bff_with_user_principal_headers(&token))
         .send()
         .await
         .unwrap();
 
     assert_eq!(me_response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_me_401_without_bff_credential() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let (user, password) = instance_state.signup_user().await;
+    let token = instance_state.login_user(&user.email, &password).await;
+
+    let me_response = instance_state
+        .reqwest_client
+        .get(format!("{}/auth/me", &instance_state.server_url))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(me_response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_me_401_without_user_session_header() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let me_response = instance_state
+        .reqwest_client
+        .get(format!("{}/auth/me", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(me_response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_login_401_without_bff_credential() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let login_response = instance_state
+        .reqwest_client
+        .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .json(&HttpLoginEmailBody {
+            email: "user@example.com".to_string(),
+            password: "Passw0rd!".to_string(),
+        })
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(login_response.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -82,6 +144,7 @@ async fn test_login_422_invalid_email() {
     let login_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&login_body)
         .send()
         .await
@@ -109,6 +172,7 @@ async fn test_login_422_invalid_password_format() {
     let login_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&login_body)
         .send()
         .await
@@ -138,6 +202,7 @@ async fn test_login_422_user_not_found() {
     let login_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&login_body)
         .send()
         .await
@@ -168,6 +233,7 @@ async fn test_login_422_invalid_password() {
     let login_response = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&login_body)
         .send()
         .await

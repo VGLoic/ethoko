@@ -25,6 +25,8 @@ pub struct Config {
     pub auth_rate_limit_config: RateLimitConfig,
     /// Resend API key for sending emails
     pub resend_api_key: String,
+    /// Shared secret used by the Central UI BFF to authenticate to Central
+    pub central_ui_bff_shared_secret: String,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +97,15 @@ impl Config {
             }
         };
 
+        let central_ui_bff_shared_secret =
+            match parse_required_env_variable::<String>("CENTRAL_UI_BFF_SHARED_SECRET") {
+                Ok(v) => v,
+                Err(e) => {
+                    errors.push(e);
+                    "".into()
+                }
+            };
+
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -124,6 +135,7 @@ impl Config {
             global_rate_limit_config,
             auth_rate_limit_config,
             resend_api_key,
+            central_ui_bff_shared_secret,
         })
     }
 }

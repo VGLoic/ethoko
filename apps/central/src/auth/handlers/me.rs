@@ -1,12 +1,12 @@
 use axum::{Json, extract::State, http::StatusCode};
 
 use crate::{
-    auth::{authenticated_user::AuthenticatedUser, http_responses::UserResponse},
+    auth::{http_responses::UserResponse, principal::CentralUiBffWithUser},
     router::{ApiError, AppState},
 };
 pub async fn handle_me(
     State(_state): State<AppState>,
-    authenticated_user: AuthenticatedUser,
+    principal: CentralUiBffWithUser,
 ) -> Result<(StatusCode, Json<UserResponse>), ApiError> {
-    Ok((StatusCode::OK, Json(authenticated_user.user.into())))
+    Ok((StatusCode::OK, Json(principal.user.into())))
 }

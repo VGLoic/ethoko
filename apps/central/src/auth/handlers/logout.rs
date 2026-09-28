@@ -1,19 +1,16 @@
 use crate::{
-    auth::{authenticated_user::AuthenticatedUser, models::requests::logout::LogoutError},
+    auth::{models::requests::logout::LogoutError, principal::CentralUiBffWithUser},
     router::{ApiError, AppState},
 };
 use axum::{extract::State, http::StatusCode};
 
 pub async fn handle_logout(
     State(state): State<AppState>,
-    authenticated_user: AuthenticatedUser,
+    principal: CentralUiBffWithUser,
 ) -> Result<StatusCode, ApiError> {
     state
         .auth_service
-        .revoke_session_token(
-            authenticated_user.user.id,
-            &authenticated_user.session_token_hash,
-        )
+        .revoke_session_token(principal.user.id, &principal.session_token_hash)
         .await?;
 
     Ok(StatusCode::OK)

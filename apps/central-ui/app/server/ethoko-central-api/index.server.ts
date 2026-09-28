@@ -33,6 +33,18 @@ type ApiResult<TData, TUnprocessableEntityReason> =
 class EthokoCentralClient {
   constructor(private baseUrl: string) {}
 
+  private createBffHeaders(params?: { userSessionToken?: string }): HeadersInit {
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.CENTRAL_UI_BFF_SHARED_SECRET}`,
+      ...(params?.userSessionToken
+        ? {
+            "X-Ethoko-User-Authorization": `Bearer ${params.userSessionToken}`,
+          }
+        : {}),
+    };
+  }
+
   private async handleResponse<
     TData,
     TSchema extends z.ZodType<TData> | null,
@@ -94,9 +106,7 @@ class EthokoCentralClient {
   > {
     const response = await fetch(`${this.baseUrl}/auth/signup/email`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: this.createBffHeaders(),
       body: JSON.stringify(signupRequest),
     });
     return await this.handleResponse(response, UserResponseSchema, {
@@ -111,9 +121,7 @@ class EthokoCentralClient {
   }): Promise<ApiResult<LoginResponse, "invalid-credentials">> {
     const response = await fetch(`${this.baseUrl}/auth/login/email`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: this.createBffHeaders(),
       body: JSON.stringify(loginRequest),
     });
     return await this.handleResponse(response, LoginResponseSchema, {
@@ -124,10 +132,7 @@ class EthokoCentralClient {
   async me(params: { token: string }): Promise<UserResponse> {
     const response = await fetch(`${this.baseUrl}/auth/me`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.token}`,
-      },
+      headers: this.createBffHeaders({ userSessionToken: params.token }),
     });
     if (!response.ok) {
       throw new Error(`Failed to fetch user: ${response.statusText}`);
@@ -139,10 +144,7 @@ class EthokoCentralClient {
   async logout(params: { token: string }): Promise<void> {
     const response = await fetch(`${this.baseUrl}/auth/logout`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.token}`,
-      },
+      headers: this.createBffHeaders({ userSessionToken: params.token }),
     });
     if (!response.ok) {
       throw new Error(`Failed to log out: ${response.statusText}`);
@@ -150,7 +152,6 @@ class EthokoCentralClient {
   }
 
   async verifyEmail(params: {
-    token: string;
     otp: string;
     email: string;
   }): Promise<
@@ -158,10 +159,7 @@ class EthokoCentralClient {
   > {
     const response = await fetch(`${this.baseUrl}/auth/verify-email`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.token}`,
-      },
+      headers: this.createBffHeaders(),
       body: JSON.stringify({ otp: params.otp, email: params.email }),
     });
     return await this.handleResponse(response, null, {
@@ -172,7 +170,6 @@ class EthokoCentralClient {
   }
 
   async resendVerificationEmail(params: {
-    token: string;
     email: string;
   }): Promise<
     ApiResult<null, "email-already-verified" | "cooldown-period-not-elapsed">
@@ -181,10 +178,7 @@ class EthokoCentralClient {
       `${this.baseUrl}/auth/resend-verification-otp`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${params.token}`,
-        },
+        headers: this.createBffHeaders(),
         body: JSON.stringify({ email: params.email }),
       },
     );

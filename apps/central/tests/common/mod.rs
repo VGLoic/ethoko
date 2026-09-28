@@ -16,7 +16,9 @@ mod fake_email_service;
 mod manual_worker;
 
 #[allow(unused_imports)]
-pub use auth_actions::AuthActions;
+pub use auth_actions::{
+    AuthActions, central_ui_bff_principal_headers, central_ui_bff_with_user_principal_headers,
+};
 
 #[allow(dead_code)]
 pub struct InstanceState {
@@ -53,6 +55,7 @@ impl TestConfigBuilder {
                     max_burst_size: 1_000,
                 },
                 resend_api_key: "test_api_key".into(),
+                central_ui_bff_shared_secret: "test-central-ui-bff-shared-secret".into(),
             },
         }
     }
@@ -173,6 +176,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let (app_router, _) = app_router(
         config.global_rate_limit_config.clone(),
         config.auth_rate_limit_config.clone(),
+        config.central_ui_bff_shared_secret.clone(),
         auth_service,
     )
     .unwrap();

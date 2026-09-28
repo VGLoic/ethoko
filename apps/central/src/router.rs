@@ -75,6 +75,7 @@ impl IpRateLimiters {
 pub fn app_router(
     global_rate_limit_config: RateLimitConfig,
     auth_rate_limit_config: RateLimitConfig,
+    central_ui_bff_shared_secret: String,
     auth_service: impl auth::AuthService,
 ) -> Result<(Router, IpRateLimiters), anyhow::Error> {
     let x_request_id = HeaderName::from_static(REQUEST_ID_HEADER);
@@ -86,7 +87,10 @@ pub fn app_router(
         .ok_or_else(|| anyhow::anyhow!("Error while building the global governor configuration"))?;
 
     let auth_service = Arc::new(auth_service);
-    let state = AppState { auth_service };
+    let state = AppState {
+        auth_service,
+        central_ui_bff_shared_secret: Arc::new(central_ui_bff_shared_secret),
+    };
 
     let (auth_router, auth_ip_rate_limiter) =
         auth::router(auth_rate_limit_config).context("failed to build auth router")?;
@@ -156,6 +160,7 @@ pub fn app_router(
 #[derive(Clone)]
 pub struct AppState {
     pub auth_service: Arc<dyn auth::AuthService>,
+    pub central_ui_bff_shared_secret: Arc<String>,
 }
 
 #[derive(Serialize, Deserialize)]

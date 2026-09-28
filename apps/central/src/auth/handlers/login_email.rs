@@ -1,7 +1,10 @@
 use crate::{
-    auth::models::requests::login_email::{
-        HttpLoginEmailBody, HttpLoginEmailResponse, LoginEmailError, LoginEmailRequest,
-        LoginEmailRequestError,
+    auth::{
+        models::requests::login_email::{
+            HttpLoginEmailBody, HttpLoginEmailResponse, LoginEmailError, LoginEmailRequest,
+            LoginEmailRequestError,
+        },
+        principal::CentralUiBff,
     },
     newtypes::{email::EmailError, password::PasswordError},
     router::{ApiError, AppState, UnprocessableEntityError},
@@ -10,6 +13,7 @@ use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_login_email(
     State(state): State<AppState>,
+    _principal: CentralUiBff,
     Json(body): Json<HttpLoginEmailBody>,
 ) -> Result<(StatusCode, Json<HttpLoginEmailResponse>), ApiError> {
     let request = LoginEmailRequest::new(body.email, body.password)?;

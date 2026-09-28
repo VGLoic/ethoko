@@ -118,6 +118,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (app_router, ip_rate_limiters) = app_router(
         config.global_rate_limit_config.clone(),
         config.auth_rate_limit_config.clone(),
+        config.central_ui_bff_shared_secret.clone(),
         auth_service,
     )
     .map_err(|e| e.context("Error while building the application router"))?;

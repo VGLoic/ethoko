@@ -5,7 +5,7 @@ use ethoko_central::{
     router::UnprocessableEntityError,
 };
 mod common;
-use common::{TestConfigBuilder, setup_instance};
+use common::{TestConfigBuilder, central_ui_bff_principal_headers, setup_instance};
 use fake::{Fake, Faker};
 
 #[tokio::test]
@@ -26,6 +26,7 @@ async fn test_signup() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&signup_body)
         .send()
         .await
@@ -55,6 +56,7 @@ async fn test_signup_trigger_otp_email_sending() {
     let _ = instance_state
         .reqwest_client
         .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&signup_body)
         .send()
         .await
@@ -75,6 +77,7 @@ async fn test_signup_422_invalid_email_format_422() {
         .unwrap();
 
     let response = instance_state.reqwest_client.post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": "invalid-email", "handle": "testuser", "password": "password123" }))
         .send()
         .await
@@ -102,6 +105,7 @@ async fn test_signup_with_existing_email_422() {
     instance_state
         .reqwest_client
         .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&first_signup_body)
         .send()
         .await
@@ -115,6 +119,7 @@ async fn test_signup_with_existing_email_422() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&second_signup_body)
         .send()
         .await
@@ -142,6 +147,7 @@ async fn test_signup_with_existing_handle_422() {
     instance_state
         .reqwest_client
         .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&first_signup_body)
         .send()
         .await
@@ -155,6 +161,7 @@ async fn test_signup_with_existing_handle_422() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&second_signup_body)
         .send()
         .await

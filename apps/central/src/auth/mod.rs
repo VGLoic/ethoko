@@ -1,4 +1,4 @@
-mod authenticated_user;
+mod principal;
 mod handlers;
 mod models;
 mod notifier;

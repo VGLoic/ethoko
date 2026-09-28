@@ -1,7 +1,10 @@
 use crate::{
-    auth::models::requests::resend_verification_otp::{
-        HttpResendVerificationOtpBody, ResendVerificationOtpError, ResendVerificationOtpRequest,
-        ResendVerificationOtpRequestError,
+    auth::{
+        models::requests::resend_verification_otp::{
+            HttpResendVerificationOtpBody, ResendVerificationOtpError,
+            ResendVerificationOtpRequest, ResendVerificationOtpRequestError,
+        },
+        principal::CentralUiBff,
     },
     newtypes::email::EmailError,
     router::{ApiError, AppState, UnprocessableEntityError},
@@ -10,6 +13,7 @@ use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_resend_verification_otp(
     State(state): State<AppState>,
+    _principal: CentralUiBff,
     Json(body): Json<HttpResendVerificationOtpBody>,
 ) -> Result<(StatusCode, Json<()>), ApiError> {
     let request = ResendVerificationOtpRequest::new(body.email)?;

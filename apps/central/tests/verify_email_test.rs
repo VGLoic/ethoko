@@ -6,7 +6,7 @@ use ethoko_central::{
     router::UnprocessableEntityError,
 };
 mod common;
-use common::{AuthActions, TestConfigBuilder, setup_instance};
+use common::{AuthActions, TestConfigBuilder, central_ui_bff_principal_headers, setup_instance};
 
 #[tokio::test]
 async fn test_verify_email_200_valid_otp() {
@@ -33,6 +33,7 @@ async fn test_verify_email_200_valid_otp() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&verify_email_body)
         .send()
         .await
@@ -67,6 +68,7 @@ async fn test_verify_email_422_already_verified() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&verify_email_body)
         .send()
         .await
@@ -78,6 +80,7 @@ async fn test_verify_email_422_already_verified() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&verify_email_body)
         .send()
         .await
@@ -104,6 +107,7 @@ async fn test_verify_email_422_invalid_otp() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&verify_email_body)
         .send()
         .await
@@ -139,6 +143,7 @@ async fn test_verify_email_422_invalid_email() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&verify_email_body)
         .send()
         .await
@@ -177,6 +182,7 @@ async fn test_verify_email_422_expired_otp() {
     let response = instance_state
         .reqwest_client
         .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
         .json(&verify_email_body)
         .send()
         .await
@@ -185,4 +191,21 @@ async fn test_verify_email_422_expired_otp() {
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let error = response.json::<UnprocessableEntityError>().await.unwrap();
     assert_eq!(error.code, "ETKAVE03");
+}
+
+#[tokio::test]
+async fn test_verify_email_401_without_bff_credential() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!("{}/auth/verify-email", &instance_state.server_url))
+        .json(&serde_json::json!({ "email": "user@example.com", "otp": "123456" }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

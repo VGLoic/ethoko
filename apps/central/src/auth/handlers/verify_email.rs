@@ -1,11 +1,15 @@
 use axum::{Json, extract::State, http::StatusCode};
 
 use crate::{
-    auth::models::{
-        http_responses::UserResponse,
-        requests::verify_email::{
-            HttpVerifyEmailBody, VerifyEmailError, VerifyEmailRequest, VerifyEmailRequestError,
+    auth::{
+        models::{
+            http_responses::UserResponse,
+            requests::verify_email::{
+                HttpVerifyEmailBody, VerifyEmailError, VerifyEmailRequest,
+                VerifyEmailRequestError,
+            },
         },
+        principal::CentralUiBff,
     },
     newtypes::email::EmailError,
     router::{ApiError, AppState, UnprocessableEntityError},
@@ -13,6 +17,7 @@ use crate::{
 
 pub async fn handle_verify_email(
     State(state): State<AppState>,
+    _principal: CentralUiBff,
     Json(body): Json<HttpVerifyEmailBody>,
 ) -> Result<(StatusCode, Json<UserResponse>), ApiError> {
     let request = VerifyEmailRequest::new(body.otp, body.email)?;
