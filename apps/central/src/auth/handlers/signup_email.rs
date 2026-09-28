@@ -3,8 +3,7 @@ use crate::{
         models::{
             http_responses::UserResponse,
             requests::signup_email::{
-                HttpSignupEmailBody, SignupEmailError, SignupEmailRequest,
-                SignupEmailRequestError,
+                HttpSignupEmailBody, SignupEmailError, SignupEmailRequest, SignupEmailRequestError,
             },
         },
         principal::CentralUiBff,

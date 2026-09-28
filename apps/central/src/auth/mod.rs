@@ -1,8 +1,8 @@
-mod principal;
 mod handlers;
 mod models;
 mod notifier;
 mod password_hasher;
+mod principal;
 mod repository;
 mod router;
 mod service;

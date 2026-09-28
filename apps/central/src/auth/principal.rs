@@ -48,9 +48,10 @@ impl FromRequestParts<AppState> for CentralUiBffWithUser {
         CentralUiBff::from_request_parts(parts, state).await?;
 
         let user_session_token = extract_user_session_bearer_token(parts)?;
-        let opaque_session_token_value = OpaqueTokenValue::new(user_session_token).map_err(|e| {
-            ApiError::Unauthorized(e.context("Error while creating opaque session token value"))
-        })?;
+        let opaque_session_token_value =
+            OpaqueTokenValue::new(user_session_token).map_err(|e| {
+                ApiError::Unauthorized(e.context("Error while creating opaque session token value"))
+            })?;
         let session_token_hash = opaque_session_token_value.hash();
 
         let user = state

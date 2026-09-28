@@ -19,10 +19,12 @@ async fn test_resend_verification_email_200() {
     // Wait for 4 seconds to ensure the cooldown period has passed
     tokio::time::sleep(Duration::from_secs(4)).await;
 
-    let resend_response = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
@@ -63,10 +65,12 @@ async fn test_resend_verification_email_invalid_email_400() {
         .await
         .unwrap();
 
-    let resend_response = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": "invalid-email-format" }))
         .send()
@@ -87,10 +91,12 @@ async fn test_resend_verification_email_user_not_found_404() {
         .await
         .unwrap();
 
-    let resend_response = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": "nonexistent@example.com" }))
         .send()
@@ -130,10 +136,12 @@ async fn test_resend_verification_email_user_already_verified_422() {
 
     assert_eq!(verify_email_response.status(), StatusCode::OK);
 
-    let resend_response = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
@@ -156,10 +164,12 @@ async fn test_resend_verification_email_cooldown_not_elapsed_422() {
 
     let (user, _password) = instance_state.signup_user().await;
 
-    let resend_response = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
@@ -190,28 +200,34 @@ async fn test_resend_verification_email_rate_limit_429() {
     // Wait for 4 seconds to ensure the cooldown period has passed and rate limiting bucket has been filled up again
     tokio::time::sleep(Duration::from_secs(4)).await;
 
-    let resend_response_0 = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response_0 = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
-    let resend_response_1 = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response_1 = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()
         .await
         .unwrap();
-    let resend_response_2 = instance_state.reqwest_client.post(format!(
-        "{}/auth/resend-verification-otp",
-        &instance_state.server_url
-    ))
+    let resend_response_2 = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": user.email.to_string() }))
         .send()

@@ -5,8 +5,7 @@ use crate::{
         models::{
             http_responses::UserResponse,
             requests::verify_email::{
-                HttpVerifyEmailBody, VerifyEmailError, VerifyEmailRequest,
-                VerifyEmailRequestError,
+                HttpVerifyEmailBody, VerifyEmailError, VerifyEmailRequest, VerifyEmailRequestError,
             },
         },
         principal::CentralUiBff,

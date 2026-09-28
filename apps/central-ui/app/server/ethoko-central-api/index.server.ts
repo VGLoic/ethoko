@@ -33,7 +33,9 @@ type ApiResult<TData, TUnprocessableEntityReason> =
 class EthokoCentralClient {
   constructor(private baseUrl: string) {}
 
-  private createBffHeaders(params?: { userSessionToken?: string }): HeadersInit {
+  private createBffHeaders(params?: {
+    userSessionToken?: string;
+  }): HeadersInit {
     return {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.CENTRAL_UI_BFF_SHARED_SECRET}`,
