@@ -4,7 +4,15 @@ Vocabulary specific to Ethoko Central — the hosted backend service. Currently 
 
 ## Language
 
-(No central-specific domain vocabulary yet. From the cli-beacon perspective, Ethoko Central is a **Storage Backend** implementation; from this context's own perspective, it is the application providing that backend.)
+### Authentication
+
+**Principal**:
+The authenticated identity making a request to Ethoko Central. Initially the only Principal is the Central UI BFF; a Principal may act alone or convey an authenticated **User** and that User's session-token hash for actions performed on the User's behalf.
+_Avoid_: "authenticated user" (a Principal need not be a User), "caller" (too vague)
+
+**Central UI BFF Principal**:
+The Principal represented by Ethoko Central UI's server layer. It authenticates with the static secret shared with Ethoko Central and is distinct from any **User** whose session it may convey.
+_Avoid_: "service user", "machine user"
 
 ## Notes
 

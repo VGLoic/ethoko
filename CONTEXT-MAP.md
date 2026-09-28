@@ -25,6 +25,18 @@ Ethoko is a warehouse for smart-contract compilation artifacts. The repository s
 
 These terms appear in both contexts and at user-facing surfaces (CLI, README, future Central API). Use them exactly; avoid the listed synonyms.
 
+### Authentication
+
+### Machine Credential
+
+A long-lived credential held by an Ethoko-operated server component, used to authenticate that component to the Ethoko Central API. It identifies the calling component, not a human **User**.
+_Avoid_: "service user", "machine user", "BFF token"
+
+### User Session Token
+
+An opaque credential issued to a **User** after sign-in and used to authorize actions as that User. When Central UI's BFF calls the Central API for a signed-in browser flow, it conveys this alongside its **Machine Credential**.
+_Avoid_: "user token", "auth token" (ambiguous)
+
 ### Project
 
 A named container within a **Storage Backend** that groups related compilation artifacts. Identified by a name; carries one storage configuration. Users address its artifacts via the **Artifact Reference** syntax.
