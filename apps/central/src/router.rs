@@ -21,7 +21,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{Span, error, info, info_span, warn};
+use tracing::{Span, debug, error, info, info_span};
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
 const TIMEOUT_SECONDS: u64 = 10;
@@ -121,14 +121,19 @@ pub fn app_router(
                     match request_id {
                         Some(v) => info_span!(
                             "http_request",
+                            event = "http.request",
                             method = ?request.method(),
                             matched_path,
                             request_id = ?v
                         ),
                         None => {
-                            error!("Failed to extract `request_id` header");
+                            error!(
+                                event = "http.request_id.missing",
+                                "Failed to extract request id header"
+                            );
                             info_span!(
                                 "http_request",
+                                event = "http.request",
                                 method = ?request.method(),
                                 matched_path,
                             )
@@ -138,9 +143,19 @@ pub fn app_router(
                 .on_response(
                     |response: &Response<Body>, latency: Duration, _span: &Span| {
                         if response.status().is_server_error() {
-                            error!("response: {} {latency:?}", response.status())
+                            error!(
+                                event = "http.request.completed",
+                                status = %response.status(),
+                                latency_ms = latency.as_millis(),
+                                "HTTP request completed with server error"
+                            )
                         } else {
-                            info!("response: {} {latency:?}", response.status())
+                            debug!(
+                                event = "http.request.completed",
+                                status = %response.status(),
+                                latency_ms = latency.as_millis(),
+                                "HTTP request completed"
+                            )
                         }
                     },
                 ),
@@ -225,16 +240,12 @@ impl IntoResponse for ApiError {
         match self {
             Self::NotFound => (StatusCode::NOT_FOUND, "Not found").into_response(),
             Self::InternalServerError(e) => {
-                error!("Internal server error: {:?}", e);
+                error!(event = "http.request.failed", error = %e, "Request failed with internal server error");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
             }
-            Self::Unauthorized(error) => {
-                warn!("Unauthorized access attempt: {:?}", error);
-                StatusCode::UNAUTHORIZED.into_response()
-            }
+            Self::Unauthorized(_error) => StatusCode::UNAUTHORIZED.into_response(),
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
             Self::UnprocessableEntity(err) => {
-                warn!(code = err.code, reason = err.reason);
                 (StatusCode::UNPROCESSABLE_ENTITY, Json(err)).into_response()
             }
         }

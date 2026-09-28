@@ -30,7 +30,7 @@ impl FromRequestParts<AppState> for CentralUiBff {
 
         if secret != state.central_ui_bff_shared_secret.as_str() {
             return Err(ApiError::Unauthorized(anyhow::anyhow!(
-                "Invalid Central UI BFF shared secret"
+                "invalid_bff_shared_secret"
             )));
         }
 
@@ -48,10 +48,8 @@ impl FromRequestParts<AppState> for CentralUiBffWithUser {
         CentralUiBff::from_request_parts(parts, state).await?;
 
         let user_session_token = extract_user_session_bearer_token(parts)?;
-        let opaque_session_token_value =
-            OpaqueTokenValue::new(user_session_token).map_err(|e| {
-                ApiError::Unauthorized(e.context("Error while creating opaque session token value"))
-            })?;
+        let opaque_session_token_value = OpaqueTokenValue::new(user_session_token)
+            .map_err(|e| ApiError::Unauthorized(e.context("invalid_user_session_token")))?;
         let session_token_hash = opaque_session_token_value.hash();
 
         let user = state
@@ -59,9 +57,7 @@ impl FromRequestParts<AppState> for CentralUiBffWithUser {
             .get_user_by_session_token(&session_token_hash)
             .await
             .map_err(|e| {
-                ApiError::Unauthorized(
-                    anyhow::Error::new(e).context("Error while fetching user by session token"),
-                )
+                ApiError::Unauthorized(anyhow::Error::new(e).context("user_session_rejected"))
             })?;
 
         Ok(Self {
@@ -89,23 +85,16 @@ fn extract_user_session_bearer_token(
         .headers
         .get(USER_AUTHORIZATION_HEADER_NAME)
         .ok_or_else(|| {
-            ApiError::Unauthorized(anyhow::anyhow!(
-                "X-Ethoko-User-Authorization header missing"
-            ))
+            ApiError::Unauthorized(anyhow::anyhow!("missing_user_authorization_header"))
         })?;
 
     let header_value = header_value.to_str().map_err(|err| {
-        ApiError::Unauthorized(
-            anyhow::Error::new(err)
-                .context("X-Ethoko-User-Authorization header is not valid ASCII"),
-        )
+        ApiError::Unauthorized(anyhow::Error::new(err).context("user_authorization_not_ascii"))
     })?;
 
-    let token = header_value.strip_prefix("Bearer ").ok_or_else(|| {
-        ApiError::Unauthorized(anyhow::anyhow!(
-            "X-Ethoko-User-Authorization header is not a Bearer token"
-        ))
-    })?;
+    let token = header_value
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| ApiError::Unauthorized(anyhow::anyhow!("user_authorization_not_bearer")))?;
 
     Ok(token.to_string())
 }
@@ -113,13 +102,11 @@ fn extract_user_session_bearer_token(
 fn map_authorization_header_rejection(rejection: TypedHeaderRejection) -> ApiError {
     match rejection.reason() {
         TypedHeaderRejectionReason::Missing => {
-            ApiError::Unauthorized(anyhow::anyhow!("Authorization header missing"))
+            ApiError::Unauthorized(anyhow::anyhow!("missing_authorization_header"))
         }
         TypedHeaderRejectionReason::Error(err) => ApiError::Unauthorized(
-            anyhow::anyhow!("{err}").context("Error while extracting authorization header"),
+            anyhow::anyhow!("authorization_header_rejected").context(err.to_string()),
         ),
-        _other => ApiError::Unauthorized(anyhow::anyhow!(
-            "Unknown error while extracting authorization header"
-        )),
+        _other => ApiError::Unauthorized(anyhow::anyhow!("unknown_authorization_header_error")),
     }
 }

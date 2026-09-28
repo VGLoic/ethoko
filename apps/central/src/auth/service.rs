@@ -21,8 +21,9 @@ use crate::{
     },
     config::OtpConfig,
     newtypes::email::Email,
+    operational_tracing::{error_chain, error_classification},
 };
-use tracing::{error, info};
+use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
@@ -130,12 +131,33 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
             .user_signed_up_with_email(&user, &auth_credential)
             .await
         {
-            error!("Error in user_signed_up_with_email notification: {:?}", e);
+            match &e {
+                SignupEmailError::Unknown(err) => {
+                    error!(
+                        event = "auth.signup.notification_failed",
+                        user_id = %user.id,
+                        error_class = error_classification(err),
+                        error_chain = %error_chain(err),
+                        "Failed to enqueue signup notification"
+                    );
+                }
+                SignupEmailError::EmailAlreadyExists(_)
+                | SignupEmailError::HandleAlreadyExists(_) => {
+                    error!(
+                        event = "auth.signup.notification_failed",
+                        user_id = %user.id,
+                        error_class = "unexpected",
+                        "Failed to enqueue signup notification"
+                    );
+                }
+            }
         }
 
-        info!(
-            "New user with ID {} signed up with email: {} and handle: {}",
-            user.id, user.email, user.handle
+        debug!(
+            event = "auth.signup.succeeded",
+            user_id = %user.id,
+            handle = %user.handle,
+            "Completed signup with email"
         );
 
         Ok((user, auth_credential))
@@ -145,12 +167,34 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
         let user = self.repository.verify_email_by_otp(request).await?;
 
         if let Err(e) = self.notifier.user_verified_email(&user).await {
-            error!("Error in user_verified_email notification: {:?}", e);
+            match &e {
+                VerifyEmailError::Unknown(err) => {
+                    error!(
+                        event = "auth.verify_email.notification_failed",
+                        user_id = %user.id,
+                        error_class = error_classification(err),
+                        error_chain = %error_chain(err),
+                        "Failed to handle email-verified notification"
+                    );
+                }
+                VerifyEmailError::EmailAlreadyVerified
+                | VerifyEmailError::InvalidOtp
+                | VerifyEmailError::OtpExpired
+                | VerifyEmailError::NotFound => {
+                    error!(
+                        event = "auth.verify_email.notification_failed",
+                        user_id = %user.id,
+                        error_class = "unexpected",
+                        "Failed to handle email-verified notification"
+                    );
+                }
+            }
         }
 
-        info!(
-            "User with ID {} verified their email: {}",
-            user.id, user.email
+        debug!(
+            event = "auth.verify_email.succeeded",
+            user_id = %user.id,
+            "Verified email"
         );
 
         Ok(user)
@@ -195,13 +239,34 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
             .user_requested_resend_verification_otp(&user)
             .await
         {
-            error!(
-                "Error in user_requested_resend_verification_otp notification: {:?}",
-                e
-            );
+            match &e {
+                ResendVerificationOtpError::Unknown(err) => {
+                    error!(
+                        event = "auth.resend_verification_otp.notification_failed",
+                        user_id = %user.id,
+                        error_class = error_classification(err),
+                        error_chain = %error_chain(err),
+                        "Failed to enqueue resend verification OTP notification"
+                    );
+                }
+                ResendVerificationOtpError::UserNotFound
+                | ResendVerificationOtpError::UserAlreadyVerified
+                | ResendVerificationOtpError::CooldownNotElapsed => {
+                    error!(
+                        event = "auth.resend_verification_otp.notification_failed",
+                        user_id = %user.id,
+                        error_class = "unexpected",
+                        "Failed to enqueue resend verification OTP notification"
+                    );
+                }
+            }
         }
 
-        info!("Resent verification OTP to email: {}", request.email);
+        debug!(
+            event = "auth.resend_verification_otp.succeeded",
+            user_id = %user.id,
+            "Accepted resend verification OTP request"
+        );
 
         Ok(())
     }
@@ -225,8 +290,7 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
                     .into(),
             })?;
 
-        if let Err(e) = verify_password(&request.password, &auth_credential.password_hash) {
-            error!("Invalid credentials for email: {}: {:?}", request.email, e);
+        if let Err(_e) = verify_password(&request.password, &auth_credential.password_hash) {
             return Err(LoginEmailError::InvalidCredentials);
         }
 
@@ -238,10 +302,32 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
             .await?;
 
         if let Err(e) = self.notifier.user_logged_in(&user).await {
-            error!("Error in user_logged_in notification: {:?}", e);
+            match &e {
+                LoginEmailError::Unknown(err) => {
+                    error!(
+                        event = "auth.login.notification_failed",
+                        user_id = %user.id,
+                        error_class = error_classification(err),
+                        error_chain = %error_chain(err),
+                        "Failed to handle login notification"
+                    );
+                }
+                LoginEmailError::UserNotFound | LoginEmailError::InvalidCredentials => {
+                    error!(
+                        event = "auth.login.notification_failed",
+                        user_id = %user.id,
+                        error_class = "unexpected",
+                        "Failed to handle login notification"
+                    );
+                }
+            }
         }
 
-        info!("User logged in: {}", user.email);
+        debug!(
+            event = "auth.login.succeeded",
+            user_id = %user.id,
+            "Completed login with email"
+        );
 
         Ok(opaque_session_token_value)
     }

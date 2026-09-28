@@ -8,8 +8,9 @@ use crate::{
     externalcom::email::{EmailService, EmailVerificationCodePayload},
     jobs::{job::Job, processor::JobProcessor},
     newtypes::otp::Otp,
+    operational_tracing::{error_chain, error_classification},
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, warn};
 
 #[derive(Debug, Clone)]
 pub struct AuthJobProcessor<R: AuthRepository, E: EmailService> {
@@ -30,7 +31,12 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
 #[async_trait::async_trait]
 impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E> {
     async fn process_job(&self, job: &Job) -> Result<(), anyhow::Error> {
-        info!("start processing job {}", job.id);
+        debug!(
+            event = "auth.job.started",
+            job_id = %job.id,
+            topic = %job.topic,
+            "Started auth job"
+        );
 
         let payload: AuthJob = serde_json::from_str(&job.payload)
             .map_err(|e| anyhow::Error::new(e).context("failed to deserialized job payload"))?;
@@ -45,10 +51,6 @@ impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E>
                 Ok(())
             }
         }
-        .map_err(|e| {
-            error!("failed to process job: {e}");
-            e
-        })
     }
 }
 
@@ -76,20 +78,36 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
             match e {
                 SendEmailVerificationOtpError::CooldownNotElapsed => {
                     warn!(
-                        "An OTP was sent but failed to be registered in database because cooldown is not yet ellapsed"
+                        event = "auth.email_verification_otp.recording_rejected",
+                        user_id = %payload.user_id,
+                        reason = "cooldown_not_elapsed",
+                        "Email verification OTP was sent but not recorded"
                     );
                 }
                 SendEmailVerificationOtpError::EmailAlreadyVerified => {
                     warn!(
-                        "An OTP was sent but failed to be registered in database because email is already verified"
+                        event = "auth.email_verification_otp.recording_rejected",
+                        user_id = %payload.user_id,
+                        reason = "email_already_verified",
+                        "Email verification OTP was sent but not recorded"
                     );
                 }
                 SendEmailVerificationOtpError::NotFound => {
                     warn!(
-                        "An OTP was sent but failed to be registered in database because user is not found"
+                        event = "auth.email_verification_otp.recording_rejected",
+                        user_id = %payload.user_id,
+                        reason = "user_not_found",
+                        "Email verification OTP was sent but not recorded"
                     );
                 }
                 SendEmailVerificationOtpError::Unknown(err) => {
+                    error!(
+                        event = "auth.email_verification_otp.recording_failed",
+                        user_id = %payload.user_id,
+                        error_class = error_classification(&err),
+                        error_chain = %error_chain(&err),
+                        "Failed to record email verification OTP after delivery"
+                    );
                     return Err(
                         err.context("failed to register email verification in database in job")
                     );
@@ -97,9 +115,10 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
             }
         };
 
-        info!(
-            "Email verification OTP sent to user with ID {}",
-            payload.user_id
+        debug!(
+            event = "auth.email_verification_otp.sent",
+            user_id = %payload.user_id,
+            "Sent email verification OTP"
         );
 
         Ok(())

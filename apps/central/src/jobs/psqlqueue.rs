@@ -30,18 +30,26 @@ impl PsqlQueue {
     ) -> Result<(), QueueError> {
         loop {
             if cancellation_token.is_cancelled() {
-                debug!("Received instruction to close");
+                debug!(
+                    event = "jobs.queue.cleanup_stopping",
+                    backend = "postgres",
+                    "Received instruction to stop queue cleanup loop"
+                );
                 break;
             }
             if let Err(e) = self.cleanup_timeout_jobs().await {
-                warn!("Failed to cleanup timeout jobs: {e:?}");
+                warn!(event = "jobs.queue.cleanup_failed", backend = "postgres", error = %e, "Failed to clean up timed out jobs");
             }
             tokio::time::sleep(std::time::Duration::from_secs(
                 timeout_polling_interval_seconds.into(),
             ))
             .await;
         }
-        debug!("PsqlQueue cleanup loop exiting");
+        debug!(
+            event = "jobs.queue.cleanup_stopped",
+            backend = "postgres",
+            "Queue cleanup loop exited"
+        );
         Ok(())
     }
 }
@@ -84,7 +92,7 @@ impl Queue for PsqlQueue {
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to insert job into psql queue"))?;
 
-        debug!("enqueued job: {}", job.id);
+        debug!(event = "jobs.enqueue.succeeded", backend = "postgres", job_id = %job.id, topic = %job.topic, "Enqueued job");
         Ok(job)
     }
 
@@ -156,7 +164,7 @@ impl Queue for PsqlQueue {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction for dequeue"))?;
 
-        debug!("job {} dequeued", job.id);
+        debug!(event = "jobs.dequeue.succeeded", backend = "postgres", job_id = %job.id, topic = %job.topic, retry_count = %job.retry_count, "Dequeued job");
 
         Ok(Some(job))
     }
@@ -176,7 +184,7 @@ impl Queue for PsqlQueue {
             anyhow::anyhow!(e).context("failed to delete job from psql queue after success")
         })?;
 
-        debug!("job {} marked as success", id);
+        debug!(event = "jobs.acknowledge.succeeded", backend = "postgres", job_id = %id, "Recorded successful job outcome");
         Ok(())
     }
 
@@ -212,7 +220,7 @@ impl Queue for PsqlQueue {
         .map_err(|e| anyhow::anyhow!(e).context("failed to fetch job from queue "))?;
 
         if job.retry_count >= job.max_retries {
-            warn!("Job {} has retried too much, ending up in DLQ", job.id);
+            warn!(event = "jobs.retry.exhausted", backend = "postgres", job_id = %job.id, topic = %job.topic, retry_count = %job.retry_count, max_retries = %job.max_retries, "Job moved to dead-letter state after failure");
             sqlx::query(
                 r#"
                 UPDATE "ethoko_job"
@@ -227,10 +235,7 @@ impl Queue for PsqlQueue {
                 anyhow::anyhow!(e).context("failed to update job into dead letter queue")
             })?;
         } else {
-            warn!(
-                "Job {} scheduled for retry with retry #{}",
-                job.id, job.retry_count
-            );
+            warn!(event = "jobs.retry.scheduled", backend = "postgres", job_id = %job.id, topic = %job.topic, retry_count = %job.retry_count, max_retries = %job.max_retries, "Job scheduled for retry after failure");
             let scheduled_at = Utc::now()
                 .checked_add_signed(chrono::Duration::seconds(self.retry_delay_seconds.into()))
                 .ok_or_else(|| anyhow::anyhow!("failed to compute scheduled_at for retry"))?;
@@ -322,7 +327,7 @@ impl Queue for PsqlQueue {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction for retry"))?;
 
-        debug!("Job {} retried from DLQ", id);
+        debug!(event = "jobs.retry.requeued", backend = "postgres", job_id = %id, "Requeued dead-letter job");
         Ok(())
     }
 
@@ -357,10 +362,7 @@ impl Queue for PsqlQueue {
 
         for timeout_job in timeout_jobs {
             if timeout_job.retry_count >= timeout_job.max_retries {
-                warn!(
-                    "Job {} has timed out and has retried too much, ending up in DLQ",
-                    timeout_job.id
-                );
+                warn!(event = "jobs.timeout.retry_exhausted", backend = "postgres", job_id = %timeout_job.id, topic = %timeout_job.topic, retry_count = %timeout_job.retry_count, max_retries = %timeout_job.max_retries, "Timed out job moved to dead-letter state");
                 sqlx::query(
                     r#"
                     UPDATE "ethoko_job"
@@ -375,10 +377,7 @@ impl Queue for PsqlQueue {
                     anyhow::anyhow!(e).context("failed to update job into dead letter queue")
                 })?;
             } else {
-                warn!(
-                    "Job {} has timed out and is scheduled for retry with retry #{}",
-                    timeout_job.id, timeout_job.retry_count
-                );
+                warn!(event = "jobs.timeout.retry_scheduled", backend = "postgres", job_id = %timeout_job.id, topic = %timeout_job.topic, retry_count = %timeout_job.retry_count, max_retries = %timeout_job.max_retries, "Timed out job scheduled for retry");
                 let scheduled_at = timeout_job
                     .dequeued_at
                     .unwrap_or(Utc::now())

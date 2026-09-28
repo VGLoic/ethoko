@@ -1,5 +1,5 @@
 use chrono::Utc;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
     auth::{
@@ -74,8 +74,10 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         _auth_credential: &AuthCredential,
     ) -> Result<(), SignupEmailError> {
         debug!(
-            "sending notification for user signed up with email: {}",
-            user.email
+            event = "auth.notification.enqueue_started",
+            notification_type = "email_verification_otp",
+            user_id = %user.id,
+            "Enqueuing signup notification"
         );
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
@@ -89,20 +91,22 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
             ),
         })?;
 
-        info!(
-            "sent notification for user signed up with email: {}",
-            user.email
+        debug!(
+            event = "auth.notification.enqueued",
+            notification_type = "email_verification_otp",
+            user_id = %user.id,
+            "Enqueued signup notification"
         );
         Ok(())
     }
 
     async fn user_verified_email(&self, user: &User) -> Result<(), VerifyEmailError> {
         debug!(
-            "sending notification for user verified email: {}",
-            user.email
+            event = "auth.notification.skipped",
+            notification_type = "user_verified_email",
+            user_id = %user.id,
+            "No notification action required for verified email event"
         );
-
-        info!("sent notification for user verified email: {}", user.email);
         Ok(())
     }
 
@@ -111,8 +115,10 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         user: &User,
     ) -> Result<(), ResendVerificationOtpError> {
         debug!(
-            "sending notification for user requested resend verification OTP: {}",
-            user.email
+            event = "auth.notification.enqueue_started",
+            notification_type = "email_verification_otp",
+            user_id = %user.id,
+            "Enqueuing resend verification OTP notification"
         );
 
         let job = JobRequest::new(
@@ -128,17 +134,22 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
             ),
         })?;
 
-        info!(
-            "sent notification for user requested resend verification OTP: {}",
-            user.email
+        debug!(
+            event = "auth.notification.enqueued",
+            notification_type = "email_verification_otp",
+            user_id = %user.id,
+            "Enqueued resend verification OTP notification"
         );
         Ok(())
     }
 
     async fn user_logged_in(&self, user: &User) -> Result<(), LoginEmailError> {
-        debug!("sending notification for user logged in: {}", user.email);
-
-        info!("sent notification for user logged in: {}", user.email);
+        debug!(
+            event = "auth.notification.skipped",
+            notification_type = "user_logged_in",
+            user_id = %user.id,
+            "No notification action required for login event"
+        );
         Ok(())
     }
 }
