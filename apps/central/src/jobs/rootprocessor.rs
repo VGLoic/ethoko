@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use tracing::warn;
-
 use crate::jobs::{job::Job, processor::JobProcessor};
 
 pub struct RootProcessor {
@@ -21,7 +19,6 @@ impl JobProcessor for RootProcessor {
         if let Some(processor) = processor {
             processor.process_job(job).await
         } else {
-            warn!("No processor found for topic: {}", job.topic);
             Err(anyhow::anyhow!(
                 "No processor found for topic: {}",
                 job.topic

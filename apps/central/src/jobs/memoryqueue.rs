@@ -52,7 +52,7 @@ impl Queue for InMemoryQueue {
             anyhow::anyhow!("{e}").context("failed to acquire jobs lock during enqueue")
         })?;
         let job = Job::from(job_request);
-        debug!("Job {} enqueued", job.id);
+        debug!(event = "jobs.enqueue.succeeded", job_id = %job.id, topic = %job.topic, "Enqueued job");
         jobs.insert(job.id, job.clone());
 
         Ok(job)
@@ -116,7 +116,7 @@ impl Queue for InMemoryQueue {
         successful_job.status = JobStatus::Successful;
         successful_job.updated_at = Utc::now();
 
-        info!("Job {id} successfully handled");
+        debug!(event = "jobs.acknowledge.succeeded", job_id = %id, "Recorded successful job outcome");
         Ok(())
     }
 
@@ -137,14 +137,11 @@ impl Queue for InMemoryQueue {
         }
 
         if job.retry_count >= job.max_retries {
-            warn!("Job {} has retried too much, ending up in DLQ", job.id);
+            warn!(event = "jobs.retry.exhausted", job_id = %job.id, topic = %job.topic, retry_count = %job.retry_count, max_retries = %job.max_retries, "Job moved to dead-letter state after failure");
             job.status = JobStatus::Dead;
             job.updated_at = Utc::now();
         } else {
-            warn!(
-                "Job {} scheduled for retry with retry #{}",
-                job.id, job.retry_count
-            );
+            warn!(event = "jobs.retry.scheduled", job_id = %job.id, topic = %job.topic, retry_count = %job.retry_count, max_retries = %job.max_retries, "Job scheduled for retry after failure");
             let scheduled_at = job
                 .dequeued_at
                 .unwrap_or(Utc::now())
@@ -177,7 +174,7 @@ impl Queue for InMemoryQueue {
         job.processing_timeout_at = None;
         job.status = JobStatus::Pending;
         job.updated_at = Utc::now();
-        info!("Job {} retried from DLQ", job.id);
+        info!(event = "jobs.retry.requeued", job_id = %job.id, topic = %job.topic, "Requeued dead-letter job");
         Ok(())
     }
 
@@ -197,24 +194,19 @@ impl Queue for InMemoryQueue {
             .map(|j| j.id)
             .collect::<Vec<uuid::Uuid>>();
         debug!(
-            "moving {} timed out processing jobs to pending_jobs",
-            timeout_ids.len()
+            event = "jobs.timeout.cleanup_started",
+            timed_out_job_count = timeout_ids.len(),
+            "Cleaning up timed out jobs"
         );
         for id in timeout_ids {
             let job = jobs.get_mut(&id);
             if let Some(j) = job {
                 if j.retry_count >= j.max_retries {
-                    warn!(
-                        "Job {} has timed out and has retried too much, ending up in DLQ",
-                        j.id
-                    );
+                    warn!(event = "jobs.timeout.retry_exhausted", job_id = %j.id, topic = %j.topic, retry_count = %j.retry_count, max_retries = %j.max_retries, "Timed out job moved to dead-letter state");
                     j.status = JobStatus::Dead;
                     j.updated_at = Utc::now();
                 } else {
-                    warn!(
-                        "Job {} has timed out and is scheduled for retry with retry #{}",
-                        j.id, j.retry_count
-                    );
+                    warn!(event = "jobs.timeout.retry_scheduled", job_id = %j.id, topic = %j.topic, retry_count = %j.retry_count, max_retries = %j.max_retries, "Timed out job scheduled for retry");
                     let scheduled_at = j
                         .dequeued_at
                         .unwrap_or(Utc::now())

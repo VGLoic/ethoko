@@ -84,8 +84,6 @@ describe("absolute path utils", () => {
     expect(parentPath.isChildOf(new AbsolutePath("foo/bar/"))).toBe(false);
   });
 });
-// typingsPath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/',
-//   localArtifactStorePath: '/Users/slourp/personal/ethoko/ethoko-monorepo/packages/cli-beacon/path/to/typings',
 
 describe("relative path utils", () => {
   const VALID_RELATIVE_PATHS = [

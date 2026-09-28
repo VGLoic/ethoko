@@ -6,7 +6,8 @@
     { "action": "shell", "resource": "cargo test *", "effect": "allow" },
     { "action": "shell", "resource": "cargo check *", "effect": "allow" },
     { "action": "shell", "resource": "cargo clippy *", "effect": "allow" },
-    { "action": "shell", "resource": "cargo build *", "effect": "allow" }
+    { "action": "shell", "resource": "cargo build *", "effect": "allow" },
+    { "action": "shell", "resource": "cargo fmt *", "effect": "allow" }
   ],
   "providers": {
     "lmstudio": {

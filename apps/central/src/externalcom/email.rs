@@ -3,7 +3,7 @@ use resend_rs::{
     Resend, types::CreateEmailBaseOptions, types::EmailTemplate as ResendEmailTemplate,
 };
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub enum EmailTemplate {
@@ -46,7 +46,16 @@ pub struct DummyEmailSender;
 #[async_trait::async_trait]
 impl EmailService for DummyEmailSender {
     async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error> {
-        info!("Sending email to: {}, content: {:?}", email, template);
+        let template_kind = match &template {
+            EmailTemplate::EmailVerificationCode(_) => "email_verification_code",
+        };
+        debug!(
+            event = "externalcom.email.send_succeeded",
+            provider = "dummy",
+            template = template_kind,
+            "Sent email via dummy provider"
+        );
+        let _ = email;
         Ok(())
     }
 }
@@ -145,10 +154,12 @@ impl EmailService for ResendEmailService {
             .map_err(|e| anyhow::Error::new(e).context("Failed to send email"))?;
 
         debug!(
-            "Sending email via ResendClient to: {}, template: {:?}",
-            email,
-            resend_template.template_id()
+            event = "externalcom.email.send_succeeded",
+            provider = "resend",
+            template = resend_template.template_id(),
+            "Sent email via provider"
         );
+        let _ = email;
         Ok(())
     }
 }
