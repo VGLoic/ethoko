@@ -18,7 +18,7 @@ To get started with local development, you'll need to set up your environment. F
 
 3. Verify that the unit tests are running:
     ```bash
-    cargo test --lib
+    pnpm --filter central test:unit
     ```
 
 4. Launch a local instance of PostgreSQL using Docker:
@@ -28,7 +28,7 @@ To get started with local development, you'll need to set up your environment. F
 
 5. Run the application
     ```bash
-    cargo run --bin central-server
+    pnpm --filter central dev
     ```
 
 The application can also be run using a single `docker compose` command:
@@ -38,23 +38,31 @@ docker compose -f compose.app.yaml up --build
 
 ### Integration tests
 
-Integration tests require a database running and exposed on port 5433, use the related docker compose for it:
+Run integration tests through the Central package script. It starts the integration database, waits for it to become healthy, runs the tests, and tears the database down afterward:
+
 ```bash
-docker compose -f compose.integration.yaml up
+pnpm --filter central test:integration
 ```
 
-Once the database is up, integration tests can be run:
-```bash
-DATABASE_URL=postgresql://admin:admin@localhost:5433/central cargo test --tests
-```
-Note that the `DATABASE_URL` environment variable is required as some tests are using the [sqlx test feature](https://docs.rs/sqlx/latest/sqlx/attr.test.html).
+To run one integration-test crate while retaining that database lifecycle:
 
-Alternatively, a script has been added in order to wrap the tests with the database container mounting and unmounting:
 ```bash
-# Allow the script to run
-chmod +x scripts/integration-test.sh
-./scripts/integration-test.sh
+pnpm --filter central test:integration --test queue_test
 ```
+
+Integration-test tracing is disabled by default. Set `CENTRAL_TEST_LOG` to one of `error`, `warn`, `info`, `debug`, or `trace` to capture traces for a failed test without adding noise to successful runs:
+
+```bash
+CENTRAL_TEST_LOG=debug pnpm --filter central test:integration --test queue_test
+```
+
+For live trace output while investigating a hang or order-dependent behavior, forward Cargo's test-harness `--nocapture` argument after its required separator:
+
+```bash
+CENTRAL_TEST_LOG=debug pnpm --filter central test:integration --test queue_test -- --nocapture
+```
+
+Arguments are forwarded to Cargo, so standard test selection and filtering remain available. The `--` before `--nocapture` is Cargo's required test-harness separator.
 
 ### Database interaction and migration
 
