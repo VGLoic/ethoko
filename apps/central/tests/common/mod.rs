@@ -7,13 +7,14 @@ use ethoko_central::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
-use tracing::{Level, error, level_filters::LevelFilter};
-use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::{Level, error};
 
 use crate::common::{fake_email_service::FakeEmailService, manual_worker::ManualWorker};
 mod auth_actions;
 mod fake_email_service;
 mod manual_worker;
+#[path = "../test_tracing.rs"]
+mod test_tracing;
 
 #[allow(unused_imports)]
 pub use auth_actions::{
@@ -105,11 +106,7 @@ impl TestConfigBuilder {
 }
 
 pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Error> {
-    let _ = tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer().with_filter(LevelFilter::from_level(config.log_level)),
-        )
-        .try_init();
+    test_tracing::init().map_err(anyhow::Error::msg)?;
 
     let pool = match PgPoolOptions::new()
         .max_connections(5)

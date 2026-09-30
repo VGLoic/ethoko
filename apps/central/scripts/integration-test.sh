@@ -25,7 +25,22 @@ until [[ $(docker inspect --format='{{json .State.Health.Status}}' integration-d
     fi
 done
 
-DATABASE_URL=postgresql://admin:admin@localhost:5433/central cargo test --tests
+test_arguments=(--quiet)
+selected_test_target=false
+
+for argument in "$@"; do
+    case "$argument" in
+        --test|--test=*)
+            selected_test_target=true
+            ;;
+    esac
+done
+
+if [ "$selected_test_target" = false ]; then
+    test_arguments+=(--tests)
+fi
+
+DATABASE_URL=postgresql://admin:admin@localhost:5433/central cargo test "${test_arguments[@]}" "$@"
 test_exit_status=$?
 
 echo "Removing docker container and volume"

@@ -8,8 +8,8 @@ use fake::rand::{self, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
 use tokio::time::sleep;
-use tracing::{Level, level_filters::LevelFilter};
-use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
+#[path = "test_tracing.rs"]
+mod test_tracing;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TestJobPayload {
@@ -166,9 +166,7 @@ fn dummy_job() -> JobRequest {
 }
 
 fn setup() {
-    let _ = tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(LevelFilter::from_level(Level::INFO)))
-        .try_init();
+    test_tracing::init().expect("invalid integration test tracing configuration");
 }
 
 async fn test_dequeue_non_ready_job<Q: Queue>(queue: Q) {
