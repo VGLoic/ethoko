@@ -1,6 +1,6 @@
 use ethoko_central::{
     auth,
-    config::{Config, OtpConfig},
+    config::{Config, OauthClientConfig, OtpConfig},
     httpserver::serve_http_server,
     jobs::{memoryqueue::InMemoryQueue, processor::JobProcessor, rootprocessor::RootProcessor},
     router::app_router,
@@ -57,6 +57,13 @@ impl TestConfigBuilder {
                 },
                 resend_api_key: "test_api_key".into(),
                 central_ui_bff_shared_secret: "test-central-ui-bff-shared-secret".into(),
+                github_oauth_client_config: OauthClientConfig {
+                    client_id: "test-client-id".into(),
+                    client_secret: "test-client-secret".into(),
+                    callback_url: "http://localhost/callback".into(),
+                    auth_url: "http://localhost/auth".into(),
+                    auth_token_url: "http://localhost/auth/token".into(),
+                },
             },
         }
     }
