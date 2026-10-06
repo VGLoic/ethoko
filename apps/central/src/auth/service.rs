@@ -17,12 +17,18 @@ use crate::{
         notifier::AuthNotifier,
         password_hasher::verify_password,
         repository::{AuthRepository, GetAuthCredentialError, GetLastOtpRequestError},
-        requests::login_email::{LoginEmailError, LoginEmailRequest},
+        requests::{
+            login_email::{LoginEmailError, LoginEmailRequest},
+            login_github_callback::{LoginGithubCallbackError, LoginGithubCallbackRequest},
+            login_github_start::{LoginGithubStart, LoginGithubStartError},
+        },
     },
-    config::OtpConfig,
+    config::{OauthClientConfig, OtpConfig},
     newtypes::email::Email,
     operational_tracing::{error_chain, error_classification},
 };
+use oauth2::{CsrfToken, EndpointNotSet, EndpointSet, Scope, basic::BasicClient};
+use sha2::Digest;
 use tracing::{debug, error};
 
 #[async_trait::async_trait]
@@ -99,6 +105,21 @@ pub trait AuthService: Send + Sync + 'static {
         user_id: uuid::Uuid,
         token_hash: &[u8; 32],
     ) -> Result<(), LogoutError>;
+
+    /// Start Oauth2 flow with Github.
+    /// A CSRF token is generated and the authorization URI is returned.
+    /// # Errors
+    /// * `LoginGithubStartError::Unknown` for any other errors that may occur during the process
+    async fn start_login_with_github(&self) -> Result<LoginGithubStart, LoginGithubStartError>;
+
+    /// Handles callback branch of Oauth2 flow with GitHub.
+    /// # Errors
+    /// * `LoginGithubCallbackError::PrimaryEmailCollision` if the Github primary email collides with an existing Ethoko user
+    /// * `LoginGithubCallbackError::Unknown` for any other errors that may occur during the process
+    async fn authorize_login_with_github(
+        &self,
+        request: LoginGithubCallbackRequest,
+    ) -> Result<OpaqueTokenValue, LoginGithubCallbackError>;
 }
 
 #[derive(Clone)]
@@ -106,14 +127,34 @@ pub struct AuthServiceImpl<R: AuthRepository, N: AuthNotifier> {
     repository: R,
     notifier: N,
     otp_config: OtpConfig,
+    github_oauth_client: oauth2::basic::BasicClient<
+        EndpointSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointSet,
+    >,
+    github_oauth_transaction_ttl_seconds: u16,
 }
 
 impl<R: AuthRepository, N: AuthNotifier> AuthServiceImpl<R, N> {
-    pub fn new(repository: R, notifier: N, otp_config: OtpConfig) -> Self {
+    pub fn new(
+        repository: R,
+        notifier: N,
+        otp_config: OtpConfig,
+        github_oauth_client_config: OauthClientConfig,
+    ) -> Self {
+        let github_oauth_client = BasicClient::new(github_oauth_client_config.client_id)
+            .set_auth_uri(github_oauth_client_config.auth_url)
+            .set_token_uri(github_oauth_client_config.auth_token_url)
+            .set_redirect_uri(github_oauth_client_config.callback_url);
         Self {
             repository,
             notifier,
             otp_config,
+            github_oauth_client,
+            github_oauth_transaction_ttl_seconds: github_oauth_client_config
+                .transaction_ttl_seconds,
         }
     }
 }
@@ -347,5 +388,72 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
         self.repository
             .revoke_session_token(user_id, token_hash)
             .await
+    }
+
+    async fn start_login_with_github(&self) -> Result<LoginGithubStart, LoginGithubStartError> {
+        let (auth_url, csrf_token) = self
+            .github_oauth_client
+            .authorize_url(CsrfToken::new_random)
+            .add_scope(Scope::new("user:email".to_string()))
+            .url();
+
+        let state_hash = sha2::Sha256::digest(csrf_token.secret().as_bytes());
+        let expires_at = chrono::Utc::now()
+            + chrono::Duration::seconds(self.github_oauth_transaction_ttl_seconds.into());
+        self.repository
+            .start_oauth_transaction(&state_hash.into(), expires_at)
+            .await?;
+
+        Ok(LoginGithubStart {
+            auth_url: auth_url.to_string(),
+            csrf_token,
+        })
+    }
+
+    async fn authorize_login_with_github(
+        &self,
+        request: LoginGithubCallbackRequest,
+    ) -> Result<OpaqueTokenValue, LoginGithubCallbackError> {
+        let state_hash = sha2::Sha256::digest(request.state.as_bytes());
+        self.repository
+            .finish_oauth_transaction(&state_hash.into())
+            .await?;
+
+        let http_client = oauth2::reqwest::Client::builder()
+            // Following redirects opens the client up to SSRF vulnerabilities.
+            .redirect(oauth2::reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| {
+                anyhow::Error::new(e)
+                    .context("failed to build http client for github oauth callback")
+            })?;
+
+        let _github_token = self
+            .github_oauth_client
+            .exchange_code(request.code)
+            .request_async(&http_client)
+            .await
+            .map_err(|e| {
+                anyhow::Error::new(e).context("failed to exchange code for github token")
+            })?;
+
+        // Retrieve Github user ID, handle and emails from Github API
+        // Find primary email, keep whether or not it is verified
+
+        // Find user with Github auth credential by Github user ID
+        // - if found, proceed with login,
+        // - if not, try to create a user with Github auth credential (NEED to update credential to handle multiple type)
+        //   - fails if user with same primary email than existing one with AutCredential password exists,
+        //   - must register a temporary handle structure that will be confirmed later on
+        //   - must set email verified to true if verified on Github
+
+        let opaque_session_token_value = OpaqueTokenValue::generate_session_token();
+        let _session_token_payload = OpaqueTokenCreatePayload::new(&opaque_session_token_value);
+        // let _ = self
+        //     .repository
+        //     .record_session_token(user.id, session_token_payload)
+        //     .await?;
+
+        Ok(opaque_session_token_value)
     }
 }

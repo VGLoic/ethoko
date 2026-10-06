@@ -81,6 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
         auth_repository.clone(),
         auth_notifier,
         config.otp_config.clone(),
+        config.github_oauth_client_config.clone(),
     );
     let auth_job_processor = auth::AuthJobProcessor::new(
         auth_repository.clone(),

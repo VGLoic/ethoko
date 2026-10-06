@@ -9,7 +9,7 @@ use common::{TestConfigBuilder, central_ui_bff_principal_headers, setup_instance
 use fake::{Fake, Faker};
 
 #[tokio::test]
-async fn test_signup() {
+async fn test_signup_email() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -39,7 +39,7 @@ async fn test_signup() {
 }
 
 #[tokio::test]
-async fn test_signup_trigger_otp_email_sending() {
+async fn test_signup_email_trigger_otp_email_sending() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -71,7 +71,7 @@ async fn test_signup_trigger_otp_email_sending() {
 }
 
 #[tokio::test]
-async fn test_signup_422_invalid_email_format_422() {
+async fn test_signup_email_422_invalid_email_format_422() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -88,7 +88,7 @@ async fn test_signup_422_invalid_email_format_422() {
 }
 
 #[tokio::test]
-async fn test_signup_with_existing_email_422() {
+async fn test_signup_email_with_existing_email_422() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -130,7 +130,7 @@ async fn test_signup_with_existing_email_422() {
 }
 
 #[tokio::test]
-async fn test_signup_with_existing_handle_422() {
+async fn test_signup_email_with_existing_handle_422() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -169,4 +169,30 @@ async fn test_signup_with_existing_handle_422() {
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let error = response.json::<UnprocessableEntityError>().await.unwrap();
     assert_eq!(error.code, "ETKAS02");
+}
+
+#[tokio::test]
+async fn test_signup_email_401_without_bff_credential() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let email = Faker.fake::<Email>();
+    let handle = Faker.fake::<Handle>();
+    let password = Faker.fake::<Password>();
+
+    let signup_body = HttpSignupEmailBody {
+        email: email.to_string(),
+        handle: handle.to_string(),
+        password: password.as_str().to_owned(),
+    };
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .json(&signup_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

@@ -41,25 +41,6 @@ pub trait EmailService: Send + Sync + 'static {
     async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error>;
 }
 
-pub struct DummyEmailSender;
-
-#[async_trait::async_trait]
-impl EmailService for DummyEmailSender {
-    async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error> {
-        let template_kind = match &template {
-            EmailTemplate::EmailVerificationCode(_) => "email_verification_code",
-        };
-        debug!(
-            event = "externalcom.email.send_succeeded",
-            provider = "dummy",
-            template = template_kind,
-            "Sent email via dummy provider"
-        );
-        let _ = email;
-        Ok(())
-    }
-}
-
 enum RsEmailVerificationTemplate {
     ResendEmailVerificationCode(RsEmailVerificationCodeVariables),
 }

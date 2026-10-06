@@ -12,7 +12,7 @@ use common::{
 use fake::{Fake, Faker};
 
 #[tokio::test]
-async fn test_login_200() {
+async fn test_login_email_200() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -39,7 +39,7 @@ async fn test_login_200() {
 }
 
 #[tokio::test]
-async fn test_login_token_valid() {
+async fn test_login_email_token_valid() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -111,7 +111,7 @@ async fn test_me_401_without_user_session_header() {
 }
 
 #[tokio::test]
-async fn test_login_401_without_bff_credential() {
+async fn test_login_email_401_without_bff_credential() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -131,7 +131,7 @@ async fn test_login_401_without_bff_credential() {
 }
 
 #[tokio::test]
-async fn test_login_422_invalid_email() {
+async fn test_login_email_422_invalid_email() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -159,7 +159,7 @@ async fn test_login_422_invalid_email() {
 }
 
 #[tokio::test]
-async fn test_login_422_invalid_password_format() {
+async fn test_login_email_422_invalid_password_format() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -187,7 +187,7 @@ async fn test_login_422_invalid_password_format() {
 }
 
 #[tokio::test]
-async fn test_login_422_user_not_found() {
+async fn test_login_email_422_user_not_found() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -217,7 +217,7 @@ async fn test_login_422_user_not_found() {
 }
 
 #[tokio::test]
-async fn test_login_422_invalid_password() {
+async fn test_login_email_422_invalid_password() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();

@@ -1,6 +1,6 @@
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
-use crate::{auth, config::RateLimitConfig};
+use crate::{auth, config::RateLimitConfig, operational_tracing::error_chain};
 use anyhow::Context;
 use axum::{
     Json, Router,
@@ -240,7 +240,7 @@ impl IntoResponse for ApiError {
         match self {
             Self::NotFound => (StatusCode::NOT_FOUND, "Not found").into_response(),
             Self::InternalServerError(e) => {
-                error!(event = "http.request.failed", error = %e, "Request failed with internal server error");
+                error!(event = "http.request.failed", error = %e, error_chain = %error_chain(&e), "Request failed with internal server error");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
             }
             Self::Unauthorized(_error) => StatusCode::UNAUTHORIZED.into_response(),

@@ -58,11 +58,16 @@ impl TestConfigBuilder {
                 resend_api_key: "test_api_key".into(),
                 central_ui_bff_shared_secret: "test-central-ui-bff-shared-secret".into(),
                 github_oauth_client_config: OauthClientConfig {
-                    client_id: "test-client-id".into(),
-                    client_secret: "test-client-secret".into(),
-                    callback_url: "http://localhost/callback".into(),
-                    auth_url: "http://localhost/auth".into(),
-                    auth_token_url: "http://localhost/auth/token".into(),
+                    client_id: oauth2::ClientId::new("test-client-id".to_string()),
+                    client_secret: oauth2::ClientSecret::new("test-client-secret".to_string()),
+                    callback_url: oauth2::RedirectUrl::new("http://localhost/callback".to_string())
+                        .unwrap(),
+                    auth_url: oauth2::AuthUrl::new("http://localhost/auth".to_string()).unwrap(),
+                    auth_token_url: oauth2::TokenUrl::new(
+                        "http://localhost/auth/token".to_string(),
+                    )
+                    .unwrap(),
+                    transaction_ttl_seconds: 600, // default to 10 minutes
                 },
             },
         }
@@ -94,6 +99,13 @@ impl TestConfigBuilder {
 
     pub fn with_otp_cooldown(mut self, cooldown_seconds: u16) -> Self {
         self.config.otp_config.cooldown_seconds = cooldown_seconds;
+        self
+    }
+
+    pub fn with_github_oauth_transaction_ttl_seconds(mut self, ttl_seconds: u16) -> Self {
+        self.config
+            .github_oauth_client_config
+            .transaction_ttl_seconds = ttl_seconds;
         self
     }
 
@@ -145,6 +157,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         auth_repository.clone(),
         users_notifier,
         config.otp_config.clone(),
+        config.github_oauth_client_config.clone(),
     );
     let users_job_processor = auth::AuthJobProcessor::new(
         auth_repository.clone(),

@@ -2,6 +2,7 @@ use crate::{
     auth::{
         models::{
             auth_credential::AuthCredential,
+            oauth_transaction::OauthTransaction,
             opaque_token::{OpaqueToken, OpaqueTokenCreatePayload},
             otp_request::{OtpPurpose, OtpRequest},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
@@ -12,7 +13,10 @@ use crate::{
             },
             user::User,
         },
-        requests::{login_email::LoginEmailError, logout::LogoutError},
+        requests::{
+            login_email::LoginEmailError, login_github_callback::LoginGithubCallbackError,
+            login_github_start::LoginGithubStartError, logout::LogoutError,
+        },
     },
     config::OtpConfig,
     newtypes::email::Email,
@@ -122,6 +126,26 @@ pub trait AuthRepository: Send + Sync + 'static {
         user_id: uuid::Uuid,
         token_hash: &[u8; 32],
     ) -> Result<(), LogoutError>;
+
+    /// Starts an Oauth transaction with a state hash
+    /// # Errors
+    /// `LoginGithubStartError::Unknown` for any other errors that may occur during the process
+    async fn start_oauth_transaction(
+        &self,
+        state_hash: &[u8; 32],
+        expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), LoginGithubStartError>;
+
+    /// Finalizes an Oauth transaction for the specified state hash.
+    /// The Oauth transaction is deleted.
+    /// # Errors
+    /// * `LoginGithubCallbackError::OauthTransactionNotFound` if the transaction is not found
+    /// * `LoginGithubCallbackError::OauthTransactionExpired` if the transaction is expired
+    /// * `LoginGithubCallbackError::Unknown` for any other errors that may occur during the process.
+    async fn finish_oauth_transaction(
+        &self,
+        state_hash: &[u8; 32],
+    ) -> Result<(), LoginGithubCallbackError>;
 }
 
 #[derive(Error, Debug)]
@@ -556,6 +580,83 @@ impl AuthRepository for PsqlAuthRepository {
             .commit()
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+
+        Ok(())
+    }
+
+    async fn start_oauth_transaction(
+        &self,
+        state_hash: &[u8; 32],
+        expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), LoginGithubStartError> {
+        let _oauth_transaction = sqlx::query_as::<_, OauthTransaction>(
+            r#"
+            INSERT INTO oauth_transaction (state_hash, expires_at)
+            VALUES ($1, $2)
+            RETURNING
+                id,
+                state_hash,
+                created_at,
+                expires_at
+            "#,
+        )
+        .bind(state_hash)
+        .bind(expires_at)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to start OAuth transaction"))?;
+
+        Ok(())
+    }
+
+    async fn finish_oauth_transaction(
+        &self,
+        state_hash: &[u8; 32],
+    ) -> Result<(), LoginGithubCallbackError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to begin transaction"))?;
+
+        let oauth_transaction = sqlx::query_as::<_, OauthTransaction>(
+            r#"
+            SELECT
+                id,
+                state_hash,
+                created_at,
+                expires_at
+            FROM oauth_transaction
+            WHERE state_hash = $1
+            FOR UPDATE
+            "#,
+        )
+        .bind(state_hash)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch OAuth transaction"))?
+        .ok_or(LoginGithubCallbackError::OauthTransactionNotFound)?;
+
+        // Delete the OAuth transaction
+        sqlx::query(
+            r#"
+            DELETE FROM oauth_transaction
+            WHERE id = $1
+            "#,
+        )
+        .bind(oauth_transaction.id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to delete OAuth transaction"))?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+
+        if oauth_transaction.expires_at < chrono::Utc::now() {
+            return Err(LoginGithubCallbackError::OauthTransactionExpired);
+        }
 
         Ok(())
     }
