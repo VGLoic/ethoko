@@ -1,6 +1,6 @@
 # central
 
-Vocabulary specific to Ethoko Central — the hosted backend service. Currently in early development; the domain will grow as features land. Shared concepts (Project, Ethoko Artifact, Input/Contract Output Artifact, Build Info, Tag, ID, Origin, Storage Backend, Forge, Artifact Reference) are defined in [`../../CONTEXT-MAP.md`](../../CONTEXT-MAP.md).
+Vocabulary specific to Ethoko Central — the hosted backend service. Currently in early development; the domain will grow as features land. Shared concepts (Project, Ethoko Artifact, Input/Contract Output Artifact, Build Info, Tag, ID, Origin, Storage Backend, Forge, Artifact Reference) are defined in [`../../GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
 
 ## Language
 

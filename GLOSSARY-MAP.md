@@ -4,9 +4,9 @@ Ethoko is a warehouse for smart-contract compilation artifacts. The repository s
 
 ## Contexts
 
-- [`packages/cli-beacon/CONTEXT.md`](./packages/cli-beacon/CONTEXT.md) — the standalone CLI: artifact discovery, mapping, push/pull, typings generation, local cache.
-- [`apps/central/CONTEXT.md`](./apps/central/CONTEXT.md) — **Ethoko Central API**, the hosted backend service and source of truth for Central domain/application logic.
-- [`apps/central-ui/CONTEXT.md`](./apps/central-ui/CONTEXT.md) — **Ethoko Central UI**, a React Router application with a thin BFF/server layer for browser flows.
+- [`packages/cli-beacon/GLOSSARY.md`](./packages/cli-beacon/GLOSSARY.md) — the standalone CLI: artifact discovery, mapping, push/pull, typings generation, local cache.
+- [`apps/central/GLOSSARY.md`](./apps/central/GLOSSARY.md) — **Ethoko Central API**, the hosted backend service and source of truth for Central domain/application logic.
+- [`apps/central-ui/GLOSSARY.md`](./apps/central-ui/GLOSSARY.md) — **Ethoko Central UI**, a React Router application with a thin BFF/server layer for browser flows.
 
 `apps/*` other than `central` and `central-ui` are integration apps that exercise the CLI against real Hardhat/Foundry codebases; they don't introduce vocabulary.
 
@@ -118,7 +118,7 @@ _Avoid_: "Foundry" as a synonym in technical contexts — Foundry is the umbrell
 
 ### Storage Backend
 
-The configured backend where a **Project**'s artifacts persist. Implementations: filesystem, AWS S3, Ethoko Central. Distinct from the **Local Artifact Store** (defined per-context — see `packages/cli-beacon/CONTEXT.md`) even when both happen to be on local disk — they live at different paths and serve different roles.
+The configured backend where a **Project**'s artifacts persist. Implementations: filesystem, AWS S3, Ethoko Central. Distinct from the **Local Artifact Store** (defined per-context — see `packages/cli-beacon/GLOSSARY.md`) even when both happen to be on local disk — they live at different paths and serve different roles.
 _Avoid_: "remote storage" (the filesystem backend can be local), "storage" alone (too vague), "storage provider" in domain conversation (it's the name of the code-level interface, not the domain term).
 
 ## Relationships

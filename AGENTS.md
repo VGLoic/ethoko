@@ -62,12 +62,12 @@ Run this validation suite from root after completing each logical unit of work (
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `VGLoic/ethoko`, accessed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `VGLoic/ethoko-monorepo`, accessed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Five canonical roles, each mapped to a label of the same name (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+Five canonical roles map directly to same-named GitHub labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Multi-context layout: `CONTEXT-MAP.md` at the root, per-package `CONTEXT.md` files under `packages/cli-beacon/` and `apps/central/`. See `docs/agents/domain.md`.
+Multi-context layout: `GLOSSARY-MAP.md` at the root, with per-context glossaries and ADRs. See `docs/agents/domain.md`.

@@ -1,6 +1,6 @@
 # cli-beacon
 
-Vocabulary specific to `@ethoko/cli-beacon` — the standalone Ethoko CLI. Shared concepts (Project, Ethoko Artifact, Input/Contract Output Artifact, Build Info, Tag, ID, Origin, Storage Backend, Forge, Artifact Reference) are defined in [`../../CONTEXT-MAP.md`](../../CONTEXT-MAP.md).
+Vocabulary specific to `@ethoko/cli-beacon` — the standalone Ethoko CLI. Shared concepts (Project, Ethoko Artifact, Input/Contract Output Artifact, Build Info, Tag, ID, Origin, Storage Backend, Forge, Artifact Reference) are defined in [`../../GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
 
 ## Language
 

@@ -1,6 +1,6 @@
 # central-ui
 
-Vocabulary specific to Ethoko Central UI — the React Router application used by users to interact with Ethoko Central. Shared concepts (Project, Namespace, Visibility, User, Ethoko Artifact, Tag, ID, Artifact Reference, Storage Backend, etc.) are defined in [`../../CONTEXT-MAP.md`](../../CONTEXT-MAP.md).
+Vocabulary specific to Ethoko Central UI — the React Router application used by users to interact with Ethoko Central. Shared concepts (Project, Namespace, Visibility, User, Ethoko Artifact, Tag, ID, Artifact Reference, Storage Backend, etc.) are defined in [`../../GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md).
 
 ## Language
 
