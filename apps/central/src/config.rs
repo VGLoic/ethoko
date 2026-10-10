@@ -30,6 +30,10 @@ pub struct Config {
     pub central_ui_bff_shared_secret: String,
     /// GitHub OAuth client configuration
     pub github_oauth_client_config: OauthClientConfig,
+    /// Time to live for Oauth transaction in seconds
+    pub oauth_transaction_ttl_seconds: u16,
+    /// GitHub API base URL
+    pub github_api_url: String,
 }
 
 #[derive(Clone, Debug)]
@@ -39,8 +43,6 @@ pub struct OauthClientConfig {
     pub callback_url: oauth2::RedirectUrl,
     pub auth_url: oauth2::AuthUrl,
     pub auth_token_url: oauth2::TokenUrl,
-    /// Time to live for Oauth transaction in seconds
-    pub transaction_ttl_seconds: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +63,7 @@ pub struct RateLimitConfig {
 
 const EMPTY_STRING: &str = "";
 const DUMMY_URL: &str = "https://google.com";
+const GITHUB_API_URL: &str = "https://api.github.com";
 
 impl Config {
     pub fn parse_from_env() -> Result<Self, Vec<anyhow::Error>> {
@@ -125,6 +128,24 @@ impl Config {
 
         let (github_oauth_client_config, github_oauth_errors) = parse_github_oauth_client_config();
 
+        let oauth_transaction_ttl_seconds =
+            match parse_env_variable::<u16>("OAUTH_TRANSACTION_TTL_SECONDS") {
+                Ok(Some(v)) => v,
+                Ok(None) => 600, // default to 10 minutes
+                Err(e) => {
+                    errors.push(e);
+                    600 // default to 10 minutes
+                }
+            };
+
+        let github_api_url = match parse_env_variable::<String>("GITHUB_API_URL") {
+            Ok(v) => v.unwrap_or(GITHUB_API_URL.into()),
+            Err(e) => {
+                errors.push(e);
+                GITHUB_API_URL.into()
+            }
+        };
+
         errors.extend(github_oauth_errors);
         if !errors.is_empty() {
             return Err(errors);
@@ -157,6 +178,8 @@ impl Config {
             resend_api_key,
             central_ui_bff_shared_secret,
             github_oauth_client_config,
+            oauth_transaction_ttl_seconds,
+            github_api_url,
         })
     }
 }
@@ -228,22 +251,12 @@ fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
         }
     };
 
-    let transaction_ttl_seconds = match parse_env_variable::<u16>("OAUTH_TRANSACTION_TTL_SECONDS") {
-        Ok(Some(v)) => v,
-        Ok(None) => 600, // default to 10 minutes
-        Err(e) => {
-            errors.push(e);
-            600 // default to 10 minutes
-        }
-    };
-
     let oauth_client_config = OauthClientConfig {
         client_id,
         client_secret,
         callback_url,
         auth_url,
         auth_token_url,
-        transaction_ttl_seconds,
     };
 
     (oauth_client_config, errors)

@@ -103,7 +103,7 @@ async fn test_login_github_callback_422_with_not_found_state() {
 async fn test_login_github_callback_422_with_expired_state() {
     let instance_state = setup_instance(
         &TestConfigBuilder::new()
-            .with_github_oauth_transaction_ttl_seconds(1)
+            .with_oauth_transaction_ttl_seconds(1)
             .build(),
     )
     .await
@@ -134,7 +134,7 @@ async fn test_login_github_callback_422_with_expired_state() {
         .headers(central_ui_bff_principal_headers())
         .json(&HttpLoginGithubCallbackBody {
             code: "some_code".to_string(),
-            state: start_response.csrf_token,
+            state: start_response.state,
         })
         .send()
         .await

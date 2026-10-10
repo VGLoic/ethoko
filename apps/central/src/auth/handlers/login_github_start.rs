@@ -17,7 +17,7 @@ pub async fn handle_login_github_start(
         StatusCode::CREATED,
         Json(HttpLoginGithubStartResponse {
             auth_url: result.auth_url,
-            csrf_token: result.csrf_token.into_secret(),
+            state: result.state.secret().to_owned(),
         }),
     ))
 }

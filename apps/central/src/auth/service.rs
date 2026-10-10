@@ -1,5 +1,6 @@
 use crate::{
     auth::{
+        acls::{github::AuthGithubPort, oauth::AuthOauthClientPort},
         models::{
             auth_credential::AuthCredential,
             opaque_token::{OpaqueTokenCreatePayload, OpaqueTokenValue},
@@ -23,11 +24,10 @@ use crate::{
             login_github_start::{LoginGithubStart, LoginGithubStartError},
         },
     },
-    config::{OauthClientConfig, OtpConfig},
+    config::OtpConfig,
     newtypes::email::Email,
     operational_tracing::{error_chain, error_classification},
 };
-use oauth2::{CsrfToken, EndpointNotSet, EndpointSet, Scope, basic::BasicClient};
 use sha2::Digest;
 use tracing::{debug, error};
 
@@ -123,44 +123,46 @@ pub trait AuthService: Send + Sync + 'static {
 }
 
 #[derive(Clone)]
-pub struct AuthServiceImpl<R: AuthRepository, N: AuthNotifier> {
+pub struct AuthServiceImpl<
+    R: AuthRepository,
+    N: AuthNotifier,
+    GhPort: AuthGithubPort,
+    GhOauth: AuthOauthClientPort,
+> {
     repository: R,
     notifier: N,
     otp_config: OtpConfig,
-    github_oauth_client: oauth2::basic::BasicClient<
-        EndpointSet,
-        EndpointNotSet,
-        EndpointNotSet,
-        EndpointNotSet,
-        EndpointSet,
-    >,
+    github_oauth_client_port: GhOauth,
     github_oauth_transaction_ttl_seconds: u16,
+    github_port: GhPort,
 }
 
-impl<R: AuthRepository, N: AuthNotifier> AuthServiceImpl<R, N> {
+impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOauthClientPort>
+    AuthServiceImpl<R, N, GhPort, GhOauth>
+{
     pub fn new(
         repository: R,
         notifier: N,
         otp_config: OtpConfig,
-        github_oauth_client_config: OauthClientConfig,
+        github_oauth_client_port: GhOauth,
+        oauth_transaction_ttl_seconds: u16,
+        github_port: GhPort,
     ) -> Self {
-        let github_oauth_client = BasicClient::new(github_oauth_client_config.client_id)
-            .set_auth_uri(github_oauth_client_config.auth_url)
-            .set_token_uri(github_oauth_client_config.auth_token_url)
-            .set_redirect_uri(github_oauth_client_config.callback_url);
         Self {
             repository,
             notifier,
             otp_config,
-            github_oauth_client,
-            github_oauth_transaction_ttl_seconds: github_oauth_client_config
-                .transaction_ttl_seconds,
+            github_oauth_client_port,
+            github_oauth_transaction_ttl_seconds: oauth_transaction_ttl_seconds,
+            github_port,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
+impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOauthClientPort>
+    AuthService for AuthServiceImpl<R, N, GhPort, GhOauth>
+{
     async fn signup_with_email(
         &self,
         request: SignupEmailRequest,
@@ -391,22 +393,21 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
     }
 
     async fn start_login_with_github(&self) -> Result<LoginGithubStart, LoginGithubStartError> {
-        let (auth_url, csrf_token) = self
-            .github_oauth_client
-            .authorize_url(CsrfToken::new_random)
-            .add_scope(Scope::new("user:email".to_string()))
-            .url();
+        let authorization_url = self
+            .github_oauth_client_port
+            .generate_authorization_url(vec!["read:user", "user:email"])
+            .await
+            .map_err(|e| e.context("failed to generate authorization url"))?;
 
-        let state_hash = sha2::Sha256::digest(csrf_token.secret().as_bytes());
         let expires_at = chrono::Utc::now()
             + chrono::Duration::seconds(self.github_oauth_transaction_ttl_seconds.into());
         self.repository
-            .start_oauth_transaction(&state_hash.into(), expires_at)
+            .start_oauth_transaction(&authorization_url.state.hash(), expires_at)
             .await?;
 
         Ok(LoginGithubStart {
-            auth_url: auth_url.to_string(),
-            csrf_token,
+            auth_url: authorization_url.url,
+            state: authorization_url.state,
         })
     }
 
@@ -419,26 +420,13 @@ impl<R: AuthRepository, N: AuthNotifier> AuthService for AuthServiceImpl<R, N> {
             .finish_oauth_transaction(&state_hash.into())
             .await?;
 
-        let http_client = oauth2::reqwest::Client::builder()
-            // Following redirects opens the client up to SSRF vulnerabilities.
-            .redirect(oauth2::reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| {
-                anyhow::Error::new(e)
-                    .context("failed to build http client for github oauth callback")
-            })?;
-
-        let _github_token = self
-            .github_oauth_client
-            .exchange_code(request.code)
-            .request_async(&http_client)
+        let access_token = self
+            .github_oauth_client_port
+            .exchange_code_for_token(&request.code)
             .await
-            .map_err(|e| {
-                anyhow::Error::new(e).context("failed to exchange code for github token")
-            })?;
+            .map_err(|e| e.context("failed to exchange code for github token"))?;
 
-        // Retrieve Github user ID, handle and emails from Github API
-        // Find primary email, keep whether or not it is verified
+        let github_user = self.github_port.get_user(&access_token).await?;
 
         // Find user with Github auth credential by Github user ID
         // - if found, proceed with login,

@@ -1,4 +1,3 @@
-use oauth2::AuthorizationCode;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -9,16 +8,13 @@ pub struct HttpLoginGithubCallbackBody {
 }
 
 pub struct LoginGithubCallbackRequest {
-    pub code: AuthorizationCode,
+    pub code: String,
     pub state: String,
 }
 
 impl LoginGithubCallbackRequest {
     pub fn new(code: String, state: String) -> Self {
-        Self {
-            code: AuthorizationCode::new(code),
-            state,
-        }
+        Self { code, state }
     }
 }
 

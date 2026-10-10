@@ -1,6 +1,7 @@
-use oauth2::CsrfToken;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::auth::models::oauth_acl::OauthState;
 
 #[derive(Debug, Error)]
 pub enum LoginGithubStartError {
@@ -10,12 +11,12 @@ pub enum LoginGithubStartError {
 
 pub struct LoginGithubStart {
     pub auth_url: String,
-    pub csrf_token: CsrfToken,
+    pub state: OauthState,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpLoginGithubStartResponse {
     pub auth_url: String,
-    pub csrf_token: String,
+    pub state: String,
 }

@@ -9,9 +9,13 @@ use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tracing::{Level, error};
 
-use crate::common::{fake_email_service::FakeEmailService, manual_worker::ManualWorker};
+use crate::common::{
+    fake_email_service::FakeEmailService, fake_github_client::FakeGithubClient,
+    manual_worker::ManualWorker,
+};
 mod auth_actions;
 mod fake_email_service;
+mod fake_github_client;
 mod manual_worker;
 #[path = "../test_tracing.rs"]
 mod test_tracing;
@@ -26,6 +30,7 @@ pub struct InstanceState {
     pub reqwest_client: reqwest::Client,
     pub server_url: String,
     pub email_service: FakeEmailService,
+    pub github_client: FakeGithubClient,
     pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
 }
 
@@ -67,8 +72,9 @@ impl TestConfigBuilder {
                         "http://localhost/auth/token".to_string(),
                     )
                     .unwrap(),
-                    transaction_ttl_seconds: 600, // default to 10 minutes
                 },
+                oauth_transaction_ttl_seconds: 600, // default to 10 minutes
+                github_api_url: "https://api.github.com".into(),
             },
         }
     }
@@ -102,10 +108,8 @@ impl TestConfigBuilder {
         self
     }
 
-    pub fn with_github_oauth_transaction_ttl_seconds(mut self, ttl_seconds: u16) -> Self {
-        self.config
-            .github_oauth_client_config
-            .transaction_ttl_seconds = ttl_seconds;
+    pub fn with_oauth_transaction_ttl_seconds(mut self, ttl_seconds: u16) -> Self {
+        self.config.oauth_transaction_ttl_seconds = ttl_seconds;
         self
     }
 
@@ -150,14 +154,20 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let job_queue = InMemoryQueue::new(2);
 
     let email_service = FakeEmailService::default();
+    let github_client = FakeGithubClient::default();
 
-    let users_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
+    let auth_oauth_github_client_adapter =
+        auth::AuthOauthClientAdapter::new(config.github_oauth_client_config.clone());
+    let auth_github_adapter = auth::AuthGithubAdapter::new(github_client.clone());
+    let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
     let auth_repository = auth::PsqlAuthRepository::new(pool);
     let auth_service = auth::AuthServiceImpl::new(
         auth_repository.clone(),
-        users_notifier,
+        auth_notifier,
         config.otp_config.clone(),
-        config.github_oauth_client_config.clone(),
+        auth_oauth_github_client_adapter,
+        config.oauth_transaction_ttl_seconds,
+        auth_github_adapter,
     );
     let users_job_processor = auth::AuthJobProcessor::new(
         auth_repository.clone(),
@@ -207,6 +217,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         server_url,
         job_worker,
         email_service,
+        github_client,
         reqwest_client: reqwest::Client::new(),
     })
 }
