@@ -3,7 +3,7 @@ use crate::{
         models::github_acl::GithubUser, requests::login_github_callback::LoginGithubCallbackError,
     },
     clients::github::GithubClient,
-    newtypes::email::Email,
+    newtypes::{email::Email, github_id::GithubId},
 };
 
 #[async_trait::async_trait]
@@ -54,7 +54,7 @@ impl<G: GithubClient> AuthGithubPort for AuthGithubAdapter<G> {
         })?;
 
         Ok(GithubUser {
-            id: authenticated_user.id,
+            id: GithubId::new(authenticated_user.id),
             username: authenticated_user.login,
             primary_email,
             email_verified: primary_email_item.verified,

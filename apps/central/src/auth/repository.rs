@@ -1,7 +1,7 @@
 use crate::{
     auth::{
         models::{
-            auth_credential::AuthCredential,
+            auth_credential::{AuthCredential, AuthCredentialPayload},
             oauth_transaction::OauthTransaction,
             opaque_token::{OpaqueToken, OpaqueTokenCreatePayload},
             otp_request::{OtpPurpose, OtpRequest},
@@ -85,14 +85,14 @@ pub trait AuthRepository: Send + Sync + 'static {
         user_id: uuid::Uuid,
     ) -> Result<Option<OtpRequest>, GetLastOtpRequestError>;
 
-    /// Gets the user and auth credential for a user by their email address.
+    /// Gets the user and auth credentials for a user by their email address.
     /// # Errors
     /// * `GetAuthCredentialError::UserNotFound` if the underlying user is not found
     /// * `GetAuthCredentialError::Unknown` for any other errors that may occur during the process.
-    async fn get_auth_credential_by_email(
+    async fn get_auth_credentials_by_email(
         &self,
         email: &Email,
-    ) -> Result<(User, AuthCredential), GetAuthCredentialError>;
+    ) -> Result<(User, Vec<AuthCredential>), GetAuthCredentialError>;
 
     /// Records an opaque session token for the specified user.
     /// # Errors
@@ -228,18 +228,20 @@ impl AuthRepository for PsqlAuthRepository {
             r#"
             INSERT INTO auth_credential (
                 user_id,
-                password_hash
+                payload
             ) VALUES ($1, $2)
             RETURNING
                 id,
                 user_id,
-                password_hash,
+                payload,
                 created_at,
                 updated_at
             "#,
         )
         .bind(user.id)
-        .bind(request.password_hash)
+        .bind(AuthCredentialPayload::from_password_hash(
+            request.password_hash,
+        ))
         .fetch_one(&mut *transaction)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to create auth credential"))?;
@@ -419,38 +421,35 @@ impl AuthRepository for PsqlAuthRepository {
             })
     }
 
-    async fn get_auth_credential_by_email(
+    async fn get_auth_credentials_by_email(
         &self,
         email: &Email,
-    ) -> Result<(User, AuthCredential), GetAuthCredentialError> {
+    ) -> Result<(User, Vec<AuthCredential>), GetAuthCredentialError> {
         let user = get_user_by_email(email, &self.pool)
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user by email"))?
             .ok_or(GetAuthCredentialError::NotFound)?;
-        let auth_credential = sqlx::query_as::<_, AuthCredential>(
+        let auth_credentials = sqlx::query_as::<_, AuthCredential>(
             r#"
             SELECT
                 id,
                 user_id,
-                password_hash,
+                payload,
                 created_at,
                 updated_at
             FROM auth_credential
-            WHERE user_id = (
-                SELECT id
-                FROM ethoko_user
-                WHERE email = $1
-            )
+            WHERE user_id = $1
             "#,
         )
-        .bind(email)
-        .fetch_optional(&self.pool)
+        .bind(user.id)
+        .fetch_all(&self.pool)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to fetch auth credential by email"))?;
 
-        match auth_credential {
-            Some(auth_credential) => Ok((user, auth_credential)),
-            None => Err(GetAuthCredentialError::NotFound),
+        if auth_credentials.is_empty() {
+            Err(GetAuthCredentialError::NotFound)
+        } else {
+            Ok((user, auth_credentials))
         }
     }
 

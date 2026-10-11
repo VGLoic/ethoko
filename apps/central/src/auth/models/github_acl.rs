@@ -1,7 +1,7 @@
-use crate::newtypes::email::Email;
+use crate::newtypes::{email::Email, github_id::GithubId};
 
 pub struct GithubUser {
-    pub id: u64,
+    pub id: GithubId,
     pub username: String,
     pub primary_email: Email,
     pub email_verified: bool,

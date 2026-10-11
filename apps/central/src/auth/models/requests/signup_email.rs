@@ -7,6 +7,7 @@ use crate::{
         email::{Email, EmailError},
         handle::{Handle, HandleError},
         password::{Password, PasswordError},
+        password_hash::PasswordHash,
     },
 };
 
@@ -21,7 +22,7 @@ pub struct HttpSignupEmailBody {
 pub struct SignupEmailRequest {
     pub email: Email,
     pub handle: Handle,
-    pub password_hash: String,
+    pub password_hash: PasswordHash,
 }
 
 #[derive(Debug, Error)]

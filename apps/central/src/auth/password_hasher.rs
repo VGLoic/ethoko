@@ -1,13 +1,13 @@
 use anyhow::anyhow;
 use argon2::{Algorithm, Argon2, Params, Version};
 use argon2::{
-    PasswordHash,
+    PasswordHash as ArgonPasswordHash,
     password_hash::{PasswordHasher, PasswordVerifier, Salt},
 };
 use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use fake::rand;
 
-use crate::newtypes::password::Password;
+use crate::newtypes::{password::Password, password_hash::PasswordHash};
 
 const ARGON2_MEMORY_COST: u32 = Params::DEFAULT_M_COST;
 const ARGON2_TIME_COST: u32 = Params::DEFAULT_T_COST;
@@ -28,22 +28,23 @@ fn argon2_instance() -> Argon2<'static> {
 }
 
 /// Hashes a password using Argon2Id algorithm.
-pub fn hash_password(password: &Password) -> Result<String, anyhow::Error> {
+pub fn hash_password(password: &Password) -> Result<PasswordHash, anyhow::Error> {
     let salt: [u8; 16] = rand::random();
     let base64_salt = BASE64_STANDARD_NO_PAD.encode(salt);
     let argon_salt = Salt::from_b64(&base64_salt)
         .map_err(|e| anyhow!(e).context("failed to build Salt struct from base64 salt string"))?;
 
-    argon2_instance()
+    let password_hash = argon2_instance()
         .hash_password(password.as_str().as_bytes(), argon_salt)
-        .map_err(|e| anyhow!(e).context("failed to hash password"))
-        .map(|v| v.to_string())
+        .map_err(|e| anyhow!(e).context("failed to hash password"))?;
+
+    Ok(PasswordHash::from(password_hash))
 }
 
 #[allow(dead_code)]
 /// Verifies a password against a stored hash.
-pub fn verify_password(password: &Password, hash: &str) -> Result<(), anyhow::Error> {
-    let parsed_hash = PasswordHash::new(hash)
+pub fn verify_password(password: &Password, hash: &PasswordHash) -> Result<(), anyhow::Error> {
+    let parsed_hash = ArgonPasswordHash::new(hash.as_str())
         .map_err(|e| anyhow!(e).context("failed to parse stored password hash"))?;
     match argon2_instance().verify_password(password.as_str().as_bytes(), &parsed_hash) {
         Ok(_) => Ok(()),
@@ -57,13 +58,6 @@ mod tests {
     use fake::{Fake, Faker};
 
     use super::*;
-
-    #[test]
-    fn test_hash_password() {
-        let password: Password = Faker.fake();
-        let hash = hash_password(&password).unwrap();
-        assert!(!hash.is_empty());
-    }
 
     #[test]
     fn test_verify_password() {

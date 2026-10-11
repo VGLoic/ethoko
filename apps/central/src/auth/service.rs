@@ -2,7 +2,7 @@ use crate::{
     auth::{
         acls::{github::AuthGithubPort, oauth::AuthOauthClientPort},
         models::{
-            auth_credential::AuthCredential,
+            auth_credential::{AuthCredential, AuthCredentialPayload},
             opaque_token::{OpaqueTokenCreatePayload, OpaqueTokenValue},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
@@ -322,9 +322,9 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         &self,
         request: LoginEmailRequest,
     ) -> Result<OpaqueTokenValue, LoginEmailError> {
-        let (user, auth_credential) = self
+        let (user, auth_credentials) = self
             .repository
-            .get_auth_credential_by_email(&request.email)
+            .get_auth_credentials_by_email(&request.email)
             .await
             .map_err(|e| match e {
                 GetAuthCredentialError::NotFound => LoginEmailError::UserNotFound,
@@ -333,7 +333,18 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                     .into(),
             })?;
 
-        if let Err(_e) = verify_password(&request.password, &auth_credential.password_hash) {
+        let password_hash = match auth_credentials
+            .iter()
+            .find(|cred| matches!(cred.payload, AuthCredentialPayload::PasswordHash { .. }))
+        {
+            Some(cred) => match &cred.payload {
+                AuthCredentialPayload::PasswordHash { hash } => hash,
+                _ => return Err(LoginEmailError::InvalidCredentials),
+            },
+            None => return Err(LoginEmailError::InvalidCredentials),
+        };
+
+        if let Err(_e) = verify_password(&request.password, password_hash) {
             return Err(LoginEmailError::InvalidCredentials);
         }
 
@@ -430,7 +441,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         // Find user with Github auth credential by Github user ID
         // - if found, proceed with login,
-        // - if not, try to create a user with Github auth credential (NEED to update credential to handle multiple type)
+        // - if not, try to create a user with Github auth credential
         //   - fails if user with same primary email than existing one with AutCredential password exists,
         //   - must register a temporary handle structure that will be confirmed later on
         //   - must set email verified to true if verified on Github

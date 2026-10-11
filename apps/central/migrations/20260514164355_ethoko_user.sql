@@ -22,7 +22,7 @@ CREATE UNIQUE INDEX unique_handle ON "ethoko_user" (handle);
 CREATE TABLE "auth_credential" (
     id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id        UUID         NOT NULL,
-    password_hash  TEXT         NOT NULL,
+    payload        JSONB        NOT NULL,
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
     FOREIGN KEY (user_id) REFERENCES "ethoko_user" (id) ON DELETE CASCADE
