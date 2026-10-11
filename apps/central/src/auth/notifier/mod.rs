@@ -12,6 +12,7 @@ use crate::{
             user::User,
         },
         notifier::jobs::{AuthJob, SendEmailVerificationOtpPayload},
+        requests::login_github_callback::LoginGithubCallbackError,
     },
     jobs::{
         job::JobRequest,
@@ -49,10 +50,25 @@ pub trait AuthNotifier: Send + Sync + 'static {
         user: &User,
     ) -> Result<(), ResendVerificationOtpError>;
 
-    /// Triggers a notification when user logged in
+    /// Triggers a notification when user logged in with email
     /// # Errors
     /// * `LoginEmailError::Unknown` for any errors that may occur during the process.
-    async fn user_logged_in(&self, user: &User) -> Result<(), LoginEmailError>;
+    async fn user_logged_in_with_email(&self, user: &User) -> Result<(), LoginEmailError>;
+
+    /// Triggers a notification when user signed up with Github
+    /// # Errors
+    /// * `LoginGithubCallbackError::Unknown` for any errors that may occur during the process.
+    async fn user_signed_up_with_github(
+        &self,
+        user: &User,
+        auth_credential: &AuthCredential,
+    ) -> Result<(), LoginGithubCallbackError>;
+
+    /// Triggers a notification when user logged in with Github
+    /// # Errors
+    /// * `LoginGithubCallbackError::Unknown` for any errors that may occur during the process.
+    async fn user_logged_in_with_github(&self, user: &User)
+    -> Result<(), LoginGithubCallbackError>;
 }
 
 #[derive(Clone)]
@@ -143,12 +159,39 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         Ok(())
     }
 
-    async fn user_logged_in(&self, user: &User) -> Result<(), LoginEmailError> {
+    async fn user_logged_in_with_email(&self, user: &User) -> Result<(), LoginEmailError> {
         debug!(
             event = "auth.notification.skipped",
-            notification_type = "user_logged_in",
+            notification_type = "user_logged_in_with_email",
             user_id = %user.id,
-            "No notification action required for login event"
+            "No notification action required for login with email event"
+        );
+        Ok(())
+    }
+
+    async fn user_signed_up_with_github(
+        &self,
+        user: &User,
+        _auth_credential: &AuthCredential,
+    ) -> Result<(), LoginGithubCallbackError> {
+        debug!(
+            event = "auth.notification.skipped",
+            notification_type = "user_signed_up_with_github",
+            user_id = %user.id,
+            "No notification action required for signup with Github event"
+        );
+        Ok(())
+    }
+
+    async fn user_logged_in_with_github(
+        &self,
+        user: &User,
+    ) -> Result<(), LoginGithubCallbackError> {
+        debug!(
+            event = "auth.notification.skipped",
+            notification_type = "user_logged_in_with_github",
+            user_id = %user.id,
+            "No notification action required for login with Github event"
         );
         Ok(())
     }

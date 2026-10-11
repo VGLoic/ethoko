@@ -11,11 +11,12 @@ use tracing::{Level, error};
 
 use crate::common::{
     fake_email_service::FakeEmailService, fake_github_client::FakeGithubClient,
-    manual_worker::ManualWorker,
+    fake_oauth_client::FakeOauthClient, manual_worker::ManualWorker,
 };
 mod auth_actions;
 mod fake_email_service;
 mod fake_github_client;
+mod fake_oauth_client;
 mod manual_worker;
 #[path = "../test_tracing.rs"]
 mod test_tracing;
@@ -31,6 +32,7 @@ pub struct InstanceState {
     pub server_url: String,
     pub email_service: FakeEmailService,
     pub github_client: FakeGithubClient,
+    pub github_oauth_client: FakeOauthClient,
     pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
 }
 
@@ -156,8 +158,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let email_service = FakeEmailService::default();
     let github_client = FakeGithubClient::default();
 
-    let auth_oauth_github_client_adapter =
-        auth::AuthOauthClientAdapter::new(config.github_oauth_client_config.clone());
+    let auth_oauth_github_client_adapter = FakeOauthClient::default();
     let auth_github_adapter = auth::AuthGithubAdapter::new(github_client.clone());
     let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
     let auth_repository = auth::PsqlAuthRepository::new(pool);
@@ -165,7 +166,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         auth_repository.clone(),
         auth_notifier,
         config.otp_config.clone(),
-        auth_oauth_github_client_adapter,
+        auth_oauth_github_client_adapter.clone(),
         config.oauth_transaction_ttl_seconds,
         auth_github_adapter,
     );
@@ -218,6 +219,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         job_worker,
         email_service,
         github_client,
+        github_oauth_client: auth_oauth_github_client_adapter,
         reqwest_client: reqwest::Client::new(),
     })
 }

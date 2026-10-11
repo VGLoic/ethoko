@@ -20,6 +20,7 @@ impl Default for FakeGithubClient {
     }
 }
 
+#[allow(dead_code)]
 impl FakeGithubClient {
     pub fn set_next_user(&self, user_response: GithubApiUserResponse) {
         *self.next_user_response.lock().unwrap() = Some(Ok(user_response));

@@ -28,17 +28,11 @@ impl<G: GithubClient> AuthGithubAdapter<G> {
 #[async_trait::async_trait]
 impl<G: GithubClient> AuthGithubPort for AuthGithubAdapter<G> {
     async fn get_user(&self, access_token: &str) -> Result<GithubUser, LoginGithubCallbackError> {
-        let authenticated_user = self
-            .github_client
-            .get_user(access_token)
-            .await
-            .map_err(|e| e.context("failed to retrieve user"))?;
-
-        let emails = self
-            .github_client
-            .get_user_emails(access_token)
-            .await
-            .map_err(|e| e.context("failed to retrieve user emails"))?;
+        let (authenticated_user, emails) = tokio::try_join!(
+            self.github_client.get_user(access_token),
+            self.github_client.get_user_emails(access_token)
+        )
+        .map_err(|e| e.context("failed to retrieve user or emails"))?;
 
         let primary_email_item = match emails.into_iter().find(|email| email.primary) {
             Some(email) => email,

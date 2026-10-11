@@ -1,9 +1,9 @@
 use crate::{
     auth::{
-        http_responses::UserResponse,
         principal::CentralUiBff,
         requests::login_github_callback::{
-            HttpLoginGithubCallbackBody, LoginGithubCallbackError, LoginGithubCallbackRequest,
+            HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse, LoginGithubCallbackError,
+            LoginGithubCallbackRequest,
         },
     },
     router::{ApiError, AppState, UnprocessableEntityError},
@@ -14,15 +14,20 @@ pub async fn handle_login_github_callback(
     State(state): State<AppState>,
     _principal: CentralUiBff,
     Json(body): Json<HttpLoginGithubCallbackBody>,
-) -> Result<(StatusCode, Json<UserResponse>), ApiError> {
+) -> Result<(StatusCode, Json<HttpLoginGithubCallbackResponse>), ApiError> {
     let request = LoginGithubCallbackRequest::new(body.code, body.state);
 
-    state
+    let token = state
         .auth_service
         .authorize_login_with_github(request)
         .await?;
 
-    Err(anyhow::anyhow!("oh no").into())
+    Ok((
+        StatusCode::OK,
+        Json(HttpLoginGithubCallbackResponse {
+            token: token.as_str().to_owned(),
+        }),
+    ))
 }
 
 impl From<LoginGithubCallbackError> for ApiError {

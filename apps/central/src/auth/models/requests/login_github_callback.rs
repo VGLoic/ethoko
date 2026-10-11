@@ -29,3 +29,8 @@ pub enum LoginGithubCallbackError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct HttpLoginGithubCallbackResponse {
+    pub token: String,
+}

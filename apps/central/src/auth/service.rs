@@ -17,7 +17,9 @@ use crate::{
         },
         notifier::AuthNotifier,
         password_hasher::verify_password,
-        repository::{AuthRepository, GetAuthCredentialError, GetLastOtpRequestError},
+        repository::{
+            AuthRepository, GetAuthCredentialError, GetLastOtpRequestError, RecordSessionTokenError,
+        },
         requests::{
             login_email::{LoginEmailError, LoginEmailRequest},
             login_github_callback::{LoginGithubCallbackError, LoginGithubCallbackRequest},
@@ -167,7 +169,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         &self,
         request: SignupEmailRequest,
     ) -> Result<(User, AuthCredential), SignupEmailError> {
-        let (user, auth_credential) = self.repository.signup_with_email(request).await?;
+        let (user, auth_credential) = self.repository.create_user_with_email_auth(request).await?;
 
         if let Err(e) = self
             .notifier
@@ -353,14 +355,20 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         let _ = self
             .repository
             .record_session_token(user.id, session_token_payload)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                RecordSessionTokenError::Unknown(err) => {
+                    err.context("Error recording session token")
+                }
+            })?;
 
-        if let Err(e) = self.notifier.user_logged_in(&user).await {
+        if let Err(e) = self.notifier.user_logged_in_with_email(&user).await {
             match &e {
                 LoginEmailError::Unknown(err) => {
                     error!(
-                        event = "auth.login.notification_failed",
-                        user_id = %user.id,
+                        event = "auth.login_with_email.notification_failed",
+                        error_class = error_classification(err),
+                        error_chain = %error_chain(err),
                         error_class = error_classification(err),
                         error_chain = %error_chain(err),
                         "Failed to handle login notification"
@@ -368,7 +376,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 }
                 LoginEmailError::UserNotFound | LoginEmailError::InvalidCredentials => {
                     error!(
-                        event = "auth.login.notification_failed",
+                        event = "auth.login_with_email.notification_failed",
                         user_id = %user.id,
                         error_class = "unexpected",
                         "Failed to handle login notification"
@@ -378,7 +386,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         }
 
         debug!(
-            event = "auth.login.succeeded",
+            event = "auth.login_with_email.succeeded",
             user_id = %user.id,
             "Completed login with email"
         );
@@ -445,13 +453,51 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         //   - fails if user with same primary email than existing one with AutCredential password exists,
         //   - must register a temporary handle structure that will be confirmed later on
         //   - must set email verified to true if verified on Github
+        let (user, _auth_credential, is_new_user) = self
+            .repository
+            .get_or_create_user_with_github_auth(github_user)
+            .await?;
 
         let opaque_session_token_value = OpaqueTokenValue::generate_session_token();
-        let _session_token_payload = OpaqueTokenCreatePayload::new(&opaque_session_token_value);
-        // let _ = self
-        //     .repository
-        //     .record_session_token(user.id, session_token_payload)
-        //     .await?;
+        let session_token_payload = OpaqueTokenCreatePayload::new(&opaque_session_token_value);
+        let _ = self
+            .repository
+            .record_session_token(user.id, session_token_payload)
+            .await
+            .map_err(|e| match e {
+                RecordSessionTokenError::Unknown(err) => {
+                    err.context("Error recording session token")
+                }
+            })?;
+
+        if let Err(e) = match is_new_user {
+            true => {
+                self.notifier
+                    .user_signed_up_with_github(&user, &_auth_credential)
+                    .await
+            }
+            false => self.notifier.user_logged_in_with_github(&user).await,
+        } {
+            match &e {
+                LoginGithubCallbackError::Unknown(err) => {
+                    error!(
+                        event = "auth.login_with_github.notification_failed",
+                        user_id = %user.id,
+                        error_class = error_classification(err),
+                        error_chain = %error_chain(err),
+                        "Error occurred while sending Github auth notification"
+                    )
+                }
+                _ => {
+                    error!(
+                        event = "auth.login_with_github.notification_failed",
+                        user_id = %user.id,
+                        error_class = "unexpected",
+                        "Error occurred while sending Github auth notification"
+                    );
+                }
+            }
+        }
 
         Ok(opaque_session_token_value)
     }

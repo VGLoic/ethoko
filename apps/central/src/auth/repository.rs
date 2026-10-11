@@ -2,6 +2,7 @@ use crate::{
     auth::{
         models::{
             auth_credential::{AuthCredential, AuthCredentialPayload},
+            github_acl::GithubUser,
             oauth_transaction::OauthTransaction,
             opaque_token::{OpaqueToken, OpaqueTokenCreatePayload},
             otp_request::{OtpPurpose, OtpRequest},
@@ -14,7 +15,7 @@ use crate::{
             user::User,
         },
         requests::{
-            login_email::LoginEmailError, login_github_callback::LoginGithubCallbackError,
+            login_github_callback::LoginGithubCallbackError,
             login_github_start::LoginGithubStartError, logout::LogoutError,
         },
     },
@@ -35,10 +36,23 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
     /// * `SignupEmailError::HandleAlreadyExists` if the handle is already taken.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
-    async fn signup_with_email(
+    async fn create_user_with_email_auth(
         &self,
         request: SignupEmailRequest,
     ) -> Result<(User, AuthCredential), SignupEmailError>;
+
+    /// Find in a user with their Github account, or creates a new user if one does not exist.
+    /// Look first for an existing user with the given Github ID, and if not found, create a new user.
+    /// An existing user with the same primary email as the Github user will fail to be created.
+    /// # Errors
+    /// * `LoginGithubCallbackError::PrimaryEmailCollision` if an existing user with the same primary email as the Github user exists.
+    /// * `LoginGithubCallbackError::Unknown` for any other errors that may occur during the process.
+    /// # Returns
+    /// * `Ok((user, auth_credential, is_new_user))` if the operation succeeds, where `is_new_user` indicates whether a new user was created.
+    async fn get_or_create_user_with_github_auth(
+        &self,
+        github_user: GithubUser,
+    ) -> Result<(User, AuthCredential, bool), LoginGithubCallbackError>;
 
     /// Registers a new email verification OTP for the user.
     /// - A new OTP is created for the user with the provided OTP hash.
@@ -96,13 +110,13 @@ pub trait AuthRepository: Send + Sync + 'static {
 
     /// Records an opaque session token for the specified user.
     /// # Errors
-    /// * `LoginEmailError::NotFound` if the user is not found
-    /// * `LoginEmailError::Unknown` for any errors that may occur during the process.
+    /// * `RecordSessionTokenError::UserNotFound` if the user is not found
+    /// * `RecordSessionTokenError::Unknown` for any errors that may occur during the process.
     async fn record_session_token(
         &self,
         user_id: uuid::Uuid,
         session_token_payload: OpaqueTokenCreatePayload,
-    ) -> Result<OpaqueToken, LoginEmailError>;
+    ) -> Result<OpaqueToken, RecordSessionTokenError>;
 
     /// Gets a user by their opaque token hash.
     /// Updates the last_used_at of the opaque token to now.
@@ -149,6 +163,12 @@ pub trait AuthRepository: Send + Sync + 'static {
 }
 
 #[derive(Error, Debug)]
+pub enum RecordSessionTokenError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Error, Debug)]
 pub enum GetAuthCredentialError {
     #[error("Auth credential not found")]
     NotFound,
@@ -180,7 +200,7 @@ const UNIQUE_HANDLE_CONSTRAINT_NAME: &str = "unique_handle";
 
 #[async_trait::async_trait]
 impl AuthRepository for PsqlAuthRepository {
-    async fn signup_with_email(
+    async fn create_user_with_email_auth(
         &self,
         request: SignupEmailRequest,
     ) -> Result<(User, AuthCredential), SignupEmailError> {
@@ -252,6 +272,110 @@ impl AuthRepository for PsqlAuthRepository {
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
 
         Ok((user, auth_credential))
+    }
+
+    async fn get_or_create_user_with_github_auth(
+        &self,
+        github_user: GithubUser,
+    ) -> Result<(User, AuthCredential, bool), LoginGithubCallbackError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
+
+        let auth_credential = sqlx::query_as::<_, AuthCredential>(
+            r#"
+            SELECT
+                id,
+                user_id,
+                payload,
+                created_at,
+                updated_at
+            FROM auth_credential
+            WHERE payload->>'github_id' = $1
+            "#,
+        )
+        .bind(github_user.id.as_u64().to_string())
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch auth credential by github id"))?;
+
+        if let Some(auth_credential) = auth_credential {
+            let user = get_user_by_id(auth_credential.user_id, &mut *transaction)
+                .await
+                .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user by id"))?
+                .ok_or(anyhow::anyhow!(
+                    "user not found for auth_credential.user_id: {}",
+                    auth_credential.user_id
+                ))?;
+
+            transaction
+                .commit()
+                .await
+                .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+            return Ok((user, auth_credential, false));
+        }
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO "ethoko_user" (
+                email,
+                handle,
+                email_verified
+            )
+            VALUES ($1, $2, $3)
+            RETURNING
+                id,
+                email,
+                email_verified,
+                handle,
+                created_at,
+                updated_at
+            "#,
+        )
+        .bind(&github_user.primary_email)
+        .bind(&github_user.username)
+        .bind(github_user.email_verified)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|e| {
+            if let sqlx::Error::Database(db_err) = &e
+                && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
+                && db_err.message().contains(UNIQUE_EMAIL_CONSTRAINT_NAME)
+            {
+                return LoginGithubCallbackError::PrimaryEmailCollision;
+            }
+            anyhow::anyhow!(e).context("failed to create user").into()
+        })?;
+
+        let auth_credential = sqlx::query_as::<_, AuthCredential>(
+            r#"
+            INSERT INTO auth_credential (
+                user_id,
+                payload
+            )
+            VALUES ($1, $2)
+            RETURNING
+                id,
+                user_id,
+                payload,
+                created_at,
+                updated_at
+            "#,
+        )
+        .bind(user.id)
+        .bind(AuthCredentialPayload::from_github_oauth(github_user.id))
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to create auth credential"))?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+
+        Ok((user, auth_credential, true))
     }
 
     async fn register_email_verification_otp(
@@ -457,7 +581,7 @@ impl AuthRepository for PsqlAuthRepository {
         &self,
         user_id: uuid::Uuid,
         session_token_payload: OpaqueTokenCreatePayload,
-    ) -> Result<OpaqueToken, LoginEmailError> {
+    ) -> Result<OpaqueToken, RecordSessionTokenError> {
         let opaque_token = sqlx::query_as::<_, OpaqueToken>(
             r#"
             INSERT INTO opaque_token (
