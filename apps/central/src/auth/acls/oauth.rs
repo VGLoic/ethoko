@@ -39,6 +39,8 @@ impl AuthOauthClientAdapter {
             .build()
             .expect("Failed to build HTTP client");
         let oauth_client = BasicClient::new(oauth_client_config.client_id)
+            .set_client_secret(oauth_client_config.client_secret)
+            .set_auth_type(oauth2::AuthType::RequestBody)
             .set_auth_uri(oauth_client_config.auth_url)
             .set_token_uri(oauth_client_config.auth_token_url)
             .set_redirect_uri(oauth_client_config.callback_url);

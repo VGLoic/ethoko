@@ -15,6 +15,19 @@ const LoginResponseSchema = z.object({
 });
 type LoginResponse = z.infer<typeof LoginResponseSchema>;
 
+const LoginGithubStartResponseSchema = z.object({
+  authUrl: z.string(),
+  state: z.string(),
+});
+type LoginGithubStartResponse = z.infer<typeof LoginGithubStartResponseSchema>;
+
+const LoginGithubExchangeResponseSchema = z.object({
+  token: z.string(),
+});
+type LoginGithubExchangeResponse = z.infer<
+  typeof LoginGithubExchangeResponseSchema
+>;
+
 const UnprocessableEntityErrorSchema = z.object({
   code: z.string(),
   reason: z.string(),
@@ -94,8 +107,6 @@ class EthokoCentralClient {
     };
   }
 
-  // private async handleUnprocessableEntityResponse(response: Response, errorCodeMapping: Record<string, TTUnprocessableEntityReason>)
-
   async signup(signupRequest: {
     email: string;
     password: string;
@@ -117,7 +128,7 @@ class EthokoCentralClient {
     });
   }
 
-  async login(loginRequest: {
+  async loginWithEmail(loginRequest: {
     email: string;
     password: string;
   }): Promise<ApiResult<LoginResponse, "invalid-credentials">> {
@@ -129,6 +140,47 @@ class EthokoCentralClient {
     return await this.handleResponse(response, LoginResponseSchema, {
       ETKAL01: "invalid-credentials",
     });
+  }
+
+  async startLoginWithGitHub(): Promise<
+    ApiResult<LoginGithubStartResponse, "unknown">
+  > {
+    const response = await fetch(`${this.baseUrl}/auth/login/github/start`, {
+      method: "POST",
+      headers: this.createBffHeaders(),
+    });
+    return await this.handleResponse(
+      response,
+      LoginGithubStartResponseSchema,
+      {},
+    );
+  }
+
+  async exchangeCodeForToken(exchangeRequest: {
+    code: string;
+    state: string;
+  }): Promise<
+    ApiResult<
+      LoginGithubExchangeResponse,
+      | "primary-email-collision"
+      | "oauth-transaction-not-found"
+      | "oauth-transaction-expired"
+    >
+  > {
+    const response = await fetch(`${this.baseUrl}/auth/login/github/callback`, {
+      method: "POST",
+      headers: this.createBffHeaders(),
+      body: JSON.stringify(exchangeRequest),
+    });
+    return await this.handleResponse(
+      response,
+      LoginGithubExchangeResponseSchema,
+      {
+        ETKLGC01: "primary-email-collision",
+        ETKLGC02: "oauth-transaction-not-found",
+        ETKLGC03: "oauth-transaction-expired",
+      },
+    );
   }
 
   async me(params: { token: string }): Promise<UserResponse> {

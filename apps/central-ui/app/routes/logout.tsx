@@ -1,15 +1,17 @@
-import { getSession, destroySession } from "~/server/sessions.server";
+import { centralSession } from "~/server/sessions.server";
 import type { Route } from "./+types/logout";
 import { redirect } from "react-router";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 
 export async function action({ request }: Route.ActionArgs) {
-  const session = await getSession(request.headers.get("Cookie"));
+  const session = await centralSession.getSession(
+    request.headers.get("Cookie"),
+  );
 
   const token = session.get("token");
   if (!token) {
     return redirect("/login", {
-      headers: { "Set-Cookie": await destroySession(session) },
+      headers: { "Set-Cookie": await centralSession.destroySession(session) },
     });
   }
 
@@ -20,6 +22,6 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   return redirect("/login", {
-    headers: { "Set-Cookie": await destroySession(session) },
+    headers: { "Set-Cookie": await centralSession.destroySession(session) },
   });
 }

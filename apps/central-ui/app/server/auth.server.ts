@@ -1,4 +1,4 @@
-import { getSession } from "./sessions.server";
+import { centralSession } from "./sessions.server";
 import { redirect } from "react-router";
 
 /**
@@ -8,7 +8,7 @@ import { redirect } from "react-router";
 export async function getSessionTokenOrRedirect(
   headers: Headers,
 ): Promise<{ token: string }> {
-  const session = await getSession(headers.get("cookie"));
+  const session = await centralSession.getSession(headers.get("cookie"));
   const token = session.get("token");
   if (!token) {
     throw redirect("/login");

@@ -6,4 +6,5 @@ export default [
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
   route("verify-email", "routes/verify-email.tsx"),
+  route("auth/github/callback", "routes/github-auth-callback.ts"),
 ] satisfies RouteConfig;

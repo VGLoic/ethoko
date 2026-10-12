@@ -42,6 +42,10 @@ impl GithubClientImpl {
             GITHUB_API_ACCEPT_HEADER,
             GITHUB_API_ACCEPT_HEADER_VALUE.parse().unwrap(),
         );
+        headers_map.insert(
+            reqwest::header::USER_AGENT,
+            "ethoko-central".parse().unwrap(),
+        );
         headers_map
     }
 }
