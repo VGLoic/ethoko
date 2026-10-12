@@ -447,12 +447,6 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         let github_user = self.github_port.get_user(&access_token).await?;
 
-        // Find user with Github auth credential by Github user ID
-        // - if found, proceed with login,
-        // - if not, try to create a user with Github auth credential
-        //   - fails if user with same primary email than existing one with AutCredential password exists,
-        //   - must register a temporary handle structure that will be confirmed later on
-        //   - must set email verified to true if verified on Github
         let (user, _auth_credential, is_new_user) = self
             .repository
             .get_or_create_user_with_github_auth(github_user)
@@ -470,13 +464,12 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 }
             })?;
 
-        if let Err(e) = match is_new_user {
-            true => {
-                self.notifier
-                    .user_signed_up_with_github(&user, &_auth_credential)
-                    .await
-            }
-            false => self.notifier.user_logged_in_with_github(&user).await,
+        if let Err(e) = if is_new_user {
+            self.notifier
+                .user_signed_up_with_github(&user, &_auth_credential)
+                .await
+        } else {
+            self.notifier.user_logged_in_with_github(&user).await
         } {
             match &e {
                 LoginGithubCallbackError::Unknown(err) => {

@@ -17,6 +17,7 @@ impl Default for FakeOauthClient {
 }
 
 impl FakeOauthClient {
+    #[allow(dead_code)]
     pub fn code(&self) -> Option<String> {
         self.code.lock().unwrap().clone()
     }

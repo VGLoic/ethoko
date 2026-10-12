@@ -5,12 +5,12 @@ use ethoko_central::{
         login_github_start::HttpLoginGithubStartResponse,
     },
     clients::github::models::{GithubApiUserEmailsResponseItem, GithubApiUserResponse},
-    newtypes::email::Email,
+    newtypes::{email::Email, handle::Handle},
     router::UnprocessableEntityError,
 };
 mod common;
 use common::{AuthActions, TestConfigBuilder, central_ui_bff_principal_headers, setup_instance};
-use fake::{Fake, Faker, faker};
+use fake::{Fake, Faker};
 
 use crate::common::central_ui_bff_with_user_principal_headers;
 
@@ -174,7 +174,7 @@ async fn test_login_github_callback_422_with_already_taken_email() {
 
     let github_user = GithubApiUserResponse {
         id: Faker.fake::<u64>(),
-        login: faker::internet::en::Username().fake::<String>(),
+        login: Faker.fake::<Handle>().to_string(),
     };
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: already_signed_up_user.email.to_string(),
@@ -216,7 +216,7 @@ async fn test_login_github_callback_500_with_invalid_code() {
     let email = Faker.fake::<Email>();
     let github_user = GithubApiUserResponse {
         id: Faker.fake::<u64>(),
-        login: faker::internet::en::Username().fake::<String>(),
+        login: Faker.fake::<Handle>().to_string(),
     };
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
@@ -270,7 +270,7 @@ async fn test_login_github_callback_200_with_newly_created_user() {
     let email = Faker.fake::<Email>();
     let github_user = GithubApiUserResponse {
         id: Faker.fake::<u64>(),
-        login: faker::internet::en::Username().fake::<String>(),
+        login: Faker.fake::<Handle>().to_string(),
     };
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
@@ -318,6 +318,65 @@ async fn test_login_github_callback_200_with_newly_created_user() {
 }
 
 #[tokio::test]
+async fn test_login_github_callback_200_with_newly_created_unverified_user_trigger_otp_email_sending()
+ {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    let github_user_emails = vec![GithubApiUserEmailsResponseItem {
+        email: email.to_string(),
+        verified: false,
+        primary: true,
+    }];
+
+    let start_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/start",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .send()
+        .await
+        .unwrap()
+        .json::<HttpLoginGithubStartResponse>()
+        .await
+        .unwrap();
+
+    instance_state.github_client.set_next_user(github_user);
+    instance_state
+        .github_client
+        .set_next_user_emails(github_user_emails);
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/callback",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .json(&HttpLoginGithubCallbackBody {
+            code: instance_state.github_oauth_client.code().unwrap(),
+            state: start_response.state,
+        })
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    instance_state.job_worker.consume_jobs().await.unwrap();
+
+    assert!(instance_state.email_service.has_sent_email_to(&email))
+}
+
+#[tokio::test]
 async fn test_login_github_callback_200_with_existing_user() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
@@ -326,7 +385,7 @@ async fn test_login_github_callback_200_with_existing_user() {
     let email = Faker.fake::<Email>();
     let github_user = GithubApiUserResponse {
         id: Faker.fake::<u64>(),
-        login: faker::internet::en::Username().fake::<String>(),
+        login: Faker.fake::<Handle>().to_string(),
     };
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
@@ -422,7 +481,7 @@ async fn test_login_github_token_valid() {
     let email = Faker.fake::<Email>();
     let github_user = GithubApiUserResponse {
         id: Faker.fake::<u64>(),
-        login: faker::internet::en::Username().fake::<String>(),
+        login: Faker.fake::<Handle>().to_string(),
     };
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),

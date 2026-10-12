@@ -93,7 +93,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
             event = "auth.notification.enqueue_started",
             notification_type = "email_verification_otp",
             user_id = %user.id,
-            "Enqueuing signup notification"
+            "Enqueuing signup with email notification"
         );
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
@@ -111,7 +111,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
             event = "auth.notification.enqueued",
             notification_type = "email_verification_otp",
             user_id = %user.id,
-            "Enqueued signup notification"
+            "Enqueued signup with email notification"
         );
         Ok(())
     }
@@ -174,11 +174,38 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         user: &User,
         _auth_credential: &AuthCredential,
     ) -> Result<(), LoginGithubCallbackError> {
+        if user.email_verified {
+            debug!(
+                event = "auth.notification.skipped",
+                notification_type = "user_signed_up_with_github",
+                user_id = %user.id,
+                "No notification action required for signup with GitHub event for verified users"
+            );
+            return Ok(());
+        }
         debug!(
-            event = "auth.notification.skipped",
-            notification_type = "user_signed_up_with_github",
+            event = "auth.notification.enqueue_started",
+            notification_type = "email_verification_otp",
             user_id = %user.id,
-            "No notification action required for signup with Github event"
+            "Enqueuing signup with GitHub notification"
+        );
+        let job = JobRequest::new(
+            AUTH_JOB_TOPIC.to_string(),
+            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+        )?
+        .with_max_retries(3)
+        .with_scheduled_at(Utc::now());
+        self.queue.enqueue(job).await.map_err(|e| match e {
+            QueueError::Unknown(err) => LoginGithubCallbackError::Unknown(
+                err.context("Error enqueuing job for user signed up with GitHub"),
+            ),
+        })?;
+
+        debug!(
+            event = "auth.notification.enqueued",
+            notification_type = "email_verification_otp",
+            user_id = %user.id,
+            "Enqueued signup with GitHub notification"
         );
         Ok(())
     }
