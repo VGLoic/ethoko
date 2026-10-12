@@ -42,6 +42,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     );
   }
 
+  if (state !== queryParsingResult.data.state) {
+    throw await redirectToLogin(session, "Invalid GitHub OAuth state");
+  }
+
   const exchangeCodeResult = await ethokoCentralClient
     .exchangeCodeForToken({
       code: queryParsingResult.data.code,
@@ -53,7 +57,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     });
 
   if (exchangeCodeResult.variant === "unprocessable-entity") {
-    // REMIND ME: plug this in login page
     const errorMessage =
       exchangeCodeResult.reason === "primary-email-collision"
         ? "Account with this email already exist, need to login with email and then add Github auth"
