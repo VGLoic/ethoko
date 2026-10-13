@@ -30,13 +30,11 @@ pub async fn handle_register_handle(
 impl From<RegisterHandleError> for ApiError {
     fn from(err: RegisterHandleError) -> Self {
         match err {
-            RegisterHandleError::HandleAlreadyExists(handle) => {
-                UnprocessableEntityError::new(
-                    "ETKARH01".to_string(),
-                    format!("The provided handle is already taken: {handle}"),
-                )
-                .into()
-            }
+            RegisterHandleError::HandleAlreadyExists(handle) => UnprocessableEntityError::new(
+                "ETKARH01".to_string(),
+                format!("The provided handle is already taken: {handle}"),
+            )
+            .into(),
             RegisterHandleError::AlreadyRegistered => UnprocessableEntityError::new(
                 "ETKARH02".to_string(),
                 "user already has a registered handle".to_string(),

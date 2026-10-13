@@ -46,7 +46,10 @@ impl SignupEmailRequest {
 
         let password_hash = password_hasher::hash_password(&password)?;
 
-        Ok(Self { email, password_hash })
+        Ok(Self {
+            email,
+            password_hash,
+        })
     }
 }
 

@@ -44,7 +44,10 @@ async fn test_register_handle_200_promotes_pending_user() {
 
     let response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&token))
         .json(&HttpRegisterHandleBody {
             handle: handle.to_string(),
@@ -89,7 +92,10 @@ async fn test_register_handle_422_duplicate_handle_keeps_other_user_pending_retr
 
     let first_register_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&first_token))
         .json(&HttpRegisterHandleBody {
             handle: claimed_handle.to_string(),
@@ -101,7 +107,10 @@ async fn test_register_handle_422_duplicate_handle_keeps_other_user_pending_retr
 
     let duplicate_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&second_token))
         .json(&HttpRegisterHandleBody {
             handle: claimed_handle.to_string(),
@@ -110,7 +119,10 @@ async fn test_register_handle_422_duplicate_handle_keeps_other_user_pending_retr
         .await
         .unwrap();
 
-    assert_eq!(duplicate_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        duplicate_response.status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
     let error = duplicate_response
         .json::<UnprocessableEntityError>()
         .await
@@ -143,11 +155,16 @@ async fn test_register_handle_422_already_registered_user_cannot_change_handle()
     let first_handle = Faker.fake::<Handle>();
     let second_handle = Faker.fake::<Handle>();
 
-    let token = instance_state.login_user(&signup_user.email, &password).await;
+    let token = instance_state
+        .login_user(&signup_user.email, &password)
+        .await;
 
     let first_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&token))
         .json(&HttpRegisterHandleBody {
             handle: first_handle.to_string(),
@@ -159,7 +176,10 @@ async fn test_register_handle_422_already_registered_user_cannot_change_handle()
 
     let second_response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&token))
         .json(&HttpRegisterHandleBody {
             handle: second_handle.to_string(),
@@ -183,11 +203,16 @@ async fn test_register_handle_422_invalid_handle() {
         .unwrap();
 
     let (signup_user, password) = instance_state.signup_user().await;
-    let token = instance_state.login_user(&signup_user.email, &password).await;
+    let token = instance_state
+        .login_user(&signup_user.email, &password)
+        .await;
 
     let response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&token))
         .json(&HttpRegisterHandleBody {
             handle: "bad handle".to_string(),
@@ -209,7 +234,10 @@ async fn test_register_handle_401_without_bff_credential() {
 
     let response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .json(&serde_json::json!({ "handle": "some-handle" }))
         .send()
         .await
@@ -226,7 +254,10 @@ async fn test_register_handle_401_without_user_session_header() {
 
     let response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "handle": "some-handle" }))
         .send()
@@ -243,12 +274,17 @@ async fn test_register_handle_pending_user_can_register_before_email_verificatio
         .unwrap();
 
     let (signup_user, password) = instance_state.signup_user().await;
-    let token = instance_state.login_user(&signup_user.email, &password).await;
+    let token = instance_state
+        .login_user(&signup_user.email, &password)
+        .await;
     let handle = Faker.fake::<Handle>();
 
     let response = instance_state
         .reqwest_client
-        .post(format!("{}/auth/register-handle", &instance_state.server_url))
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
         .headers(central_ui_bff_with_user_principal_headers(&token))
         .json(&HttpRegisterHandleBody {
             handle: handle.to_string(),

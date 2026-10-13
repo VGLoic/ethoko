@@ -367,7 +367,9 @@ impl AuthRepository for PsqlAuthRepository {
             anyhow::anyhow!(e).context("failed to create user").into()
         })?;
         let user: User = user_row.try_into().map_err(|e| {
-            LoginGithubCallbackError::Unknown(anyhow::Error::new(e).context("created invalid user row"))
+            LoginGithubCallbackError::Unknown(
+                anyhow::Error::new(e).context("created invalid user row"),
+            )
         })?;
 
         let auth_credential = sqlx::query_as::<_, AuthCredential>(
@@ -668,7 +670,9 @@ impl AuthRepository for PsqlAuthRepository {
         .map_err(|e| {
             if let sqlx::Error::Database(db_err) = &e
                 && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
-                && db_err.message().contains(UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME)
+                && db_err
+                    .message()
+                    .contains(UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME)
             {
                 return RegisterHandleError::HandleAlreadyExists(request.handle.to_string());
             }
@@ -676,15 +680,26 @@ impl AuthRepository for PsqlAuthRepository {
         })?
         .map(TryInto::try_into)
         .transpose()
-        .map_err(|e| RegisterHandleError::Unknown(anyhow::Error::new(e).context("updated invalid user row during register handle")))?;
+        .map_err(|e| {
+            RegisterHandleError::Unknown(
+                anyhow::Error::new(e).context("updated invalid user row during register handle"),
+            )
+        })?;
 
         match user {
             Some(user) => Ok(user),
             None => {
                 let existing_user = get_user_by_id(user_id, &self.pool)
                     .await
-                    .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user after register handle attempt"))?
-                    .ok_or_else(|| RegisterHandleError::Unknown(anyhow::anyhow!("user not found for register handle")))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!(e)
+                            .context("failed to fetch user after register handle attempt")
+                    })?
+                    .ok_or_else(|| {
+                        RegisterHandleError::Unknown(anyhow::anyhow!(
+                            "user not found for register handle"
+                        ))
+                    })?;
 
                 if existing_user.lifecycle() == UserLifecycle::Registered {
                     Err(RegisterHandleError::AlreadyRegistered)

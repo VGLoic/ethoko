@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    auth::models::user::User,
-    newtypes::email::Email,
-};
+use crate::{auth::models::user::User, newtypes::email::Email};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum AuthJob {

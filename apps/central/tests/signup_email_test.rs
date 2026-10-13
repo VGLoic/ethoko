@@ -1,9 +1,6 @@
 use axum::http::StatusCode;
 use ethoko_central::{
-    auth::{
-        http_responses::SignupEmailResponse,
-        requests::signup_email::HttpSignupEmailBody,
-    },
+    auth::{http_responses::SignupEmailResponse, requests::signup_email::HttpSignupEmailBody},
     newtypes::{email::Email, password::Password},
     router::UnprocessableEntityError,
 };
@@ -75,7 +72,9 @@ async fn test_signup_email_422_invalid_email_format_422() {
         .await
         .unwrap();
 
-    let response = instance_state.reqwest_client.post(format!("{}/auth/signup/email", &instance_state.server_url))
+    let response = instance_state
+        .reqwest_client
+        .post(format!("{}/auth/signup/email", &instance_state.server_url))
         .headers(central_ui_bff_principal_headers())
         .json(&serde_json::json!({ "email": "invalid-email", "password": "password123" }))
         .send()

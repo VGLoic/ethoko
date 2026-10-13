@@ -28,13 +28,11 @@ pub async fn handle_signup_email(
 impl From<SignupEmailError> for ApiError {
     fn from(err: SignupEmailError) -> Self {
         match err {
-            SignupEmailError::EmailAlreadyExists(email) => {
-                UnprocessableEntityError::new(
-                    "ETKAS01".to_string(),
-                    format!("The provided email is already registered: {}", email),
-                )
-                .into()
-            }
+            SignupEmailError::EmailAlreadyExists(email) => UnprocessableEntityError::new(
+                "ETKAS01".to_string(),
+                format!("The provided email is already registered: {}", email),
+            )
+            .into(),
             SignupEmailError::Unknown(e) => ApiError::InternalServerError(e),
         }
     }
