@@ -4,6 +4,11 @@ Vocabulary specific to Ethoko Central — the hosted backend service. Currently 
 
 ## Language
 
+### Suggested Handle
+
+A non-reserving handle proposal supplied by an external authentication provider for a **Pending User**. It may prefill handle registration but is not a registered handle and does not make a **Namespace** unavailable.
+_Avoid_: "temporary handle", "reserved handle", "provider handle".
+
 ### Authentication
 
 **Principal**:
