@@ -3,10 +3,14 @@ use ethoko_central::{
     auth::{
         http_responses::UserResponse,
         requests::{
+            login_github_callback::{HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse},
             login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
+            login_github_start::HttpLoginGithubStartResponse,
             register_handle::HttpRegisterHandleBody,
         },
     },
+    clients::github::models::{GithubApiUserEmailsResponseItem, GithubApiUserResponse},
+    newtypes::email::Email,
     newtypes::handle::Handle,
     router::UnprocessableEntityError,
 };
@@ -297,6 +301,94 @@ async fn test_register_handle_pending_user_can_register_before_email_verificatio
     let user: UserResponse = response.json().await.unwrap();
     match user {
         UserResponse::Registered { email_verified, .. } => assert!(!email_verified),
+        UserResponse::Pending { .. } => panic!("expected registered user response"),
+    }
+}
+
+#[tokio::test]
+async fn test_register_handle_github_pending_user_can_register_before_email_verification() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    let github_user_emails = vec![GithubApiUserEmailsResponseItem {
+        email: email.to_string(),
+        verified: false,
+        primary: true,
+    }];
+
+    let start_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/start",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .send()
+        .await
+        .unwrap()
+        .json::<HttpLoginGithubStartResponse>()
+        .await
+        .unwrap();
+
+    instance_state.github_client.set_next_user(github_user);
+    instance_state
+        .github_client
+        .set_next_user_emails(github_user_emails);
+
+    let token = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/callback",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .json(&HttpLoginGithubCallbackBody {
+            code: instance_state.github_oauth_client.code().unwrap(),
+            state: start_response.state,
+        })
+        .send()
+        .await
+        .unwrap()
+        .json::<HttpLoginGithubCallbackResponse>()
+        .await
+        .unwrap()
+        .token;
+
+    let handle = Faker.fake::<Handle>();
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/register-handle",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_with_user_principal_headers(&token))
+        .json(&HttpRegisterHandleBody {
+            handle: handle.to_string(),
+        })
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let user: UserResponse = response.json().await.unwrap();
+    match user {
+        UserResponse::Registered {
+            email: response_email,
+            handle: registered_handle,
+            email_verified,
+            ..
+        } => {
+            assert_eq!(response_email, email);
+            assert_eq!(registered_handle, handle);
+            assert!(!email_verified);
+        }
         UserResponse::Pending { .. } => panic!("expected registered user response"),
     }
 }
