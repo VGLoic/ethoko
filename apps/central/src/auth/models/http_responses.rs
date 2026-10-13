@@ -37,17 +37,17 @@ pub struct SignupEmailResponse {
 
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
-        match user.handle {
-            Some(handle) => UserResponse::Registered {
+        match user {
+            User::Pending(user) => UserResponse::Pending {
                 email: user.email,
-                handle,
+                suggested_handle: user.suggested_handle,
                 email_verified: user.email_verified,
                 created_at: user.created_at,
                 updated_at: user.updated_at,
             },
-            None => UserResponse::Pending {
+            User::Registered(user) => UserResponse::Registered {
                 email: user.email,
-                suggested_handle: user.suggested_handle,
+                handle: user.handle,
                 email_verified: user.email_verified,
                 created_at: user.created_at,
                 updated_at: user.updated_at,
@@ -59,10 +59,10 @@ impl From<User> for UserResponse {
 impl From<User> for SignupEmailResponse {
     fn from(user: User) -> Self {
         SignupEmailResponse {
-            email: user.email,
-            email_verified: user.email_verified,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
+            email: user.email().to_owned(),
+            email_verified: user.email_verified(),
+            created_at: user.created_at(),
+            updated_at: user.updated_at(),
         }
     }
 }

@@ -21,7 +21,7 @@ pub async fn handle_register_handle(
 
     let user = state
         .auth_service
-        .register_handle(principal.user.id, request)
+        .register_handle(principal.user.id(), request)
         .await?;
 
     Ok((StatusCode::OK, Json(user.into())))

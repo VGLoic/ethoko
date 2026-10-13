@@ -19,8 +19,8 @@ pub struct SendEmailVerificationOtpPayload {
 impl SendEmailVerificationOtpPayload {
     pub fn new(user: &User) -> Self {
         Self {
-            user_id: user.id,
-            user_email: user.email.to_owned(),
+            user_id: user.id(),
+            user_email: user.email().to_owned(),
         }
     }
 }

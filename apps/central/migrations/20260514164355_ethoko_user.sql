@@ -2,12 +2,14 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "moddatetime";
 
+CREATE TYPE user_lifecycle AS ENUM ('pending', 'registered');
+
 CREATE TABLE "ethoko_user" (
     id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     email          TEXT         NOT NULL,
     handle         TEXT,
     suggested_handle TEXT,
-    lifecycle      TEXT         NOT NULL,
+    lifecycle      user_lifecycle NOT NULL,
     email_verified BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
