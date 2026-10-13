@@ -8,6 +8,7 @@ use crate::{
             otp_request::{OtpPurpose, OtpRequest},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                register_handle::{RegisterHandleError, RegisterHandleRequest},
                 send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
@@ -29,12 +30,11 @@ use thiserror::Error;
 /// Repository trait for auth-related operations
 #[async_trait::async_trait]
 pub trait AuthRepository: Send + Sync + 'static {
-    /// Registers a new user with the provided email, handle and password hash.
-    /// - A new user is created with the provided email and handle, the email is marked as not verified.
+    /// Registers a new pending user with the provided email and password hash.
+    /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
-    /// * `SignupEmailError::HandleAlreadyExists` if the handle is already taken.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
     async fn create_user_with_email_auth(
         &self,
@@ -118,6 +118,12 @@ pub trait AuthRepository: Send + Sync + 'static {
         session_token_payload: OpaqueTokenCreatePayload,
     ) -> Result<OpaqueToken, RecordSessionTokenError>;
 
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError>;
+
     /// Gets a user by their opaque token hash.
     /// Updates the last_used_at of the opaque token to now.
     /// # Errors
@@ -196,7 +202,7 @@ impl PsqlAuthRepository {
 // 23505 is the PostgreSQL error code for unique_violation
 const UNIQUE_VIOLATION_ERROR_CODE: &str = "23505";
 const UNIQUE_EMAIL_CONSTRAINT_NAME: &str = "unique_email";
-const UNIQUE_HANDLE_CONSTRAINT_NAME: &str = "unique_handle";
+const UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME: &str = "unique_registered_handle";
 
 #[async_trait::async_trait]
 impl AuthRepository for PsqlAuthRepository {
@@ -215,31 +221,34 @@ impl AuthRepository for PsqlAuthRepository {
             INSERT INTO "ethoko_user" (
                 email,
                 handle,
+                suggested_handle,
+                lifecycle,
                 email_verified
-            ) VALUES ($1, $2, $3)
+            ) VALUES ($1, $2, $3, $4, $5)
             RETURNING
                 id,
                 email,
                 handle,
+                suggested_handle,
+                lifecycle,
                 email_verified,
                 created_at,
                 updated_at
             "#,
         )
         .bind(&request.email)
-        .bind(&request.handle)
+        .bind(Option::<String>::None)
+        .bind(Option::<String>::None)
+        .bind("pending")
         .bind(false)
         .fetch_one(&mut *transaction)
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(db_err) = &e
                 && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
+                && db_err.message().contains(UNIQUE_EMAIL_CONSTRAINT_NAME)
             {
-                if db_err.message().contains(UNIQUE_EMAIL_CONSTRAINT_NAME) {
-                    return SignupEmailError::EmailAlreadyExists(request.email.to_string());
-                } else if db_err.message().contains(UNIQUE_HANDLE_CONSTRAINT_NAME) {
-                    return SignupEmailError::HandleAlreadyExists(request.handle.to_string());
-                }
+                return SignupEmailError::EmailAlreadyExists(request.email.to_string());
             }
             anyhow::anyhow!(e).context("failed to create user").into()
         })?;
@@ -322,20 +331,26 @@ impl AuthRepository for PsqlAuthRepository {
             INSERT INTO "ethoko_user" (
                 email,
                 handle,
+                suggested_handle,
+                lifecycle,
                 email_verified
             )
-            VALUES ($1, $2, $3)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING
                 id,
                 email,
-                email_verified,
                 handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
                 created_at,
                 updated_at
             "#,
         )
         .bind(&github_user.primary_email)
-        .bind(&github_user.username)
+        .bind(Option::<String>::None)
+        .bind(Some(github_user.username.clone()))
+        .bind("pending")
         .bind(github_user.email_verified)
         .fetch_one(&mut *transaction)
         .await
@@ -617,6 +632,62 @@ impl AuthRepository for PsqlAuthRepository {
         Ok(opaque_token)
     }
 
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            UPDATE "ethoko_user"
+            SET handle = $2,
+                suggested_handle = NULL,
+                lifecycle = 'registered'
+            WHERE id = $1 AND lifecycle = 'pending'
+            RETURNING
+                id,
+                email,
+                handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
+                created_at,
+                updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(&request.handle)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| {
+            if let sqlx::Error::Database(db_err) = &e
+                && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
+                && db_err.message().contains(UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME)
+            {
+                return RegisterHandleError::HandleAlreadyExists(request.handle.to_string());
+            }
+            RegisterHandleError::Unknown(anyhow::anyhow!(e).context("failed to register handle"))
+        })?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => {
+                let existing_user = get_user_by_id(user_id, &self.pool)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user after register handle attempt"))?
+                    .ok_or_else(|| RegisterHandleError::Unknown(anyhow::anyhow!("user not found for register handle")))?;
+
+                if existing_user.lifecycle == crate::auth::models::user::UserLifecycle::Registered {
+                    Err(RegisterHandleError::AlreadyRegistered)
+                } else {
+                    Err(RegisterHandleError::Unknown(anyhow::anyhow!(
+                        "register handle update did not affect any row"
+                    )))
+                }
+            }
+        }
+    }
+
     async fn get_user_by_session_token(
         &self,
         token_hash: &[u8; 32],
@@ -817,13 +888,15 @@ async fn get_user_by_email<'a, E: Executor<'a, Database = Postgres>>(
 ) -> Result<Option<User>, sqlx::Error> {
     let user = sqlx::query_as::<_, User>(
         r#"
-        SELECT
-            id,
-            email,
-            handle,
-            email_verified,
-            created_at,
-            updated_at
+            SELECT
+                id,
+                email,
+                handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
+                created_at,
+                updated_at
         FROM "ethoko_user"
         WHERE email = $1
         "#,
@@ -841,13 +914,15 @@ async fn get_user_by_id<'a, E: Executor<'a, Database = Postgres>>(
 ) -> Result<Option<User>, sqlx::Error> {
     let user = sqlx::query_as::<_, User>(
         r#"
-        SELECT
-            id,
-            email,
-            handle,
-            email_verified,
-            created_at,
-            updated_at
+            SELECT
+                id,
+                email,
+                handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
+                created_at,
+                updated_at
         FROM "ethoko_user"
         WHERE id = $1
         "#,

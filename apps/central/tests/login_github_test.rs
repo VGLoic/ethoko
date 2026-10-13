@@ -1,5 +1,6 @@
 use axum::http::StatusCode;
 use ethoko_central::{
+    auth::http_responses::UserResponse,
     auth::requests::{
         login_github_callback::{HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse},
         login_github_start::HttpLoginGithubStartResponse,
@@ -483,6 +484,7 @@ async fn test_login_github_token_valid() {
         id: Faker.fake::<u64>(),
         login: Faker.fake::<Handle>().to_string(),
     };
+    let expected_suggested_handle = github_user.login.clone();
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
         verified: true,
@@ -535,4 +537,18 @@ async fn test_login_github_token_valid() {
         .unwrap();
 
     assert_eq!(me_response.status(), StatusCode::OK);
+    let me_body: UserResponse = me_response.json().await.unwrap();
+    match me_body {
+        UserResponse::Pending {
+            email: response_email,
+            suggested_handle,
+            email_verified,
+            ..
+        } => {
+            assert_eq!(response_email, email);
+            assert_eq!(suggested_handle, Some(expected_suggested_handle));
+            assert!(email_verified);
+        }
+        UserResponse::Registered { .. } => panic!("expected pending github user response"),
+    }
 }

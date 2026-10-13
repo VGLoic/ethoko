@@ -7,6 +7,7 @@ use crate::{
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
                 logout::LogoutError,
+                register_handle::{RegisterHandleError, RegisterHandleRequest},
                 resend_verification_otp::{
                     ResendVerificationOtpError, ResendVerificationOtpRequest,
                 },
@@ -35,12 +36,11 @@ use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
-    /// Registers a new user with the provided email, handle and password hash.
-    /// - A new user is created with the provided email and handle, the email is marked as not verified.
+    /// Registers a new pending user with the provided email and password hash.
+    /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
-    /// * `SignupEmailError::HandleAlreadyExists` if the handle is already taken.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
     async fn signup_with_email(
         &self,
@@ -84,6 +84,12 @@ pub trait AuthService: Send + Sync + 'static {
         &self,
         request: LoginEmailRequest,
     ) -> Result<OpaqueTokenValue, LoginEmailError>;
+
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError>;
 
     /// Fetches a user by their session token hash.
     /// The resolution will only succeed if the underlying token is valid and associated with an existing user.
@@ -186,8 +192,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                         "Failed to enqueue signup notification"
                     );
                 }
-                SignupEmailError::EmailAlreadyExists(_)
-                | SignupEmailError::HandleAlreadyExists(_) => {
+                SignupEmailError::EmailAlreadyExists(_) => {
                     error!(
                         event = "auth.signup.notification_failed",
                         user_id = %user.id,
@@ -201,7 +206,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         debug!(
             event = "auth.signup.succeeded",
             user_id = %user.id,
-            handle = %user.handle,
+            lifecycle = ?user.lifecycle,
             "Completed signup with email"
         );
 
@@ -392,6 +397,14 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         );
 
         Ok(opaque_session_token_value)
+    }
+
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError> {
+        self.repository.register_handle(user_id, request).await
     }
 
     async fn get_user_by_session_token(
