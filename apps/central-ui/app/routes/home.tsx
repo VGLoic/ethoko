@@ -19,6 +19,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
+  const user = loaderData.user;
+
   return (
     <main className="flex flex-col items-center justify-center pt-16 pb-4 gap-16">
       <div className="flex flex-col items-center gap-8">
@@ -26,10 +28,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <div className="font-bold">Email:</div>
           <div>{loaderData.user.email}</div>
         </div>
-        <div className="flex flex-row items-center gap-4">
-          <div className="font-bold">Handle:</div>
-          <div>{loaderData.user.handle}</div>
-        </div>
+        {user.state === "registered" ? (
+          <div className="flex flex-row items-center gap-4">
+            <div className="font-bold">Handle:</div>
+            <div>{user.handle}</div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <p>Complete onboarding by registering your handle.</p>
+            <Link to="/register-handle">Register Handle</Link>
+          </div>
+        )}
         <div className="flex flex-row items-center gap-4">
           <div className="font-bold">Email Verified:</div>
           {loaderData.user.emailVerified ? (
