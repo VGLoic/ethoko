@@ -26,15 +26,6 @@ pub enum UserResponse {
     },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SignupEmailResponse {
-    pub email: Email,
-    pub email_verified: bool,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
         match user {
@@ -52,17 +43,6 @@ impl From<User> for UserResponse {
                 created_at: user.created_at,
                 updated_at: user.updated_at,
             },
-        }
-    }
-}
-
-impl From<User> for SignupEmailResponse {
-    fn from(user: User) -> Self {
-        SignupEmailResponse {
-            email: user.email().to_owned(),
-            email_verified: user.email_verified(),
-            created_at: user.created_at(),
-            updated_at: user.updated_at(),
         }
     }
 }
