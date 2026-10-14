@@ -85,6 +85,11 @@ pub trait AuthService: Send + Sync + 'static {
         request: LoginEmailRequest,
     ) -> Result<OpaqueTokenValue, LoginEmailError>;
 
+    /// Registers a handle for the specified user, transitionning it from a pending user to a registered user.
+    /// # Errors
+    /// * `RegisterHandleError::HandleAlreadyExists` if the requested handle is already taken.
+    /// * `RegisterHandleError::AlreadyRegistered` if the user has already registered a handle.
+    /// * `RegisterHandleError::Unknown` for any other errors that may occur during the process.
     async fn register_handle(
         &self,
         user_id: uuid::Uuid,

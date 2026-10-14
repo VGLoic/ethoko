@@ -3,8 +3,8 @@ use ethoko_central::{
     auth::{
         http_responses::UserResponse,
         requests::{
-            login_github_callback::{HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse},
             login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
+            login_github_callback::{HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse},
             login_github_start::HttpLoginGithubStartResponse,
             register_handle::HttpRegisterHandleBody,
         },

@@ -1,10 +1,8 @@
 use crate::{
     auth::{
-        models::{
-            http_responses::SignupEmailResponse,
-            requests::signup_email::{
-                HttpSignupEmailBody, SignupEmailError, SignupEmailRequest, SignupEmailRequestError,
-            },
+        models::requests::signup_email::{
+            HttpSignupEmailBody, HttpSignupEmailResponse, SignupEmailError, SignupEmailRequest,
+            SignupEmailRequestError,
         },
         principal::CentralUiBff,
     },
@@ -17,12 +15,15 @@ pub async fn handle_signup_email(
     State(state): State<AppState>,
     _principal: CentralUiBff,
     Json(body): Json<HttpSignupEmailBody>,
-) -> Result<(StatusCode, Json<SignupEmailResponse>), ApiError> {
+) -> Result<(StatusCode, Json<HttpSignupEmailResponse>), ApiError> {
     let request = SignupEmailRequest::new(body.email, body.password)?;
 
     let (user, _auth_credential) = state.auth_service.signup_with_email(request).await?;
 
-    Ok((StatusCode::CREATED, Json(user.into())))
+    Ok((
+        StatusCode::CREATED,
+        Json(HttpSignupEmailResponse::from(user)),
+    ))
 }
 
 impl From<SignupEmailError> for ApiError {

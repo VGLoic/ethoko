@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use ethoko_central::{
-    auth::{http_responses::SignupEmailResponse, requests::signup_email::HttpSignupEmailBody},
+    auth::requests::signup_email::{HttpSignupEmailBody, HttpSignupEmailResponse},
     newtypes::{email::Email, password::Password},
     router::UnprocessableEntityError,
 };
@@ -31,7 +31,7 @@ async fn test_signup_email() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::CREATED);
-    let response_body: SignupEmailResponse = response.json().await.unwrap();
+    let response_body: HttpSignupEmailResponse = response.json().await.unwrap();
     assert_eq!(response_body.email, email);
     assert!(!response_body.email_verified);
 }
@@ -57,7 +57,7 @@ async fn test_signup_email_trigger_otp_email_sending() {
         .send()
         .await
         .unwrap()
-        .json::<SignupEmailResponse>()
+        .json::<HttpSignupEmailResponse>()
         .await
         .unwrap();
 

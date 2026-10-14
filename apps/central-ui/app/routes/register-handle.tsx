@@ -106,7 +106,8 @@ export default function RegisterHandle({
     );
   }
 
-  const formErrors = actionData?.success === false ? actionData.errors : undefined;
+  const formErrors =
+    actionData?.success === false ? actionData.errors : undefined;
 
   return (
     <main className="flex flex-col pt-16 pb-4 px-8 gap-8">

@@ -1,7 +1,6 @@
 use ethoko_central::{
-    auth::http_responses::SignupEmailResponse,
     auth::requests::login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
-    auth::requests::signup_email::HttpSignupEmailBody,
+    auth::requests::signup_email::{HttpSignupEmailBody, HttpSignupEmailResponse},
     newtypes::email::Email,
     newtypes::password::Password,
 };
@@ -17,14 +16,14 @@ const USER_AUTHORIZATION_HEADER_NAME: &str = "X-Ethoko-User-Authorization";
 pub trait AuthActions {
     /// Signs up a new user and returns the user response along with the password.
     /// The email and password are generated automatically.
-    async fn signup_user(&self) -> (SignupEmailResponse, Password);
+    async fn signup_user(&self) -> (HttpSignupEmailResponse, Password);
 
     /// Logs in a user with the given email and password, returning the authentication token.
     async fn login_user(&self, email: &Email, password: &Password) -> String;
 }
 
 impl AuthActions for InstanceState {
-    async fn signup_user(&self) -> (SignupEmailResponse, Password) {
+    async fn signup_user(&self) -> (HttpSignupEmailResponse, Password) {
         let email = Faker.fake::<Email>();
         let password = Faker.fake::<Password>();
 
@@ -40,7 +39,7 @@ impl AuthActions for InstanceState {
             .send()
             .await
             .unwrap()
-            .json::<SignupEmailResponse>()
+            .json::<HttpSignupEmailResponse>()
             .await
             .unwrap();
 

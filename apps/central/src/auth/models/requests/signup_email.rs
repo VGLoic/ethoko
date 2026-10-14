@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    auth::password_hasher,
+    auth::{models::user::User, password_hasher},
     newtypes::{
         email::{Email, EmailError},
         password::{Password, PasswordError},
@@ -59,6 +59,26 @@ pub enum SignupEmailError {
     EmailAlreadyExists(String),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpSignupEmailResponse {
+    pub email: Email,
+    pub email_verified: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<User> for HttpSignupEmailResponse {
+    fn from(user: User) -> Self {
+        HttpSignupEmailResponse {
+            email: user.email().to_owned(),
+            email_verified: user.email_verified(),
+            created_at: user.created_at(),
+            updated_at: user.updated_at(),
+        }
+    }
 }
 
 #[cfg(test)]

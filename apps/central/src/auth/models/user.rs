@@ -128,10 +128,6 @@ impl User {
             User::Registered(user) => Some(user),
         }
     }
-
-    pub fn registered_handle(&self) -> Option<&Handle> {
-        self.as_registered().map(|user| &user.handle)
-    }
 }
 
 impl TryFrom<UserRow> for User {

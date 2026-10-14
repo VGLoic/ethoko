@@ -118,6 +118,11 @@ pub trait AuthRepository: Send + Sync + 'static {
         session_token_payload: OpaqueTokenCreatePayload,
     ) -> Result<OpaqueToken, RecordSessionTokenError>;
 
+    /// Registers a handle for the specified user, transitioning them from a pending user to a registered user.
+    /// # Errors
+    /// * `RegisterHandleError::HandleAlreadyExists` if the requested handle is already taken.
+    /// * `RegisterHandleError::AlreadyRegistered` if the user has already registered a handle.
+    /// * `RegisterHandleError::Unknown` for any other errors that may occur during the process.
     async fn register_handle(
         &self,
         user_id: uuid::Uuid,

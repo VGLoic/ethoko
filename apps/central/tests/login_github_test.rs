@@ -321,7 +321,9 @@ async fn test_login_github_callback_200_with_newly_created_user() {
     let me_response = instance_state
         .reqwest_client
         .get(format!("{}/auth/me", &instance_state.server_url))
-        .headers(central_ui_bff_with_user_principal_headers(&response_body.token))
+        .headers(central_ui_bff_with_user_principal_headers(
+            &response_body.token,
+        ))
         .send()
         .await
         .unwrap();
@@ -501,7 +503,9 @@ async fn test_login_github_callback_200_with_existing_user() {
     let me_response = instance_state
         .reqwest_client
         .get(format!("{}/auth/me", &instance_state.server_url))
-        .headers(central_ui_bff_with_user_principal_headers(&response_body.token))
+        .headers(central_ui_bff_with_user_principal_headers(
+            &response_body.token,
+        ))
         .send()
         .await
         .unwrap();
@@ -519,7 +523,9 @@ async fn test_login_github_callback_200_with_existing_user() {
             assert_eq!(suggested_handle, Some(expected_suggested_handle));
             assert!(email_verified);
         }
-        UserResponse::Registered { .. } => panic!("expected existing github user to remain pending"),
+        UserResponse::Registered { .. } => {
+            panic!("expected existing github user to remain pending")
+        }
     }
 }
 
