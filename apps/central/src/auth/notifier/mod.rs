@@ -92,7 +92,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.enqueue_started",
             notification_type = "email_verification_otp",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Enqueuing signup with email notification"
         );
         let job = JobRequest::new(
@@ -110,7 +110,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.enqueued",
             notification_type = "email_verification_otp",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Enqueued signup with email notification"
         );
         Ok(())
@@ -120,7 +120,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.skipped",
             notification_type = "user_verified_email",
-            user_id = %user.id,
+            user_id = %user.id(),
             "No notification action required for verified email event"
         );
         Ok(())
@@ -133,7 +133,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.enqueue_started",
             notification_type = "email_verification_otp",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Enqueuing resend verification OTP notification"
         );
 
@@ -153,7 +153,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.enqueued",
             notification_type = "email_verification_otp",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Enqueued resend verification OTP notification"
         );
         Ok(())
@@ -163,7 +163,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.skipped",
             notification_type = "user_logged_in_with_email",
-            user_id = %user.id,
+            user_id = %user.id(),
             "No notification action required for login with email event"
         );
         Ok(())
@@ -174,11 +174,11 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         user: &User,
         _auth_credential: &AuthCredential,
     ) -> Result<(), LoginGithubCallbackError> {
-        if user.email_verified {
+        if user.email_verified() {
             debug!(
                 event = "auth.notification.skipped",
                 notification_type = "user_signed_up_with_github",
-                user_id = %user.id,
+                user_id = %user.id(),
                 "No notification action required for signup with GitHub event for verified users"
             );
             return Ok(());
@@ -186,7 +186,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.enqueue_started",
             notification_type = "email_verification_otp",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Enqueuing signup with GitHub notification"
         );
         let job = JobRequest::new(
@@ -204,7 +204,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.enqueued",
             notification_type = "email_verification_otp",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Enqueued signup with GitHub notification"
         );
         Ok(())
@@ -217,7 +217,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         debug!(
             event = "auth.notification.skipped",
             notification_type = "user_logged_in_with_github",
-            user_id = %user.id,
+            user_id = %user.id(),
             "No notification action required for login with Github event"
         );
         Ok(())

@@ -1,13 +1,28 @@
 import z from "zod";
 import { config } from "~/server/config.server";
 
-const UserResponseSchema = z.object({
+const PendingUserResponseSchema = z.object({
+  state: z.literal("pending"),
+  email: z.email(),
+  suggestedHandle: z.string().nullable().optional(),
+  emailVerified: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+const RegisteredUserResponseSchema = z.object({
+  state: z.literal("registered"),
   email: z.email(),
   handle: z.string(),
   emailVerified: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
+
+const UserResponseSchema = z.discriminatedUnion("state", [
+  PendingUserResponseSchema,
+  RegisteredUserResponseSchema,
+]);
 type UserResponse = z.infer<typeof UserResponseSchema>;
 
 const LoginResponseSchema = z.object({
@@ -110,13 +125,7 @@ class EthokoCentralClient {
   async signup(signupRequest: {
     email: string;
     password: string;
-    handle: string;
-  }): Promise<
-    ApiResult<
-      UserResponse,
-      "email-already-registered" | "handle-already-registered"
-    >
-  > {
+  }): Promise<ApiResult<UserResponse, "email-already-registered">> {
     const response = await fetch(`${this.baseUrl}/auth/signup/email`, {
       method: "POST",
       headers: this.createBffHeaders(),
@@ -124,7 +133,27 @@ class EthokoCentralClient {
     });
     return await this.handleResponse(response, UserResponseSchema, {
       ETKAS01: "email-already-registered",
-      ETKAS02: "handle-already-registered",
+    });
+  }
+
+  async registerHandle(params: {
+    token: string;
+    handle: string;
+  }): Promise<
+    ApiResult<
+      UserResponse,
+      "handle-already-registered" | "already-registered" | "invalid-handle"
+    >
+  > {
+    const response = await fetch(`${this.baseUrl}/auth/register-handle`, {
+      method: "POST",
+      headers: this.createBffHeaders({ userSessionToken: params.token }),
+      body: JSON.stringify({ handle: params.handle }),
+    });
+    return await this.handleResponse(response, UserResponseSchema, {
+      ETKARH01: "handle-already-registered",
+      ETKARH02: "already-registered",
+      ETKARH03: "invalid-handle",
     });
   }
 

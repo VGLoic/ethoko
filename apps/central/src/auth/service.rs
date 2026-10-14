@@ -7,6 +7,7 @@ use crate::{
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
                 logout::LogoutError,
+                register_handle::{RegisterHandleError, RegisterHandleRequest},
                 resend_verification_otp::{
                     ResendVerificationOtpError, ResendVerificationOtpRequest,
                 },
@@ -35,12 +36,11 @@ use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
-    /// Registers a new user with the provided email, handle and password hash.
-    /// - A new user is created with the provided email and handle, the email is marked as not verified.
+    /// Registers a new pending user with the provided email and password hash.
+    /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
-    /// * `SignupEmailError::HandleAlreadyExists` if the handle is already taken.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
     async fn signup_with_email(
         &self,
@@ -84,6 +84,17 @@ pub trait AuthService: Send + Sync + 'static {
         &self,
         request: LoginEmailRequest,
     ) -> Result<OpaqueTokenValue, LoginEmailError>;
+
+    /// Registers a handle for the specified user, transitionning it from a pending user to a registered user.
+    /// # Errors
+    /// * `RegisterHandleError::HandleAlreadyExists` if the requested handle is already taken.
+    /// * `RegisterHandleError::AlreadyRegistered` if the user has already registered a handle.
+    /// * `RegisterHandleError::Unknown` for any other errors that may occur during the process.
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError>;
 
     /// Fetches a user by their session token hash.
     /// The resolution will only succeed if the underlying token is valid and associated with an existing user.
@@ -180,17 +191,16 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 SignupEmailError::Unknown(err) => {
                     error!(
                         event = "auth.signup.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = error_classification(err),
                         error_chain = %error_chain(err),
                         "Failed to enqueue signup notification"
                     );
                 }
-                SignupEmailError::EmailAlreadyExists(_)
-                | SignupEmailError::HandleAlreadyExists(_) => {
+                SignupEmailError::EmailAlreadyExists(_) => {
                     error!(
                         event = "auth.signup.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = "unexpected",
                         "Failed to enqueue signup notification"
                     );
@@ -200,8 +210,8 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         debug!(
             event = "auth.signup.succeeded",
-            user_id = %user.id,
-            handle = %user.handle,
+            user_id = %user.id(),
+            lifecycle = ?user.lifecycle(),
             "Completed signup with email"
         );
 
@@ -216,7 +226,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 VerifyEmailError::Unknown(err) => {
                     error!(
                         event = "auth.verify_email.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = error_classification(err),
                         error_chain = %error_chain(err),
                         "Failed to handle email-verified notification"
@@ -228,7 +238,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 | VerifyEmailError::NotFound => {
                     error!(
                         event = "auth.verify_email.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = "unexpected",
                         "Failed to handle email-verified notification"
                     );
@@ -238,7 +248,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         debug!(
             event = "auth.verify_email.succeeded",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Verified email"
         );
 
@@ -259,12 +269,12 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                     err.context("Error fetching user by email").into()
                 }
             })?;
-        if user.email_verified {
+        if user.email_verified() {
             return Err(ResendVerificationOtpError::UserAlreadyVerified);
         }
         let last_otp = self
             .repository
-            .get_last_otp_request_by_user_id(user.id)
+            .get_last_otp_request_by_user_id(user.id())
             .await
             .map_err(|e| match e {
                 GetLastOtpRequestError::Unknown(err) => {
@@ -288,7 +298,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 ResendVerificationOtpError::Unknown(err) => {
                     error!(
                         event = "auth.resend_verification_otp.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = error_classification(err),
                         error_chain = %error_chain(err),
                         "Failed to enqueue resend verification OTP notification"
@@ -299,7 +309,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 | ResendVerificationOtpError::CooldownNotElapsed => {
                     error!(
                         event = "auth.resend_verification_otp.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = "unexpected",
                         "Failed to enqueue resend verification OTP notification"
                     );
@@ -309,7 +319,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         debug!(
             event = "auth.resend_verification_otp.succeeded",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Accepted resend verification OTP request"
         );
 
@@ -354,7 +364,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         let session_token_payload = OpaqueTokenCreatePayload::new(&opaque_session_token_value);
         let _ = self
             .repository
-            .record_session_token(user.id, session_token_payload)
+            .record_session_token(user.id(), session_token_payload)
             .await
             .map_err(|e| match e {
                 RecordSessionTokenError::Unknown(err) => {
@@ -377,7 +387,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 LoginEmailError::UserNotFound | LoginEmailError::InvalidCredentials => {
                     error!(
                         event = "auth.login_with_email.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = "unexpected",
                         "Failed to handle login notification"
                     );
@@ -387,11 +397,19 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         debug!(
             event = "auth.login_with_email.succeeded",
-            user_id = %user.id,
+            user_id = %user.id(),
             "Completed login with email"
         );
 
         Ok(opaque_session_token_value)
+    }
+
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError> {
+        self.repository.register_handle(user_id, request).await
     }
 
     async fn get_user_by_session_token(
@@ -456,7 +474,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         let session_token_payload = OpaqueTokenCreatePayload::new(&opaque_session_token_value);
         let _ = self
             .repository
-            .record_session_token(user.id, session_token_payload)
+            .record_session_token(user.id(), session_token_payload)
             .await
             .map_err(|e| match e {
                 RecordSessionTokenError::Unknown(err) => {
@@ -475,7 +493,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 LoginGithubCallbackError::Unknown(err) => {
                     error!(
                         event = "auth.login_with_github.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = error_classification(err),
                         error_chain = %error_chain(err),
                         "Error occurred while sending Github auth notification"
@@ -484,7 +502,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                 _ => {
                     error!(
                         event = "auth.login_with_github.notification_failed",
-                        user_id = %user.id,
+                        user_id = %user.id(),
                         error_class = "unexpected",
                         "Error occurred while sending Github auth notification"
                     );

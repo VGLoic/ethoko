@@ -2,10 +2,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    auth::password_hasher,
+    auth::{models::user::User, password_hasher},
     newtypes::{
         email::{Email, EmailError},
-        handle::{Handle, HandleError},
         password::{Password, PasswordError},
         password_hash::PasswordHash,
     },
@@ -15,13 +14,11 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct HttpSignupEmailBody {
     pub email: String,
-    pub handle: String,
     pub password: String,
 }
 
 pub struct SignupEmailRequest {
     pub email: Email,
-    pub handle: Handle,
     pub password_hash: PasswordHash,
 }
 
@@ -29,8 +26,6 @@ pub struct SignupEmailRequest {
 pub enum SignupEmailRequestError {
     #[error("Invalid email")]
     InvalidEmail(EmailError),
-    #[error("Invalid handle")]
-    InvalidHandle(HandleError),
     #[error("Invalid password")]
     InvalidPassword(PasswordError),
     #[error(transparent)]
@@ -42,16 +37,10 @@ impl SignupEmailRequest {
     ///
     /// # Errors
     /// `SignupEmailRequestError::InvalidEmail` if the email format is invalid.
-    /// `SignupEmailRequestError::InvalidHandle` if the handle format is invalid
     /// `SignupEmailRequestError::InvalidPassword` if the password format is invalid
     /// `SignupEmailRequestError::Unknown` for any other errors that may occur during the process.
-    pub fn new(
-        email: String,
-        handle: String,
-        password: String,
-    ) -> Result<Self, SignupEmailRequestError> {
+    pub fn new(email: String, password: String) -> Result<Self, SignupEmailRequestError> {
         let email = Email::new(&email).map_err(SignupEmailRequestError::InvalidEmail)?;
-        let handle = Handle::new(&handle).map_err(SignupEmailRequestError::InvalidHandle)?;
         let password =
             Password::new(&password).map_err(SignupEmailRequestError::InvalidPassword)?;
 
@@ -59,7 +48,6 @@ impl SignupEmailRequest {
 
         Ok(Self {
             email,
-            handle,
             password_hash,
         })
     }
@@ -69,10 +57,28 @@ impl SignupEmailRequest {
 pub enum SignupEmailError {
     #[error("Email {0} already exists")]
     EmailAlreadyExists(String),
-    #[error("Handle {0} already exists")]
-    HandleAlreadyExists(String),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpSignupEmailResponse {
+    pub email: Email,
+    pub email_verified: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<User> for HttpSignupEmailResponse {
+    fn from(user: User) -> Self {
+        HttpSignupEmailResponse {
+            email: user.email().to_owned(),
+            email_verified: user.email_verified(),
+            created_at: user.created_at(),
+            updated_at: user.updated_at(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -84,27 +90,17 @@ mod tests {
     #[test]
     fn test_valid_email_signup_request() {
         let email = Faker.fake::<Email>();
-        let handle = Faker.fake::<Handle>();
         let password = Faker.fake::<Password>();
 
-        let result = SignupEmailRequest::new(
-            email.to_string(),
-            handle.to_string(),
-            password.as_str().to_string(),
-        );
+        let result = SignupEmailRequest::new(email.to_string(), password.as_str().to_string());
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_invalid_email_signup_request() {
         let invalid_email = "invalid-email".to_string();
-        let handle = Faker.fake::<Handle>();
         let password = Faker.fake::<Password>();
-        let result = SignupEmailRequest::new(
-            invalid_email,
-            handle.to_string(),
-            password.as_str().to_string(),
-        );
+        let result = SignupEmailRequest::new(invalid_email, password.as_str().to_string());
         assert!(matches!(
             result,
             Err(SignupEmailRequestError::InvalidEmail(_))
@@ -112,28 +108,10 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_handle_signup_request() {
-        let email = Faker.fake::<Email>();
-        let invalid_handle = "invalid@handle".to_string();
-        let password = Faker.fake::<Password>();
-        let result = SignupEmailRequest::new(
-            email.to_string(),
-            invalid_handle,
-            password.as_str().to_string(),
-        );
-        assert!(matches!(
-            result,
-            Err(SignupEmailRequestError::InvalidHandle(_))
-        ));
-    }
-
-    #[test]
     fn test_invalid_password_signup_request() {
         let email = Faker.fake::<Email>();
-        let handle = Faker.fake::<Handle>();
         let invalid_password = "invalid-password".to_string();
-        let result =
-            SignupEmailRequest::new(email.to_string(), handle.to_string(), invalid_password);
+        let result = SignupEmailRequest::new(email.to_string(), invalid_password);
         assert!(matches!(
             result,
             Err(SignupEmailRequestError::InvalidPassword(_))

@@ -8,11 +8,12 @@ use crate::{
             otp_request::{OtpPurpose, OtpRequest},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                register_handle::{RegisterHandleError, RegisterHandleRequest},
                 send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
             },
-            user::User,
+            user::{User, UserLifecycle, UserLifecycleRow, UserRow},
         },
         requests::{
             login_github_callback::LoginGithubCallbackError,
@@ -29,12 +30,11 @@ use thiserror::Error;
 /// Repository trait for auth-related operations
 #[async_trait::async_trait]
 pub trait AuthRepository: Send + Sync + 'static {
-    /// Registers a new user with the provided email, handle and password hash.
-    /// - A new user is created with the provided email and handle, the email is marked as not verified.
+    /// Registers a new pending user with the provided email and password hash.
+    /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
-    /// * `SignupEmailError::HandleAlreadyExists` if the handle is already taken.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
     async fn create_user_with_email_auth(
         &self,
@@ -118,6 +118,17 @@ pub trait AuthRepository: Send + Sync + 'static {
         session_token_payload: OpaqueTokenCreatePayload,
     ) -> Result<OpaqueToken, RecordSessionTokenError>;
 
+    /// Registers a handle for the specified user, transitioning them from a pending user to a registered user.
+    /// # Errors
+    /// * `RegisterHandleError::HandleAlreadyExists` if the requested handle is already taken.
+    /// * `RegisterHandleError::AlreadyRegistered` if the user has already registered a handle.
+    /// * `RegisterHandleError::Unknown` for any other errors that may occur during the process.
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError>;
+
     /// Gets a user by their opaque token hash.
     /// Updates the last_used_at of the opaque token to now.
     /// # Errors
@@ -196,7 +207,7 @@ impl PsqlAuthRepository {
 // 23505 is the PostgreSQL error code for unique_violation
 const UNIQUE_VIOLATION_ERROR_CODE: &str = "23505";
 const UNIQUE_EMAIL_CONSTRAINT_NAME: &str = "unique_email";
-const UNIQUE_HANDLE_CONSTRAINT_NAME: &str = "unique_handle";
+const UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME: &str = "unique_registered_handle";
 
 #[async_trait::async_trait]
 impl AuthRepository for PsqlAuthRepository {
@@ -210,38 +221,44 @@ impl AuthRepository for PsqlAuthRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
 
-        let user = sqlx::query_as::<_, User>(
+        let user_row = sqlx::query_as::<_, UserRow>(
             r#"
             INSERT INTO "ethoko_user" (
                 email,
                 handle,
+                suggested_handle,
+                lifecycle,
                 email_verified
-            ) VALUES ($1, $2, $3)
+            ) VALUES ($1, $2, $3, $4, $5)
             RETURNING
                 id,
                 email,
                 handle,
+                suggested_handle,
+                lifecycle,
                 email_verified,
                 created_at,
                 updated_at
             "#,
         )
         .bind(&request.email)
-        .bind(&request.handle)
+        .bind(Option::<String>::None)
+        .bind(Option::<String>::None)
+        .bind(UserLifecycleRow::Pending)
         .bind(false)
         .fetch_one(&mut *transaction)
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(db_err) = &e
                 && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
+                && db_err.message().contains(UNIQUE_EMAIL_CONSTRAINT_NAME)
             {
-                if db_err.message().contains(UNIQUE_EMAIL_CONSTRAINT_NAME) {
-                    return SignupEmailError::EmailAlreadyExists(request.email.to_string());
-                } else if db_err.message().contains(UNIQUE_HANDLE_CONSTRAINT_NAME) {
-                    return SignupEmailError::HandleAlreadyExists(request.handle.to_string());
-                }
+                return SignupEmailError::EmailAlreadyExists(request.email.to_string());
             }
             anyhow::anyhow!(e).context("failed to create user").into()
+        })?;
+        let user: User = user_row.try_into().map_err(|e| {
+            SignupEmailError::Unknown(anyhow::Error::new(e).context("created invalid user row"))
         })?;
 
         let auth_credential = sqlx::query_as::<_, AuthCredential>(
@@ -258,7 +275,7 @@ impl AuthRepository for PsqlAuthRepository {
                 updated_at
             "#,
         )
-        .bind(user.id)
+        .bind(user.id())
         .bind(AuthCredentialPayload::from_password_hash(
             request.password_hash,
         ))
@@ -317,25 +334,31 @@ impl AuthRepository for PsqlAuthRepository {
             return Ok((user, auth_credential, false));
         }
 
-        let user = sqlx::query_as::<_, User>(
+        let user_row = sqlx::query_as::<_, UserRow>(
             r#"
             INSERT INTO "ethoko_user" (
                 email,
                 handle,
+                suggested_handle,
+                lifecycle,
                 email_verified
             )
-            VALUES ($1, $2, $3)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING
                 id,
                 email,
-                email_verified,
                 handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
                 created_at,
                 updated_at
             "#,
         )
         .bind(&github_user.primary_email)
-        .bind(&github_user.username)
+        .bind(Option::<String>::None)
+        .bind(Some(github_user.username.clone()))
+        .bind(UserLifecycleRow::Pending)
         .bind(github_user.email_verified)
         .fetch_one(&mut *transaction)
         .await
@@ -347,6 +370,11 @@ impl AuthRepository for PsqlAuthRepository {
                 return LoginGithubCallbackError::PrimaryEmailCollision;
             }
             anyhow::anyhow!(e).context("failed to create user").into()
+        })?;
+        let user: User = user_row.try_into().map_err(|e| {
+            LoginGithubCallbackError::Unknown(
+                anyhow::Error::new(e).context("created invalid user row"),
+            )
         })?;
 
         let auth_credential = sqlx::query_as::<_, AuthCredential>(
@@ -364,7 +392,7 @@ impl AuthRepository for PsqlAuthRepository {
                 updated_at
             "#,
         )
-        .bind(user.id)
+        .bind(user.id())
         .bind(AuthCredentialPayload::from_github_oauth(github_user.id))
         .fetch_one(&mut *transaction)
         .await
@@ -398,7 +426,7 @@ impl AuthRepository for PsqlAuthRepository {
             Some(user) => user,
             None => return Err(SendEmailVerificationOtpError::NotFound),
         };
-        if user.email_verified {
+        if user.email_verified() {
             return Err(SendEmailVerificationOtpError::EmailAlreadyVerified);
         }
 
@@ -470,11 +498,11 @@ impl AuthRepository for PsqlAuthRepository {
             Some(user) => user,
             None => return Err(VerifyEmailError::NotFound),
         };
-        if user.email_verified {
+        if user.email_verified() {
             return Err(VerifyEmailError::EmailAlreadyVerified);
         }
 
-        let otp_request = get_last_otp_request_by_user_id(user.id, &mut *transaction)
+        let otp_request = get_last_otp_request_by_user_id(user.id(), &mut *transaction)
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
 
@@ -503,12 +531,12 @@ impl AuthRepository for PsqlAuthRepository {
             WHERE id = $1
             "#,
         )
-        .bind(user.id)
+        .bind(user.id())
         .execute(&mut *transaction)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to update user email_verified"))?;
 
-        let updated_user = get_user_by_id(user.id, &mut *transaction)
+        let updated_user = get_user_by_id(user.id(), &mut *transaction)
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to fetch updated user"))?
             .ok_or(anyhow::anyhow!("failed to fetch updated user"))?;
@@ -565,7 +593,7 @@ impl AuthRepository for PsqlAuthRepository {
             WHERE user_id = $1
             "#,
         )
-        .bind(user.id)
+        .bind(user.id())
         .fetch_all(&self.pool)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to fetch auth credential by email"))?;
@@ -615,6 +643,78 @@ impl AuthRepository for PsqlAuthRepository {
         .map_err(|e| anyhow::anyhow!(e).context("failed to record session token"))?;
 
         Ok(opaque_token)
+    }
+
+    async fn register_handle(
+        &self,
+        user_id: uuid::Uuid,
+        request: RegisterHandleRequest,
+    ) -> Result<User, RegisterHandleError> {
+        let user = sqlx::query_as::<_, UserRow>(
+            r#"
+            UPDATE "ethoko_user"
+            SET handle = $2,
+                suggested_handle = NULL,
+                lifecycle = 'registered'
+            WHERE id = $1 AND lifecycle = 'pending'
+            RETURNING
+                id,
+                email,
+                handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
+                created_at,
+                updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(&request.handle)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| {
+            if let sqlx::Error::Database(db_err) = &e
+                && db_err.code() == Some(UNIQUE_VIOLATION_ERROR_CODE.into())
+                && db_err
+                    .message()
+                    .contains(UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME)
+            {
+                return RegisterHandleError::HandleAlreadyExists(request.handle.to_string());
+            }
+            RegisterHandleError::Unknown(anyhow::anyhow!(e).context("failed to register handle"))
+        })?
+        .map(TryInto::try_into)
+        .transpose()
+        .map_err(|e| {
+            RegisterHandleError::Unknown(
+                anyhow::Error::new(e).context("updated invalid user row during register handle"),
+            )
+        })?;
+
+        match user {
+            Some(user) => Ok(user),
+            None => {
+                let existing_user = get_user_by_id(user_id, &self.pool)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!(e)
+                            .context("failed to fetch user after register handle attempt")
+                    })?
+                    .ok_or_else(|| {
+                        RegisterHandleError::Unknown(anyhow::anyhow!(
+                            "user not found for register handle"
+                        ))
+                    })?;
+
+                if existing_user.lifecycle() == UserLifecycle::Registered {
+                    Err(RegisterHandleError::AlreadyRegistered)
+                } else {
+                    Err(RegisterHandleError::Unknown(anyhow::anyhow!(
+                        "register handle update did not affect any row"
+                    )))
+                }
+            }
+        }
     }
 
     async fn get_user_by_session_token(
@@ -815,22 +915,27 @@ async fn get_user_by_email<'a, E: Executor<'a, Database = Postgres>>(
     email: &Email,
     executor: E,
 ) -> Result<Option<User>, sqlx::Error> {
-    let user = sqlx::query_as::<_, User>(
+    let user = sqlx::query_as::<_, UserRow>(
         r#"
-        SELECT
-            id,
-            email,
-            handle,
-            email_verified,
-            created_at,
-            updated_at
+            SELECT
+                id,
+                email,
+                handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
+                created_at,
+                updated_at
         FROM "ethoko_user"
         WHERE email = $1
         "#,
     )
     .bind(email)
     .fetch_optional(executor)
-    .await?;
+    .await?
+    .map(TryInto::try_into)
+    .transpose()
+    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
     Ok(user)
 }
@@ -839,22 +944,27 @@ async fn get_user_by_id<'a, E: Executor<'a, Database = Postgres>>(
     user_id: uuid::Uuid,
     executor: E,
 ) -> Result<Option<User>, sqlx::Error> {
-    let user = sqlx::query_as::<_, User>(
+    let user = sqlx::query_as::<_, UserRow>(
         r#"
-        SELECT
-            id,
-            email,
-            handle,
-            email_verified,
-            created_at,
-            updated_at
+            SELECT
+                id,
+                email,
+                handle,
+                suggested_handle,
+                lifecycle,
+                email_verified,
+                created_at,
+                updated_at
         FROM "ethoko_user"
         WHERE id = $1
         "#,
     )
     .bind(user_id)
     .fetch_optional(executor)
-    .await?;
+    .await?
+    .map(TryInto::try_into)
+    .transpose()
+    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
     Ok(user)
 }

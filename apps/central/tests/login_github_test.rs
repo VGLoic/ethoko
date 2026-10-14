@@ -1,5 +1,6 @@
 use axum::http::StatusCode;
 use ethoko_central::{
+    auth::http_responses::UserResponse,
     auth::requests::{
         login_github_callback::{HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse},
         login_github_start::HttpLoginGithubStartResponse,
@@ -272,6 +273,7 @@ async fn test_login_github_callback_200_with_newly_created_user() {
         id: Faker.fake::<u64>(),
         login: Faker.fake::<Handle>().to_string(),
     };
+    let expected_suggested_handle = github_user.login.clone();
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
         verified: true,
@@ -315,6 +317,32 @@ async fn test_login_github_callback_200_with_newly_created_user() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: HttpLoginGithubCallbackResponse = response.json().await.unwrap();
     assert!(response_body.token.starts_with("etks_"));
+
+    let me_response = instance_state
+        .reqwest_client
+        .get(format!("{}/auth/me", &instance_state.server_url))
+        .headers(central_ui_bff_with_user_principal_headers(
+            &response_body.token,
+        ))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(me_response.status(), StatusCode::OK);
+    let me_body: UserResponse = me_response.json().await.unwrap();
+    match me_body {
+        UserResponse::Pending {
+            email: response_email,
+            suggested_handle,
+            email_verified,
+            ..
+        } => {
+            assert_eq!(response_email, email);
+            assert_eq!(suggested_handle, Some(expected_suggested_handle));
+            assert!(email_verified);
+        }
+        UserResponse::Registered { .. } => panic!("expected pending github user response"),
+    }
 }
 
 #[tokio::test]
@@ -387,6 +415,7 @@ async fn test_login_github_callback_200_with_existing_user() {
         id: Faker.fake::<u64>(),
         login: Faker.fake::<Handle>().to_string(),
     };
+    let expected_suggested_handle = github_user.login.clone();
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
         verified: true,
@@ -470,6 +499,91 @@ async fn test_login_github_callback_200_with_existing_user() {
     assert_eq!(response.status(), StatusCode::OK);
     let response_body: HttpLoginGithubCallbackResponse = response.json().await.unwrap();
     assert!(response_body.token.starts_with("etks_"));
+
+    let me_response = instance_state
+        .reqwest_client
+        .get(format!("{}/auth/me", &instance_state.server_url))
+        .headers(central_ui_bff_with_user_principal_headers(
+            &response_body.token,
+        ))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(me_response.status(), StatusCode::OK);
+    let me_body: UserResponse = me_response.json().await.unwrap();
+    match me_body {
+        UserResponse::Pending {
+            email: response_email,
+            suggested_handle,
+            email_verified,
+            ..
+        } => {
+            assert_eq!(response_email, email);
+            assert_eq!(suggested_handle, Some(expected_suggested_handle));
+            assert!(email_verified);
+        }
+        UserResponse::Registered { .. } => {
+            panic!("expected existing github user to remain pending")
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_login_github_callback_422_with_existing_pending_user_email_collision() {
+    let instance_state = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+
+    let (existing_pending_user, _password) = instance_state.signup_user().await;
+
+    let start_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/start",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .send()
+        .await
+        .unwrap()
+        .json::<HttpLoginGithubStartResponse>()
+        .await
+        .unwrap();
+
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    let github_user_emails = vec![GithubApiUserEmailsResponseItem {
+        email: existing_pending_user.email.to_string(),
+        verified: false,
+        primary: true,
+    }];
+
+    instance_state.github_client.set_next_user(github_user);
+    instance_state
+        .github_client
+        .set_next_user_emails(github_user_emails);
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/callback",
+            &instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .json(&HttpLoginGithubCallbackBody {
+            code: instance_state.github_oauth_client.code().unwrap(),
+            state: start_response.state,
+        })
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = response.json::<UnprocessableEntityError>().await.unwrap();
+    assert_eq!(error.code, "ETKLGC01");
 }
 
 #[tokio::test]
@@ -483,6 +597,7 @@ async fn test_login_github_token_valid() {
         id: Faker.fake::<u64>(),
         login: Faker.fake::<Handle>().to_string(),
     };
+    let expected_suggested_handle = github_user.login.clone();
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
         email: email.to_string(),
         verified: true,
@@ -535,4 +650,18 @@ async fn test_login_github_token_valid() {
         .unwrap();
 
     assert_eq!(me_response.status(), StatusCode::OK);
+    let me_body: UserResponse = me_response.json().await.unwrap();
+    match me_body {
+        UserResponse::Pending {
+            email: response_email,
+            suggested_handle,
+            email_verified,
+            ..
+        } => {
+            assert_eq!(response_email, email);
+            assert_eq!(suggested_handle, Some(expected_suggested_handle));
+            assert!(email_verified);
+        }
+        UserResponse::Registered { .. } => panic!("expected pending github user response"),
+    }
 }

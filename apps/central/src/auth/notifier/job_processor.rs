@@ -64,7 +64,7 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
         let otp_hash = otp.hash();
 
         let email_template_payload =
-            EmailVerificationCodePayload::new(payload.user_email.clone(), payload.user_handle, otp);
+            EmailVerificationCodePayload::new(payload.user_email.clone(), otp);
         self.email_service
             .send_email(payload.user_email, email_template_payload.into())
             .await
