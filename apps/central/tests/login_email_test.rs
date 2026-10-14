@@ -1,5 +1,6 @@
 use axum::http::StatusCode;
 use ethoko_central::{
+    auth::http_responses::UserResponse,
     auth::requests::login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
     newtypes::password::Password,
     router::UnprocessableEntityError,
@@ -12,15 +13,15 @@ use common::{
 use fake::{Fake, Faker};
 
 #[tokio::test]
-async fn test_login_200() {
+async fn test_login_email_200() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
 
-    let (user, password) = instance_state.signup_user().await;
+    let (signup_user, password) = instance_state.signup_user().await;
 
     let login_body = HttpLoginEmailBody {
-        email: user.email.to_string(),
+        email: signup_user.email.to_string(),
         password: password.as_str().to_string(),
     };
 
@@ -39,19 +40,19 @@ async fn test_login_200() {
 }
 
 #[tokio::test]
-async fn test_login_token_valid() {
+async fn test_login_email_token_valid() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
 
-    let (user, password) = instance_state.signup_user().await;
+    let (signup_user, password) = instance_state.signup_user().await;
 
     let token = instance_state
         .reqwest_client
         .post(format!("{}/auth/login/email", &instance_state.server_url))
         .headers(central_ui_bff_principal_headers())
         .json(&HttpLoginEmailBody {
-            email: user.email.to_string(),
+            email: signup_user.email.to_string(),
             password: password.as_str().to_string(),
         })
         .send()
@@ -71,6 +72,20 @@ async fn test_login_token_valid() {
         .unwrap();
 
     assert_eq!(me_response.status(), StatusCode::OK);
+    let user: UserResponse = me_response.json().await.unwrap();
+    match user {
+        UserResponse::Pending {
+            email,
+            suggested_handle,
+            email_verified,
+            ..
+        } => {
+            assert_eq!(email, signup_user.email);
+            assert_eq!(suggested_handle, None);
+            assert!(!email_verified);
+        }
+        UserResponse::Registered { .. } => panic!("expected pending user response"),
+    }
 }
 
 #[tokio::test]
@@ -111,7 +126,7 @@ async fn test_me_401_without_user_session_header() {
 }
 
 #[tokio::test]
-async fn test_login_401_without_bff_credential() {
+async fn test_login_email_401_without_bff_credential() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -131,7 +146,7 @@ async fn test_login_401_without_bff_credential() {
 }
 
 #[tokio::test]
-async fn test_login_422_invalid_email() {
+async fn test_login_email_422_invalid_email() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -159,7 +174,7 @@ async fn test_login_422_invalid_email() {
 }
 
 #[tokio::test]
-async fn test_login_422_invalid_password_format() {
+async fn test_login_email_422_invalid_password_format() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -187,7 +202,7 @@ async fn test_login_422_invalid_password_format() {
 }
 
 #[tokio::test]
-async fn test_login_422_user_not_found() {
+async fn test_login_email_422_user_not_found() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -217,7 +232,7 @@ async fn test_login_422_user_not_found() {
 }
 
 #[tokio::test]
-async fn test_login_422_invalid_password() {
+async fn test_login_email_422_invalid_password() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();

@@ -3,6 +3,7 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::Error;
 use tracing::Level;
 
 /// Public application configuration
@@ -27,6 +28,21 @@ pub struct Config {
     pub resend_api_key: String,
     /// Shared secret used by the Central UI BFF to authenticate to Central
     pub central_ui_bff_shared_secret: String,
+    /// GitHub OAuth client configuration
+    pub github_oauth_client_config: OauthClientConfig,
+    /// Time to live for Oauth transaction in seconds
+    pub oauth_transaction_ttl_seconds: u16,
+    /// GitHub API base URL
+    pub github_api_url: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct OauthClientConfig {
+    pub client_id: oauth2::ClientId,
+    pub client_secret: oauth2::ClientSecret,
+    pub callback_url: oauth2::RedirectUrl,
+    pub auth_url: oauth2::AuthUrl,
+    pub auth_token_url: oauth2::TokenUrl,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +61,10 @@ pub struct RateLimitConfig {
     pub max_burst_size: u32,
 }
 
+const EMPTY_STRING: &str = "";
+const DUMMY_URL: &str = "https://google.com";
+const GITHUB_API_URL: &str = "https://api.github.com";
+
 impl Config {
     pub fn parse_from_env() -> Result<Self, Vec<anyhow::Error>> {
         let mut errors = Vec::new();
@@ -53,7 +73,7 @@ impl Config {
             Ok(v) => v,
             Err(e) => {
                 errors.push(e);
-                "http://localhost:3000".into()
+                DUMMY_URL.into()
             }
         };
 
@@ -61,7 +81,7 @@ impl Config {
             Ok(v) => v,
             Err(e) => {
                 errors.push(e);
-                "http://localhost:3001".into()
+                DUMMY_URL.into()
             }
         };
 
@@ -93,7 +113,7 @@ impl Config {
             Ok(v) => v,
             Err(e) => {
                 errors.push(e);
-                "".into()
+                EMPTY_STRING.into()
             }
         };
 
@@ -102,10 +122,31 @@ impl Config {
                 Ok(v) => v,
                 Err(e) => {
                     errors.push(e);
-                    "".into()
+                    EMPTY_STRING.into()
                 }
             };
 
+        let (github_oauth_client_config, github_oauth_errors) = parse_github_oauth_client_config();
+
+        let oauth_transaction_ttl_seconds =
+            match parse_env_variable::<u16>("OAUTH_TRANSACTION_TTL_SECONDS") {
+                Ok(Some(v)) => v,
+                Ok(None) => 600, // default to 10 minutes
+                Err(e) => {
+                    errors.push(e);
+                    600 // default to 10 minutes
+                }
+            };
+
+        let github_api_url = match parse_env_variable::<String>("GITHUB_API_URL") {
+            Ok(v) => v.unwrap_or(GITHUB_API_URL.into()),
+            Err(e) => {
+                errors.push(e);
+                GITHUB_API_URL.into()
+            }
+        };
+
+        errors.extend(github_oauth_errors);
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -136,8 +177,89 @@ impl Config {
             auth_rate_limit_config,
             resend_api_key,
             central_ui_bff_shared_secret,
+            github_oauth_client_config,
+            oauth_transaction_ttl_seconds,
+            github_api_url,
         })
     }
+}
+
+fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
+    let mut errors = Vec::new();
+
+    let client_id = match parse_required_env_variable::<String>("GITHUB_OAUTH_CLIENT_ID") {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(e);
+            EMPTY_STRING.into()
+        }
+    };
+    let client_id = oauth2::ClientId::new(client_id);
+
+    let client_secret = match parse_required_env_variable::<String>("GITHUB_OAUTH_CLIENT_SECRET") {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(e);
+            EMPTY_STRING.into()
+        }
+    };
+    let client_secret = oauth2::ClientSecret::new(client_secret);
+
+    let callback_url = match parse_required_env_variable::<String>("GITHUB_OAUTH_CALLBACK_URL") {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(e);
+            DUMMY_URL.into()
+        }
+    };
+    let callback_url = match oauth2::RedirectUrl::new(callback_url) {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(anyhow::Error::new(e));
+            oauth2::RedirectUrl::new(DUMMY_URL.into()).unwrap()
+        }
+    };
+
+    let auth_url = match parse_required_env_variable::<String>("GITHUB_OAUTH_AUTH_URL") {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(e);
+            EMPTY_STRING.into()
+        }
+    };
+    let auth_url = match oauth2::AuthUrl::new(auth_url) {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(anyhow::Error::new(e));
+            oauth2::AuthUrl::new(DUMMY_URL.into()).unwrap()
+        }
+    };
+
+    let auth_token_url = match parse_required_env_variable::<String>("GITHUB_OAUTH_AUTH_TOKEN_URL")
+    {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(e);
+            EMPTY_STRING.into()
+        }
+    };
+    let auth_token_url = match oauth2::TokenUrl::new(auth_token_url) {
+        Ok(v) => v,
+        Err(e) => {
+            errors.push(anyhow::Error::new(e));
+            oauth2::TokenUrl::new(DUMMY_URL.into()).unwrap()
+        }
+    };
+
+    let oauth_client_config = OauthClientConfig {
+        client_id,
+        client_secret,
+        callback_url,
+        auth_url,
+        auth_token_url,
+    };
+
+    (oauth_client_config, errors)
 }
 
 fn parse_required_env_variable<T>(key: &str) -> Result<T, anyhow::Error>

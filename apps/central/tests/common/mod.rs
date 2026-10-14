@@ -1,6 +1,6 @@
 use ethoko_central::{
     auth,
-    config::{Config, OtpConfig},
+    config::{Config, OauthClientConfig, OtpConfig},
     httpserver::serve_http_server,
     jobs::{memoryqueue::InMemoryQueue, processor::JobProcessor, rootprocessor::RootProcessor},
     router::app_router,
@@ -9,9 +9,14 @@ use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tracing::{Level, error};
 
-use crate::common::{fake_email_service::FakeEmailService, manual_worker::ManualWorker};
+use crate::common::{
+    fake_email_service::FakeEmailService, fake_github_client::FakeGithubClient,
+    fake_oauth_client::FakeOauthClient, manual_worker::ManualWorker,
+};
 mod auth_actions;
 mod fake_email_service;
+mod fake_github_client;
+mod fake_oauth_client;
 mod manual_worker;
 #[path = "../test_tracing.rs"]
 mod test_tracing;
@@ -26,6 +31,8 @@ pub struct InstanceState {
     pub reqwest_client: reqwest::Client,
     pub server_url: String,
     pub email_service: FakeEmailService,
+    pub github_client: FakeGithubClient,
+    pub github_oauth_client: FakeOauthClient,
     pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
 }
 
@@ -57,6 +64,19 @@ impl TestConfigBuilder {
                 },
                 resend_api_key: "test_api_key".into(),
                 central_ui_bff_shared_secret: "test-central-ui-bff-shared-secret".into(),
+                github_oauth_client_config: OauthClientConfig {
+                    client_id: oauth2::ClientId::new("test-client-id".to_string()),
+                    client_secret: oauth2::ClientSecret::new("test-client-secret".to_string()),
+                    callback_url: oauth2::RedirectUrl::new("http://localhost/callback".to_string())
+                        .unwrap(),
+                    auth_url: oauth2::AuthUrl::new("http://localhost/auth".to_string()).unwrap(),
+                    auth_token_url: oauth2::TokenUrl::new(
+                        "http://localhost/auth/token".to_string(),
+                    )
+                    .unwrap(),
+                },
+                oauth_transaction_ttl_seconds: 600, // default to 10 minutes
+                github_api_url: "https://api.github.com".into(),
             },
         }
     }
@@ -87,6 +107,11 @@ impl TestConfigBuilder {
 
     pub fn with_otp_cooldown(mut self, cooldown_seconds: u16) -> Self {
         self.config.otp_config.cooldown_seconds = cooldown_seconds;
+        self
+    }
+
+    pub fn with_oauth_transaction_ttl_seconds(mut self, ttl_seconds: u16) -> Self {
+        self.config.oauth_transaction_ttl_seconds = ttl_seconds;
         self
     }
 
@@ -131,13 +156,19 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let job_queue = InMemoryQueue::new(2);
 
     let email_service = FakeEmailService::default();
+    let github_client = FakeGithubClient::default();
 
-    let users_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
+    let auth_oauth_github_client_adapter = FakeOauthClient::default();
+    let auth_github_adapter = auth::AuthGithubAdapter::new(github_client.clone());
+    let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
     let auth_repository = auth::PsqlAuthRepository::new(pool);
     let auth_service = auth::AuthServiceImpl::new(
         auth_repository.clone(),
-        users_notifier,
+        auth_notifier,
         config.otp_config.clone(),
+        auth_oauth_github_client_adapter.clone(),
+        config.oauth_transaction_ttl_seconds,
+        auth_github_adapter,
     );
     let users_job_processor = auth::AuthJobProcessor::new(
         auth_repository.clone(),
@@ -187,6 +218,8 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         server_url,
         job_worker,
         email_service,
+        github_client,
+        github_oauth_client: auth_oauth_github_client_adapter,
         reqwest_client: reqwest::Client::new(),
     })
 }

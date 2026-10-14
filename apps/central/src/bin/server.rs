@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use ethoko_central::{
-    auth,
+    auth, clients,
     config::Config,
     externalcom::email::ResendEmailService,
     httpserver::serve_http_server,
@@ -74,13 +74,20 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let email_service =
         ResendEmailService::new(config.web_app_url.clone(), config.resend_api_key.clone());
+    let github_client = clients::github::GithubClientImpl::new(&config.github_api_url);
 
+    let auth_oauth_github_client_adapter =
+        auth::AuthOauthClientAdapter::new(config.github_oauth_client_config.clone());
+    let auth_github_adapter = auth::AuthGithubAdapter::new(github_client);
     let auth_repository = auth::PsqlAuthRepository::new(pool);
     let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
     let auth_service = auth::AuthServiceImpl::new(
         auth_repository.clone(),
         auth_notifier,
         config.otp_config.clone(),
+        auth_oauth_github_client_adapter,
+        config.oauth_transaction_ttl_seconds,
+        auth_github_adapter,
     );
     let auth_job_processor = auth::AuthJobProcessor::new(
         auth_repository.clone(),

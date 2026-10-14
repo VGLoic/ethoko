@@ -2,7 +2,7 @@ import { Form } from "react-router";
 import type { Route } from "./+types/signup";
 import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
-import { HandleSchema, PasswordSchema } from "~/server/newtypes.server";
+import { PasswordSchema } from "~/server/newtypes.server";
 
 export function meta() {
   return [
@@ -19,7 +19,6 @@ export async function action({ request }: Route.ActionArgs) {
       email: z.email(),
       password: PasswordSchema,
       passwordConfirmation: PasswordSchema,
-      handle: HandleSchema,
     })
     .refine((data) => data.password === data.passwordConfirmation, {
       message: "Passwords do not match",
@@ -34,7 +33,6 @@ export async function action({ request }: Route.ActionArgs) {
       errors: {
         reason: null,
         email: errors.properties?.email?.errors.join(", "),
-        handle: errors.properties?.handle?.errors.join(", "),
         password: errors.properties?.password?.errors.join(", "),
         passwordConfirmation:
           errors.properties?.passwordConfirmation?.errors.join(", "),
@@ -45,7 +43,6 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     const signupResult = await ethokoCentralClient.signup({
       email: signupRequestParsingResult.data.email,
-      handle: signupRequestParsingResult.data.handle,
       password: signupRequestParsingResult.data.password,
     });
 
@@ -59,15 +56,6 @@ export async function action({ request }: Route.ActionArgs) {
           errors: {
             reason: null,
             email: "An account with this email already exist",
-          },
-        };
-      }
-      if (signupResult.reason === "handle-already-registered") {
-        return {
-          success: false as const,
-          errors: {
-            reason: null,
-            handle: "This handle is not available",
           },
         };
       }
@@ -101,13 +89,6 @@ export default function Signup({ actionData }: Route.ComponentProps) {
     <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
       <h1 className="flex justify-center">Sign Up to Ethoko Central</h1>
       <Form method="post" className="flex flex-col gap-4">
-        <label>
-          Handle:
-          <input type="text" name="handle" required className="border p-2" />
-          {actionData?.errors?.handle ? (
-            <p className="text-red-500">{actionData.errors.handle}</p>
-          ) : null}
-        </label>
         <label>
           Email:
           <input type="email" name="email" required className="border p-2" />

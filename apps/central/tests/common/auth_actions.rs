@@ -1,9 +1,7 @@
 use ethoko_central::{
-    auth::http_responses::UserResponse,
     auth::requests::login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
-    auth::requests::signup_email::HttpSignupEmailBody,
+    auth::requests::signup_email::{HttpSignupEmailBody, HttpSignupEmailResponse},
     newtypes::email::Email,
-    newtypes::handle::Handle,
     newtypes::password::Password,
 };
 use fake::{Fake, Faker};
@@ -17,22 +15,20 @@ const USER_AUTHORIZATION_HEADER_NAME: &str = "X-Ethoko-User-Authorization";
 #[allow(dead_code)]
 pub trait AuthActions {
     /// Signs up a new user and returns the user response along with the password.
-    /// The email, handle and password are generated automatically.
-    async fn signup_user(&self) -> (UserResponse, Password);
+    /// The email and password are generated automatically.
+    async fn signup_user(&self) -> (HttpSignupEmailResponse, Password);
 
     /// Logs in a user with the given email and password, returning the authentication token.
     async fn login_user(&self, email: &Email, password: &Password) -> String;
 }
 
 impl AuthActions for InstanceState {
-    async fn signup_user(&self) -> (UserResponse, Password) {
+    async fn signup_user(&self) -> (HttpSignupEmailResponse, Password) {
         let email = Faker.fake::<Email>();
-        let handle = Faker.fake::<Handle>();
         let password = Faker.fake::<Password>();
 
         let signup_body = HttpSignupEmailBody {
             email: email.to_string(),
-            handle: handle.to_string(),
             password: password.as_str().to_owned(),
         };
         let user = self
@@ -43,7 +39,7 @@ impl AuthActions for InstanceState {
             .send()
             .await
             .unwrap()
-            .json::<UserResponse>()
+            .json::<HttpSignupEmailResponse>()
             .await
             .unwrap();
 

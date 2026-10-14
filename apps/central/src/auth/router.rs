@@ -1,8 +1,9 @@
-use crate::auth::handlers::logout::handle_logout;
 use crate::router::IpRateLimiter;
 use crate::{
     auth::handlers::{
-        login_email::handle_login_email, me::handle_me,
+        login_email::handle_login_email, login_github_callback::handle_login_github_callback,
+        login_github_start::handle_login_github_start, logout::handle_logout, me::handle_me,
+        register_handle::handle_register_handle,
         resend_verification_otp::handle_resend_verification_otp, signup_email::handle_signup_email,
         verify_email::handle_verify_email,
     },
@@ -37,8 +38,11 @@ pub fn router(
             post(handle_resend_verification_otp),
         )
         .route("/login/email", post(handle_login_email))
+        .route("/login/github/start", post(handle_login_github_start))
+        .route("/login/github/callback", post(handle_login_github_callback))
         .route("/logout", post(handle_logout))
         .route("/me", get(handle_me))
+        .route("/register-handle", post(handle_register_handle))
         .layer(GovernorLayer::new(auth_router_governor_conf));
 
     Ok((router, IpRateLimiter::new(limiter)))

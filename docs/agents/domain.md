@@ -4,43 +4,38 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT-MAP.md`** at the repo root — points at the per-context `CONTEXT.md` files. May also hold shared vocabulary (terms used by both the CLI and the backend, e.g. artifact, project, user).
-- **Per-context `CONTEXT.md`**:
-  - `packages/cli-beacon/CONTEXT.md` — vocabulary specific to the CLI side
-  - `apps/central/CONTEXT.md` — vocabulary specific to the backend service
-- **`docs/adr/`** at the repo root — system-wide architectural decisions.
-- **Per-context `docs/adr/`**:
-  - `packages/cli-beacon/docs/adr/`
-  - `apps/central/docs/adr/`
+- **`GLOSSARY-MAP.md`** at the repo root, if it exists: it points to each context's `GLOSSARY.md`. Read every glossary relevant to the topic.
+- **`docs/adr/`**: read ADRs affecting the area of work. Also check each relevant context's `docs/adr/` for scoped decisions.
 
-Read whichever contexts are relevant to the topic at hand. If your work spans both surfaces, read both.
-
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The producer skill (`/grill-with-docs`) creates them lazily when terms or decisions actually get resolved.
+If any of these files do not exist, **proceed silently**. Do not flag their absence or suggest creating them upfront. The `/domain-modeling` skill creates them when terms or decisions are actually resolved.
 
 ## File structure
 
 ```
 /
-├── CONTEXT-MAP.md
+├── GLOSSARY-MAP.md
 ├── docs/adr/                          ← system-wide decisions
 ├── packages/
 │   └── cli-beacon/
-│       ├── CONTEXT.md
+│       ├── GLOSSARY.md
 │       └── docs/adr/                  ← CLI-specific decisions
 └── apps/
-    └── central/
-        ├── CONTEXT.md
-        └── docs/adr/                  ← backend-specific decisions
+    ├── central/
+    │   ├── GLOSSARY.md
+    │   └── docs/adr/                  ← backend-specific decisions
+    └── central-ui/
+        ├── GLOSSARY.md
+        └── docs/adr/                  ← UI-specific decisions
 ```
 
 ## Use the glossary's vocabulary
 
-When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in the relevant `CONTEXT.md` (or `CONTEXT-MAP.md` for shared terms). Don't drift to synonyms the glossary explicitly avoids.
+When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in the relevant `GLOSSARY.md`. Don't drift to synonyms the glossary explicitly avoids.
 
-If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/grill-with-docs`).
+If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
 
 ## Flag ADR conflicts
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
+> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_

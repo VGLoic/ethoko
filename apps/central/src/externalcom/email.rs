@@ -1,4 +1,4 @@
-use crate::newtypes::{email::Email, handle::Handle, otp::Otp};
+use crate::newtypes::{email::Email, otp::Otp};
 use resend_rs::{
     Resend, types::CreateEmailBaseOptions, types::EmailTemplate as ResendEmailTemplate,
 };
@@ -13,7 +13,6 @@ pub enum EmailTemplate {
 #[derive(Debug, Clone)]
 pub struct EmailVerificationCodePayload {
     pub email: Email,
-    pub handle: Handle,
     pub otp: Otp,
 }
 
@@ -24,8 +23,8 @@ impl From<EmailVerificationCodePayload> for EmailTemplate {
 }
 
 impl EmailVerificationCodePayload {
-    pub fn new(email: Email, handle: Handle, otp: Otp) -> Self {
-        Self { email, handle, otp }
+    pub fn new(email: Email, otp: Otp) -> Self {
+        Self { email, otp }
     }
 }
 
@@ -39,25 +38,6 @@ pub trait EmailService: Send + Sync + 'static {
     /// # Errors
     /// * `anyhow::Error` for any errors that may occur during the process
     async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error>;
-}
-
-pub struct DummyEmailSender;
-
-#[async_trait::async_trait]
-impl EmailService for DummyEmailSender {
-    async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error> {
-        let template_kind = match &template {
-            EmailTemplate::EmailVerificationCode(_) => "email_verification_code",
-        };
-        debug!(
-            event = "externalcom.email.send_succeeded",
-            provider = "dummy",
-            template = template_kind,
-            "Sent email via dummy provider"
-        );
-        let _ = email;
-        Ok(())
-    }
 }
 
 enum RsEmailVerificationTemplate {
@@ -78,7 +58,6 @@ impl RsEmailVerificationTemplate {
             RsEmailVerificationTemplate::ResendEmailVerificationCode(vars) => {
                 let mut map = HashMap::new();
                 map.insert("email".to_string(), serde_json::json!(vars.email));
-                map.insert("handle".to_string(), serde_json::json!(vars.handle));
                 map.insert(
                     "verification_url".to_string(),
                     serde_json::json!(vars.verification_url),
@@ -92,7 +71,6 @@ impl RsEmailVerificationTemplate {
 #[derive(Debug)]
 struct RsEmailVerificationCodeVariables {
     email: Email,
-    handle: Handle,
     verification_url: String,
 }
 
@@ -122,7 +100,6 @@ impl ResendEmailService {
                 RsEmailVerificationTemplate::ResendEmailVerificationCode(
                     RsEmailVerificationCodeVariables {
                         email: payload.email,
-                        handle: payload.handle,
                         verification_url,
                     },
                 )

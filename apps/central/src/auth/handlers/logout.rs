@@ -10,7 +10,7 @@ pub async fn handle_logout(
 ) -> Result<StatusCode, ApiError> {
     state
         .auth_service
-        .revoke_session_token(principal.user.id, &principal.session_token_hash)
+        .revoke_session_token(principal.user.id(), &principal.session_token_hash)
         .await?;
 
     Ok(StatusCode::OK)

@@ -4,9 +4,9 @@ Ethoko is a warehouse for smart-contract compilation artifacts. The repository s
 
 ## Contexts
 
-- [`packages/cli-beacon/CONTEXT.md`](./packages/cli-beacon/CONTEXT.md) — the standalone CLI: artifact discovery, mapping, push/pull, typings generation, local cache.
-- [`apps/central/CONTEXT.md`](./apps/central/CONTEXT.md) — **Ethoko Central API**, the hosted backend service and source of truth for Central domain/application logic.
-- [`apps/central-ui/CONTEXT.md`](./apps/central-ui/CONTEXT.md) — **Ethoko Central UI**, a React Router application with a thin BFF/server layer for browser flows.
+- [`packages/cli-beacon/GLOSSARY.md`](./packages/cli-beacon/GLOSSARY.md) — the standalone CLI: artifact discovery, mapping, push/pull, typings generation, local cache.
+- [`apps/central/GLOSSARY.md`](./apps/central/GLOSSARY.md) — **Ethoko Central API**, the hosted backend service and source of truth for Central domain/application logic.
+- [`apps/central-ui/GLOSSARY.md`](./apps/central-ui/GLOSSARY.md) — **Ethoko Central UI**, a React Router application with a thin BFF/server layer for browser flows.
 
 `apps/*` other than `central` and `central-ui` are integration apps that exercise the CLI against real Hardhat/Foundry codebases; they don't introduce vocabulary.
 
@@ -46,7 +46,7 @@ _Avoid_: "repository" (overloaded with git/Docker), "warehouse" (Ethoko itself i
 
 ### Namespace
 
-The owner-prefix of a **Project** on **Ethoko Central** (e.g. the `vincent` in `vincent/my-contracts`). For v1, every Namespace corresponds to exactly one **User** and is identical to that User's handle. Filesystem and AWS backends have no Namespace — Projects are flat-named in local config.
+The owner-prefix of a **Project** on **Ethoko Central** (e.g. the `vincent` in `vincent/my-contracts`). For v1, every Namespace corresponds to exactly one **Registered User** and is identical to that User's handle. Filesystem and AWS backends have no Namespace — Projects are flat-named in local config.
 _Avoid_: "scope" (npm's word, conflicts with the storage-scoping language already used in code), "owner" (keep that for the human role).
 
 ### Visibility
@@ -55,8 +55,18 @@ Per-Project property on **Ethoko Central**: `public` (anyone, including unauthen
 
 ### User
 
-A person with an account on **Ethoko Central**. Identified by a unique, **immutable** handle that doubles as their **Namespace** (e.g. `vincent`). May authenticate via email + password, a linked GitHub account, or both — multiple auth methods can be attached to the same User, but only by adding them from an authenticated session. Sign-in flows never silently merge accounts. The "User" concept does not apply to filesystem or AWS storage backends.
+A person known to **Ethoko Central**. A User is either a **Pending User** or a **Registered User**. May authenticate via email + password, a linked GitHub account, or both — multiple auth methods can be attached to the same User, but only by adding them from an authenticated session. Sign-in flows never silently merge accounts. The "User" concept does not apply to filesystem or AWS storage backends.
 _Avoid_: "account" (overloaded — could mean billing, GitHub, AWS), "developer" (a role, not an identity).
+
+### Pending User
+
+A **User** who has not yet registered their permanent handle. A Pending User may hold a **User Session Token** only to complete onboarding or manage their session. Once they register an available handle, they become a **Registered User**; this transition is irreversible.
+_Avoid_: "temporary User" (their identity is not temporary).
+
+### Registered User
+
+A **User** identified by a unique, immutable handle that doubles as their **Namespace** (e.g. `vincent`). A Registered User may use normal User capabilities. Email verification is independent of handle registration.
+_Avoid_: "complete User" (vague), "verified User" (email verification is a separate attribute).
 
 ### Compilation Artifact
 
@@ -118,7 +128,7 @@ _Avoid_: "Foundry" as a synonym in technical contexts — Foundry is the umbrell
 
 ### Storage Backend
 
-The configured backend where a **Project**'s artifacts persist. Implementations: filesystem, AWS S3, Ethoko Central. Distinct from the **Local Artifact Store** (defined per-context — see `packages/cli-beacon/CONTEXT.md`) even when both happen to be on local disk — they live at different paths and serve different roles.
+The configured backend where a **Project**'s artifacts persist. Implementations: filesystem, AWS S3, Ethoko Central. Distinct from the **Local Artifact Store** (defined per-context — see `packages/cli-beacon/GLOSSARY.md`) even when both happen to be on local disk — they live at different paths and serve different roles.
 _Avoid_: "remote storage" (the filesystem backend can be local), "storage" alone (too vague), "storage provider" in domain conversation (it's the name of the code-level interface, not the domain term).
 
 ## Relationships
