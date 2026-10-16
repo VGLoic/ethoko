@@ -1,13 +1,11 @@
-use std::{net::IpAddr, sync::Arc, time::Duration};
+use std::{net::IpAddr, time::Duration};
 
-use crate::{
-    auth, auth::state::AuthState, config::RateLimitConfig, operational_tracing::error_chain,
-};
+use crate::{auth::Auth, config::RateLimitConfig, operational_tracing::error_chain};
 use anyhow::Context;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{FromRef, MatchedPath, Request},
+    extract::{MatchedPath, Request},
     http::StatusCode,
     http::header::HeaderName,
     response::{IntoResponse, Response},
@@ -77,8 +75,7 @@ impl IpRateLimiters {
 pub fn app_router(
     global_rate_limit_config: RateLimitConfig,
     auth_rate_limit_config: RateLimitConfig,
-    central_ui_bff_shared_secret: String,
-    auth_service: impl auth::AuthService,
+    auth: Auth,
 ) -> Result<(Router, IpRateLimiters), anyhow::Error> {
     let x_request_id = HeaderName::from_static(REQUEST_ID_HEADER);
 
@@ -88,14 +85,9 @@ pub fn app_router(
         .finish()
         .ok_or_else(|| anyhow::anyhow!("Error while building the global governor configuration"))?;
 
-    let auth_service = Arc::new(auth_service);
-    let state = AppState {
-        auth_service,
-        central_ui_bff_shared_secret: Arc::new(central_ui_bff_shared_secret),
-    };
-
-    let (auth_router, auth_ip_rate_limiter) =
-        auth::router(auth_rate_limit_config).context("failed to build auth router")?;
+    let (auth_router, auth_ip_rate_limiter) = auth
+        .router(auth_rate_limit_config)
+        .context("failed to build auth router")?;
     let limiters = IpRateLimiters::new(vec![
         IpRateLimiter::new(global_governor_conf.limiter().clone()),
         auth_ip_rate_limiter,
@@ -106,7 +98,6 @@ pub fn app_router(
         .route("/health", get(get_healthcheck))
         .nest("/auth", auth_router)
         .fallback(not_found)
-        .with_state(state)
         .layer((
             // Set `x-request-id` header for every request
             SetRequestIdLayer::new(x_request_id.clone(), MakeRequestUuid),
@@ -172,22 +163,6 @@ pub fn app_router(
             PropagateRequestIdLayer::new(x_request_id),
         ));
     Ok((router, limiters))
-}
-
-#[derive(Clone)]
-pub struct AppState {
-    pub auth_service: Arc<dyn auth::AuthService>,
-    pub central_ui_bff_shared_secret: Arc<String>,
-}
-
-impl FromRef<AppState> for AuthState {
-    /// Clones the auth dependency handles from application state. This is infallible.
-    fn from_ref(state: &AppState) -> Self {
-        Self {
-            auth_service: state.auth_service.clone(),
-            central_ui_bff_shared_secret: state.central_ui_bff_shared_secret.clone(),
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize)]

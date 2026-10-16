@@ -1,11 +1,7 @@
 use dotenvy::dotenv;
 use ethoko_central::{
-    auth, clients,
-    config::Config,
-    externalcom::email::ResendEmailService,
-    httpserver::serve_http_server,
-    jobs::{self, processor::JobProcessor},
-    router::app_router,
+    auth, clients, config::Config, externalcom::email::ResendEmailService,
+    httpserver::serve_http_server, jobs, router::app_router,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, time::Duration};
@@ -78,30 +74,23 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let auth_oauth_github_client_adapter =
         auth::AuthOauthClientAdapter::new(config.github_oauth_client_config.clone());
-    let auth_github_adapter = auth::AuthGithubAdapter::new(github_client);
-    let auth_repository = auth::PsqlAuthRepository::new(pool);
-    let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
-    let auth_service = auth::AuthServiceImpl::new(
-        auth_repository.clone(),
-        auth_notifier,
-        config.otp_config.clone(),
-        auth_oauth_github_client_adapter,
-        config.oauth_transaction_ttl_seconds,
-        auth_github_adapter,
-    );
-    let auth_job_processor = auth::AuthJobProcessor::new(
-        auth_repository.clone(),
+    let auth = auth::Auth::compose(
+        pool,
+        job_queue.clone(),
         email_service,
+        github_client,
+        auth_oauth_github_client_adapter,
         config.otp_config.clone(),
+        config.oauth_transaction_ttl_seconds,
+        config.central_ui_bff_shared_secret.clone(),
     );
 
+    let auth_job_registration = auth.job_registration();
     let job_worker_queue = job_queue.clone();
     let job_worker_token = cancellation_token.clone();
-    let job_worker_handle = tokio::spawn(async {
-        let root_processor = jobs::rootprocessor::RootProcessor::new(HashMap::from([(
-            auth::AUTH_JOB_TOPIC.to_string(),
-            Box::new(auth_job_processor) as Box<dyn JobProcessor>,
-        )]));
+    let job_worker_handle = tokio::spawn(async move {
+        let root_processor =
+            jobs::rootprocessor::RootProcessor::new(HashMap::from([auth_job_registration]));
         let worker = jobs::polling_worker::Worker::new(job_worker_queue, root_processor, 1_000);
 
         if let Err(e) = worker.run(job_worker_token).await {
@@ -125,8 +114,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (app_router, ip_rate_limiters) = app_router(
         config.global_rate_limit_config.clone(),
         config.auth_rate_limit_config.clone(),
-        config.central_ui_bff_shared_secret.clone(),
-        auth_service,
+        auth,
     )
     .map_err(|e| e.context("Error while building the application router"))?;
 

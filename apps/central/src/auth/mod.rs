@@ -1,4 +1,5 @@
 mod acls;
+mod composition;
 mod handlers;
 mod models;
 mod notifier;
@@ -11,8 +12,8 @@ pub(crate) mod state;
 
 pub use acls::github::AuthGithubAdapter;
 pub use acls::oauth::{AuthOauthClientAdapter, AuthOauthClientPort};
+pub use composition::Auth;
 pub use models::{http_responses, oauth_acl, requests};
 pub use notifier::{AUTH_JOB_TOPIC, AuthNotifierImpl, job_processor::AuthJobProcessor};
 pub use repository::PsqlAuthRepository;
-pub use router::router;
 pub use service::{AuthService, AuthServiceImpl};

@@ -2,7 +2,7 @@ use ethoko_central::{
     auth,
     config::{Config, OauthClientConfig, OtpConfig},
     httpserver::serve_http_server,
-    jobs::{memoryqueue::InMemoryQueue, processor::JobProcessor, rootprocessor::RootProcessor},
+    jobs::{memoryqueue::InMemoryQueue, rootprocessor::RootProcessor},
     router::app_router,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -159,30 +159,19 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let github_client = FakeGithubClient::default();
 
     let auth_oauth_github_client_adapter = FakeOauthClient::default();
-    let auth_github_adapter = auth::AuthGithubAdapter::new(github_client.clone());
-    let auth_notifier = auth::AuthNotifierImpl::new(job_queue.clone());
-    let auth_repository = auth::PsqlAuthRepository::new(pool);
-    let auth_service = auth::AuthServiceImpl::new(
-        auth_repository.clone(),
-        auth_notifier,
-        config.otp_config.clone(),
-        auth_oauth_github_client_adapter.clone(),
-        config.oauth_transaction_ttl_seconds,
-        auth_github_adapter,
-    );
-    let users_job_processor = auth::AuthJobProcessor::new(
-        auth_repository.clone(),
+    let auth = auth::Auth::compose(
+        pool,
+        job_queue.clone(),
         email_service.clone(),
+        github_client.clone(),
+        auth_oauth_github_client_adapter.clone(),
         config.otp_config.clone(),
+        config.oauth_transaction_ttl_seconds,
+        config.central_ui_bff_shared_secret.clone(),
     );
 
-    let job_worker_queue = job_queue.clone();
-    let job_worker_users_job_processor = users_job_processor.clone();
-    let root_processor = RootProcessor::new(HashMap::from([(
-        auth::AUTH_JOB_TOPIC.to_string(),
-        Box::new(job_worker_users_job_processor) as Box<dyn JobProcessor>,
-    )]));
-    let job_worker = ManualWorker::new(job_worker_queue, root_processor);
+    let root_processor = RootProcessor::new(HashMap::from([auth.job_registration()]));
+    let job_worker = ManualWorker::new(job_queue, root_processor);
 
     let port = config.port;
 
@@ -204,8 +193,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     let (app_router, _) = app_router(
         config.global_rate_limit_config.clone(),
         config.auth_rate_limit_config.clone(),
-        config.central_ui_bff_shared_secret.clone(),
-        auth_service,
+        auth,
     )
     .unwrap();
     tokio::spawn(async move {

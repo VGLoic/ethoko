@@ -37,6 +37,39 @@ async fn test_signup_email() {
 }
 
 #[tokio::test]
+async fn test_signup_email_uses_configured_bff_credential() {
+    let mut config = TestConfigBuilder::build_default();
+    config.central_ui_bff_shared_secret = "deployment-specific-bff-secret".into();
+    let instance_state = setup_instance(&config).await.unwrap();
+    let signup_body = HttpSignupEmailBody {
+        email: Faker.fake::<Email>().to_string(),
+        password: Faker.fake::<Password>().as_str().to_owned(),
+    };
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .headers(central_ui_bff_principal_headers())
+        .json(&signup_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    let response = instance_state
+        .reqwest_client
+        .post(format!("{}/auth/signup/email", &instance_state.server_url))
+        .bearer_auth(&config.central_ui_bff_shared_secret)
+        .json(&signup_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let response_body: HttpSignupEmailResponse = response.json().await.unwrap();
+    assert_eq!(response_body.email.to_string(), signup_body.email);
+}
+
+#[tokio::test]
 async fn test_signup_email_trigger_otp_email_sending() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
