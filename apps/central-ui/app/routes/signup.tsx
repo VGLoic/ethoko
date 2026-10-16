@@ -3,11 +3,12 @@ import type { Route } from "./+types/signup";
 import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 import { PasswordSchema } from "~/server/newtypes.server";
+import { Feedback, Field, Page, SubmitButton } from "~/components/ui";
 
 export function meta() {
   return [
-    { title: "Sign Up" },
-    { name: "description", content: "Sign up to Ethoko Central!" },
+    { title: "Sign up · Ethoko Central" },
+    { name: "description", content: "Sign up to Ethoko Central." },
   ];
 }
 
@@ -55,7 +56,8 @@ export async function action({ request }: Route.ActionArgs) {
           success: false as const,
           errors: {
             reason: null,
-            email: "An account with this email already exist",
+            email:
+              "This email is already registered. Sign in with your email and password.",
           },
         };
       }
@@ -70,7 +72,7 @@ export async function action({ request }: Route.ActionArgs) {
     return {
       success: false as const,
       errors: {
-        reason: "An error occurred during signup.",
+        reason: "We couldn’t complete sign-up. Try again in a moment.",
       },
     };
   }
@@ -79,54 +81,46 @@ export async function action({ request }: Route.ActionArgs) {
 export default function Signup({ actionData }: Route.ComponentProps) {
   if (actionData?.success) {
     return (
-      <main>
-        <p>Sign up successful!</p>
-      </main>
+      <Page>
+        <h1>Check your email</h1>
+        <Feedback tone="success">
+          You’re signed up. Check your email for a verification code.
+        </Feedback>
+      </Page>
     );
   }
 
   return (
-    <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
-      <h1 className="flex justify-center">Sign Up to Ethoko Central</h1>
-      <Form method="post" className="flex flex-col gap-4">
-        <label>
-          Email:
-          <input type="email" name="email" required className="border p-2" />
-          {actionData?.errors?.email ? (
-            <p className="text-red-500">{actionData.errors.email}</p>
-          ) : null}
-        </label>
-        <label>
-          Password:
-          <input
-            type="password"
-            name="password"
-            required
-            className="border p-2"
-          />
-          {actionData?.errors?.password ? (
-            <p className="text-red-500">{actionData.errors.password}</p>
-          ) : null}
-        </label>
-        <label>
-          Password confirmation:
-          <input
-            type="password"
-            name="passwordConfirmation"
-            required
-            className="border p-2"
-          />
-          {actionData?.errors?.passwordConfirmation ? (
-            <p className="text-red-500">
-              {actionData.errors.passwordConfirmation}
-            </p>
-          ) : null}
-        </label>
-        {actionData?.errors?.reason ? (
-          <p className="text-red-500">{actionData.errors.reason}</p>
-        ) : null}
-        <button type="submit">Sign Up</button>
+    <Page>
+      <h1>Sign up to Ethoko Central</h1>
+      <Form method="post">
+        <Field
+          label="Email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          required
+          error={actionData?.errors?.email}
+        />
+        <Field
+          label="Password"
+          type="password"
+          name="password"
+          autoComplete="new-password"
+          required
+          error={actionData?.errors?.password}
+        />
+        <Field
+          label="Confirm password"
+          type="password"
+          name="passwordConfirmation"
+          autoComplete="new-password"
+          required
+          error={actionData?.errors?.passwordConfirmation}
+        />
+        <Feedback>{actionData?.errors?.reason}</Feedback>
+        <SubmitButton pendingLabel="Signing up…">Sign up</SubmitButton>
       </Form>
-    </main>
+    </Page>
   );
 }

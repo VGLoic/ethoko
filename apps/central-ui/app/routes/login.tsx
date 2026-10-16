@@ -4,11 +4,12 @@ import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 import { PasswordSchema } from "~/server/newtypes.server";
 import { centralSession, githubOAuthSession } from "~/server/sessions.server";
+import { Feedback, Field, Page, SubmitButton } from "~/components/ui";
 
 export function meta() {
   return [
-    { title: "Log In" },
-    { name: "description", content: "Log in to Ethoko Central!" },
+    { title: "Sign in · Ethoko Central" },
+    { name: "description", content: "Sign in to Ethoko Central." },
   ];
 }
 
@@ -76,7 +77,8 @@ export async function action({ request }: Route.ActionArgs) {
           return {
             intent: LOGIN_WITH_EMAIL_INTENT,
             errors: {
-              reason: "Invalid email or password",
+              reason:
+                "We couldn’t sign you in. Check your email and password, then try again.",
             },
           };
         }
@@ -93,7 +95,7 @@ export async function action({ request }: Route.ActionArgs) {
       return {
         intent: LOGIN_WITH_EMAIL_INTENT,
         errors: {
-          reason: "An error occurred during login.",
+          reason: "The sign-in service is unavailable. Try again in a moment.",
         },
       };
     }
@@ -123,43 +125,45 @@ export default function Login({
   loaderData,
 }: Route.ComponentProps) {
   return (
-    <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
-      {loaderData?.error ? (
-        <p className="text-red-500">{loaderData.error}</p>
-      ) : null}
-      <h1 className="flex justify-center">Log In to Ethoko Central</h1>
-      <Form method="post" className="flex flex-col gap-4">
-        <label>
-          Email:
-          <input type="email" name="email" required className="border p-2" />
-          {actionData?.intent === LOGIN_WITH_EMAIL_INTENT &&
-          actionData?.errors?.email ? (
-            <p className="text-red-500">{actionData.errors.email}</p>
-          ) : null}
-        </label>
-        <label>
-          Password:
-          <input
-            type="password"
-            name="password"
-            required
-            className="border p-2"
-          />
-          <input type="hidden" name="intent" value={LOGIN_WITH_EMAIL_INTENT} />
-          {actionData?.errors?.password ? (
-            <p className="text-red-500">{actionData.errors.password}</p>
-          ) : null}
-        </label>
-        {actionData?.intent === LOGIN_WITH_EMAIL_INTENT &&
-        actionData?.errors?.reason ? (
-          <p className="text-red-500">{actionData.errors.reason}</p>
-        ) : null}
-        <button type="submit">Log In</button>
+    <Page>
+      <Feedback>{loaderData?.error}</Feedback>
+      <h1>Sign in to Ethoko Central</h1>
+      <Form method="post">
+        <Field
+          label="Email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          required
+          error={actionData?.errors?.email}
+        />
+        <Field
+          label="Password"
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          required
+          error={actionData?.errors?.password}
+        />
+        <input type="hidden" name="intent" value={LOGIN_WITH_EMAIL_INTENT} />
+        <Feedback>{actionData?.errors?.reason}</Feedback>
+        <SubmitButton
+          intent={LOGIN_WITH_EMAIL_INTENT}
+          pendingLabel="Signing in…"
+        >
+          Sign in
+        </SubmitButton>
       </Form>
-      <Form method="post" className="flex flex-col gap-4">
+      <Form method="post">
         <input type="hidden" name="intent" value={LOGIN_WITH_GITHUB_INTENT} />
-        <button type="submit">Log In with GitHub</button>
+        <SubmitButton
+          intent={LOGIN_WITH_GITHUB_INTENT}
+          secondary
+          pendingLabel="Connecting…"
+        >
+          Sign in with GitHub
+        </SubmitButton>
       </Form>
-    </main>
+    </Page>
   );
 }

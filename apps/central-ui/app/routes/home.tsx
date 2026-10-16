@@ -2,11 +2,12 @@ import type { Route } from "./+types/home";
 import { getSessionTokenOrRedirect } from "~/server/auth.server";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 import { Form, Link } from "react-router";
+import { Page, SubmitButton } from "~/components/ui";
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "Ethoko Central Home" },
-    { name: "description", content: "Welcome to Ethoko Central!" },
+    { title: "Home · Ethoko Central" },
+    { name: "description", content: "Your Ethoko Central details." },
   ];
 }
 
@@ -22,32 +23,32 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const user = loaderData.user;
 
   return (
-    <main className="flex flex-col items-center justify-center pt-16 pb-4 gap-16">
-      <div className="flex flex-col items-center gap-8">
-        <div className="flex flex-row items-center gap-4">
+    <Page>
+      <div className="profile">
+        <div className="profile-row">
           <div className="font-bold">Email:</div>
-          <div>{loaderData.user.email}</div>
+          <div className="identifier">{loaderData.user.email}</div>
         </div>
         {user.state === "registered" ? (
-          <div className="flex flex-row items-center gap-4">
+          <div className="profile-row">
             <div className="font-bold">Handle:</div>
-            <div>{user.handle}</div>
+            <div className="identifier">{user.handle}</div>
           </div>
         ) : (
-          <div className="flex items-center gap-4">
+          <div className="profile-row">
             <p>Complete onboarding by registering your handle.</p>
-            <Link to="/register-handle">Register Handle</Link>
+            <Link to="/register-handle">Register handle</Link>
           </div>
         )}
-        <div className="flex flex-row items-center gap-4">
-          <div className="font-bold">Email Verified:</div>
+        <div className="profile-row">
+          <div className="font-bold">Email verified:</div>
           {loaderData.user.emailVerified ? (
             <div>Yes</div>
           ) : (
-            <div className="flex items-center gap-4">
+            <div className="profile-row">
               <p>No</p>
               <Link to={`verify-email?email=${loaderData.user.email}`}>
-                Verify Email
+                Verify email
               </Link>
             </div>
           )}
@@ -55,9 +56,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       </div>
       <div>
         <Form method="post" action="/logout">
-          <button type="submit">Logout</button>
+          <SubmitButton secondary pendingLabel="Signing out…">
+            Sign out
+          </SubmitButton>
         </Form>
       </div>
-    </main>
+    </Page>
   );
 }
