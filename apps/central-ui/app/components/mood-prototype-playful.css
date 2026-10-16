@@ -1,0 +1,392 @@
+/* THROWAWAY: two playful layouts using the selected ivory/vermilion palette. */
+.mp-playful {
+  --scene-sky: #dedbd4;
+  --scene-hill: #ccc7bf;
+  --scene-ground: #c1bab0;
+  --scene-wall: #f4ecdd;
+  --scene-roof: #655b55;
+  --scene-door: #514a47;
+  --scene-slat: #6d615a;
+  --scene-crate: #bb8057;
+}
+.mp-playful.mp-dark {
+  --scene-sky: #39393e;
+  --scene-hill: #454449;
+  --scene-ground: #57514d;
+  --scene-wall: #8a7c6b;
+  --scene-roof: #514544;
+  --scene-door: #333234;
+  --scene-slat: #514a48;
+  --scene-crate: #b77b50;
+}
+.mp-pixel-scene {
+  width: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+.scene-sky {
+  fill: var(--scene-sky);
+}
+.scene-hill {
+  fill: var(--scene-hill);
+}
+.scene-ground {
+  fill: var(--scene-ground);
+}
+.scene-wall {
+  fill: var(--scene-wall);
+}
+.scene-roof,
+.scene-trim {
+  fill: var(--scene-roof);
+}
+.scene-door,
+.scene-boots,
+.scene-wire {
+  fill: var(--scene-door);
+}
+.scene-slat {
+  fill: var(--scene-slat);
+}
+.scene-crate {
+  fill: var(--scene-crate);
+}
+.scene-crate-line {
+  fill: #77543d;
+}
+.scene-lantern,
+.scene-jacket {
+  fill: #f47b48;
+}
+.scene-lantern-light {
+  fill: #ffc18b;
+}
+.scene-skin {
+  fill: #edd3b4;
+}
+.scene-cart {
+  fill: #b1b0ab;
+}
+.scene-path {
+  fill: var(--scene-wall);
+  opacity: 0.35;
+}
+.mp-play-header {
+  max-width: 1220px;
+  margin: auto;
+  padding: 30px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.mp-play-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+.mp-playful .mp-mark {
+  border-radius: 9px;
+  transform: rotate(-5deg);
+}
+.mp-workshop {
+  max-width: 1100px;
+  padding: 25px 35px 45px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: 1fr 440px;
+  gap: 70px;
+  align-items: start;
+}
+.mp-workshop-title {
+  padding: 12px 0 24px;
+}
+.mp-workshop-title h2 {
+  font:
+    42px/1.1 Georgia,
+    serif;
+  letter-spacing: -1.5px;
+  margin: 14px 0;
+}
+.mp-workshop-title p {
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 300px;
+}
+.mp-scene-frame {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  overflow: hidden;
+  transform: rotate(-1deg);
+}
+.mp-scene-caption {
+  display: flex;
+  justify-content: space-between;
+  padding: 13px 20px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.mp-play-nav {
+  display: flex;
+  gap: 8px;
+  margin: 25px 0;
+}
+.mp-play-nav button {
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 12px;
+  text-align: left;
+}
+.mp-play-nav button > span {
+  margin-right: 8px;
+  color: var(--accent);
+}
+.mp-play-nav button[aria-current] {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--soft);
+}
+.mp-scene-note {
+  font-size: 10px;
+  color: var(--muted);
+  max-width: 320px;
+}
+.mp-workshop-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  padding: 36px;
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--line) 35%, transparent);
+}
+.mp-card-sticker {
+  position: absolute;
+  right: 24px;
+  top: -17px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 10px;
+  transform: rotate(8deg);
+  font-size: 24px;
+}
+.mp-playful-B .mp-form-area input,
+.mp-playful-B .mp-input-prefix,
+.mp-playful-B .mp-primary,
+.mp-playful-B .mp-secondary {
+  border-radius: 10px;
+}
+.mp-playful-B .mp-form-area input {
+  background: var(--bg);
+}
+.mp-playful-B .mp-empty {
+  border-radius: 14px;
+  background: var(--bg);
+}
+.mp-depot {
+  max-width: 1060px;
+  padding: 15px 30px 40px;
+  margin: auto;
+}
+.mp-depot-world {
+  position: relative;
+  border: 2px solid var(--line);
+  background: var(--scene-sky);
+  box-shadow: 5px 5px 0 var(--line);
+}
+.mp-depot-title {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 2px solid var(--line);
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 1px;
+  background: var(--surface);
+}
+.mp-depot-world .mp-pixel-scene {
+  width: 56%;
+  margin-left: auto;
+}
+.mp-depot-caption {
+  position: absolute;
+  top: 29%;
+  left: 30px;
+}
+.mp-depot-caption h2 {
+  font:
+    bold 27px/1.2 ui-monospace,
+    monospace;
+  letter-spacing: -1px;
+  margin-bottom: 16px;
+}
+.mp-depot-caption p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.mp-depot-desk {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 35px;
+  margin-top: 35px;
+  align-items: start;
+}
+.mp-depot-desk .mp-play-nav {
+  flex-direction: column;
+  margin: 0;
+}
+.mp-playful-C .mp-mark {
+  border-radius: 0;
+  transform: none;
+}
+.mp-playful-C .mp-play-nav button {
+  border-radius: 0;
+  border-width: 2px;
+  font-family: ui-monospace, monospace;
+  padding: 13px;
+}
+.mp-playful-C .mp-play-nav button[aria-current] {
+  box-shadow: 3px 3px 0 var(--accent);
+}
+.mp-inventory {
+  margin: 30px 0;
+  border-top: 2px dashed var(--line);
+  padding-top: 20px;
+}
+.mp-inventory p {
+  padding-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mp-inventory p span {
+  color: var(--accent);
+  padding-right: 10px;
+}
+.mp-depot-panel {
+  border: 2px solid var(--line);
+  background: var(--surface);
+  box-shadow: 5px 5px 0 var(--line);
+}
+.mp-panel-title {
+  background: var(--soft);
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 2px solid var(--line);
+  font:
+    10px ui-monospace,
+    monospace;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+.mp-depot-panel .mp-form-area {
+  max-width: none;
+  padding: 25px 35px;
+}
+.mp-playful-C h1 {
+  font:
+    bold 27px/1.2 ui-monospace,
+    monospace;
+}
+.mp-playful-C .mp-primary,
+.mp-playful-C .mp-secondary,
+.mp-playful-C input,
+.mp-playful-C .mp-input-prefix {
+  border-radius: 0;
+  border-width: 2px;
+}
+.mp-playful-C .mp-primary {
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.mp-playful-C .mp-primary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+@media (max-width: 900px) {
+  .mp-workshop {
+    gap: 30px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .mp-workshop-card {
+    padding: 25px;
+  }
+  .mp-play-nav {
+    flex-wrap: wrap;
+  }
+  .mp-depot-caption h2 {
+    font-size: 22px;
+  }
+  .mp-depot-caption p {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .mp-play-header {
+    padding: 25px;
+  }
+  .mp-play-label {
+    display: none;
+  }
+  .mp-workshop {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 25px;
+    gap: 30px;
+  }
+  .mp-workshop > aside,
+  .mp-workshop-card {
+    width: 100%;
+  }
+  .mp-workshop-title h2 {
+    font-size: 32px;
+  }
+  .mp-workshop-title {
+    padding-top: 0;
+  }
+  .mp-workshop .mp-scene-frame {
+    max-width: 400px;
+  }
+  .mp-depot {
+    padding: 10px 20px;
+  }
+  .mp-depot-world .mp-pixel-scene {
+    width: 100%;
+  }
+  .mp-depot-caption {
+    position: static;
+    padding: 18px;
+  }
+  .mp-depot-caption h2 {
+    margin: 0;
+  }
+  .mp-depot-desk {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .mp-depot-desk > aside,
+  .mp-depot-panel {
+    width: 100%;
+  }
+  .mp-depot-desk .mp-play-nav {
+    flex-direction: row;
+  }
+  .mp-depot-desk .mp-play-nav button {
+    flex: 1;
+    padding: 8px;
+    font-size: 11px;
+  }
+  .mp-inventory {
+    display: none;
+  }
+  .mp-depot-panel .mp-form-area {
+    padding: 25px;
+  }
+}

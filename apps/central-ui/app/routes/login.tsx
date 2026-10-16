@@ -1,4 +1,5 @@
-import { Form, redirect } from "react-router";
+import { Form, redirect, useSearchParams } from "react-router";
+import { MoodPrototype } from "~/components/mood-prototype";
 import type { Route } from "./+types/login";
 import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
@@ -122,6 +123,10 @@ export default function Login({
   actionData,
   loaderData,
 }: Route.ComponentProps) {
+  const [searchParams] = useSearchParams();
+  if (import.meta.env.DEV && searchParams.has("variant")) {
+    return <MoodPrototype />;
+  }
   return (
     <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
       {loaderData?.error ? (

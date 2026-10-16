@@ -19,6 +19,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "prototype:central": "pnpm --filter central-ui dev --open '/login?variant=A'",
     "test:unit": "turbo run test:unit",
     "test:e2e:core": "pnpm --filter @ethoko/cli-beacon test:e2e",
     "test:e2e:apps": "turbo run test:e2e:apps",

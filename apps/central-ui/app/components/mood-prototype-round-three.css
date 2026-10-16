@@ -1,0 +1,40 @@
+/* THROWAWAY round 3: neutral surfaces, ivory text, two orange-red energies. */
+.mood-prototype.mp-round-three {
+  --bg: #eeede8;
+  --surface: #f8f7f2;
+  --ink: #383634;
+  --muted: #6b6661;
+  --line: #d0cbc5;
+  --accent: #ac4b37;
+  --soft: #eaded7;
+  --on-accent: #fffaf3;
+  --success: #526773;
+  --error: #a63730;
+}
+.mood-prototype.mp-round-three.mp-dark {
+  --bg: #323232;
+  --surface: #3e3e3e;
+  --ink: #f0e9dc;
+  --muted: #c4bfba;
+  --line: #65615f;
+  --accent: #f47b48;
+  --soft: #49403c;
+  --on-accent: #291b16;
+  --success: #bacbd4;
+  --error: #ffb4a9;
+}
+.mood-prototype.mp-round-three.mp-palette-B {
+  --accent: #bd431e;
+  --soft: #f1ddcf;
+}
+.mood-prototype.mp-round-three.mp-palette-B.mp-dark {
+  --accent: #ff8538;
+  --soft: #4c413b;
+}
+.mp-round-three.mp-palette-B .mp-mark {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.mp-round-three.mp-palette-B .mp-primary {
+  box-shadow: 0 3px 16px color-mix(in srgb, var(--accent) 20%, transparent);
+}

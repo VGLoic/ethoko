@@ -1,0 +1,105 @@
+/* THROWAWAY round 2: fixed compact layout, three lifted dark palettes. */
+.mp-round-two {
+  --bg: #eeefea;
+  --surface: #f8f8f3;
+  --ink: #373932;
+  --muted: #656b60;
+  --line: #cbd0c5;
+  --accent: #a25132;
+  --soft: #e6ded0;
+  --on-accent: #fffaf3;
+}
+.mp-round-two.mp-palette-B {
+  --bg: #eceee9;
+  --surface: #f7f8f2;
+  --ink: #343c3c;
+  --muted: #626e6b;
+  --line: #c9d0c9;
+  --accent: #ac4b37;
+  --soft: #e8ddd3;
+}
+.mp-round-two.mp-palette-C {
+  --bg: #f0eee7;
+  --surface: #faf8f1;
+  --ink: #3b3932;
+  --muted: #6f695c;
+  --line: #d5cfc0;
+  --accent: #916126;
+  --soft: #e9dfca;
+}
+.mp-round-two.mp-dark {
+  --bg: #303231;
+  --surface: #3b3e3b;
+  --ink: #f0e9dc;
+  --muted: #c0c2b7;
+  --line: #5d635c;
+  --accent: #e6a080;
+  --soft: #49423d;
+  --on-accent: #30231c;
+  --success: #bcd3ac;
+  --error: #ffb4a9;
+}
+.mp-round-two.mp-palette-B.mp-dark {
+  --bg: #303b46;
+  --surface: #3c4954;
+  --ink: #f1eadb;
+  --muted: #bdc8cb;
+  --line: #62717a;
+  --accent: #f2a08a;
+  --soft: #4d4849;
+  --on-accent: #39231e;
+}
+.mp-round-two.mp-palette-C.mp-dark {
+  --bg: #353638;
+  --surface: #424346;
+  --ink: #f4e9d4;
+  --muted: #c7c2b6;
+  --line: #686761;
+  --accent: #edbc79;
+  --soft: #514b40;
+  --on-accent: #352819;
+}
+.mp-round-two h1,
+.mp-round-two .mp-empty h2 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.7px;
+}
+.mp-round-two h1 {
+  font-size: 32px;
+}
+.mp-round-two .mp-workbench-top {
+  background: var(--surface);
+}
+.mp-round-two .mp-reference {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+}
+.mp-round-two .mp-primary {
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.mp-round-two .mp-rail nav button[aria-current] {
+  box-shadow: inset 2px 0 var(--accent);
+}
+.mp-round-two .mp-mark {
+  background: var(--soft);
+}
+.mp-round-two .mp-switch-main {
+  flex-wrap: wrap;
+}
+@media (max-width: 800px) {
+  .mp-round-two .mp-switcher {
+    width: calc(100vw - 24px);
+  }
+  .mp-round-two .mp-switch-main {
+    justify-content: center;
+  }
+  .mp-round-two .mp-switch-meta {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .mp-round-two {
+    padding-bottom: 180px;
+  }
+}
