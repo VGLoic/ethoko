@@ -54,7 +54,10 @@ dividers intentionally need not meet interactive-boundary contrast.
 The selected dark accent alone is only 3.96:1 as text on the lifted surface, so
 links use the lighter `--accent-text` role. The selected light success text was
 4.49:1 on the soft surface, so it was darkened slightly. See `DESIGN-SYSTEM.md` for
-the final role values. Disabled controls are intentionally visually subdued;
+the final role values. Button hover and pressed overlays were also calculated:
+the pressed overlay is limited to 12% black so dark action text remains above
+4.5:1 (the initially reviewed 16% overlay fell just below that threshold).
+Disabled controls are intentionally visually subdued;
 their unavailability is also conveyed by the native disabled state.
 
 ## Repository checks
