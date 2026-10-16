@@ -120,9 +120,3 @@ repository; tags point to artifact IDs.
 Only credential failures should suggest checking the password. Preserve distinct
 expired-code, cooldown, session-expiry, and service-failure meanings. Explain
 irreversible choices before submission and provide a concrete next step.
-
-## Verification
-
-See `DESIGN-VALIDATION.md` for the checks and environment limitations recorded for
-the initial migration. No new test suite or prototype controls belong to this
-migration.
