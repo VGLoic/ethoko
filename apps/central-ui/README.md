@@ -80,7 +80,9 @@ Make sure to deploy the output of `npm run build`
 
 ## Styling
 
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
+Central UI uses the [Ivory & Vermilion design system](./DESIGN-SYSTEM.md), built
+with shared CSS tokens, Tailwind CSS, and reusable form/feedback primitives.
+Consult it before styling screens or writing interface copy.
 
 ---
 

@@ -35,5 +35,8 @@ export const HandleSchema = z
 
 export const OtpSchema = z
   .string()
-  .length(6, "OTP must be exactly 6 characters long.")
-  .refine((val) => /^[0-9]+$/.test(val), "OTP must contain only numbers.");
+  .length(6, "Enter the 6-digit verification code from your email.")
+  .refine(
+    (val) => /^[0-9]+$/.test(val),
+    "The verification code must contain only numbers.",
+  );

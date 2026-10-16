@@ -10,7 +10,7 @@ async function redirectToLogin(session?: Session, errorMessage?: string) {
     headers["Set-Cookie"] = await githubOAuthSession.destroySession(session);
   }
   throw redirect(
-    `/login?error=${encodeURIComponent(errorMessage ?? "Unknown error")}`,
+    `/login?error=${encodeURIComponent(errorMessage ?? "We couldn’t complete GitHub sign-in. Try signing in again.")}`,
     {
       headers,
     },
@@ -38,12 +38,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!state) {
     throw await redirectToLogin(
       session,
-      "Missing GitHub OAuth state in session",
+      "Your GitHub sign-in session is missing. Try signing in again.",
     );
   }
 
   if (state !== queryParsingResult.data.state) {
-    throw await redirectToLogin(session, "Invalid GitHub OAuth state");
+    throw await redirectToLogin(
+      session,
+      "Your GitHub sign-in session could not be verified. Try signing in again.",
+    );
   }
 
   const exchangeCodeResult = await ethokoCentralClient
@@ -53,20 +56,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     })
     .catch(async (err) => {
       console.error("Error exchanging code for token:", err);
-      throw await redirectToLogin(session, "Fail to login with Github");
+      throw await redirectToLogin(
+        session,
+        "The GitHub sign-in service is unavailable. Try again in a moment.",
+      );
     });
 
   if (exchangeCodeResult.variant === "unprocessable-entity") {
     const errorMessage =
       exchangeCodeResult.reason === "primary-email-collision"
-        ? "Account with this email already exist, need to login with email and then add Github auth"
+        ? "This email is already registered. Sign in with your email and password, then link GitHub."
         : exchangeCodeResult.reason === "oauth-transaction-not-found"
-          ? "GitHub OAuth transaction not found"
+          ? "Your GitHub sign-in request was not found. Try signing in again."
           : exchangeCodeResult.reason === "oauth-transaction-expired"
-            ? "GitHub OAuth transaction has expired"
+            ? "Your GitHub sign-in request has expired. Try signing in again."
             : exchangeCodeResult.reason === "unknown"
-              ? "Unknown error occurred during GitHub OAuth token exchange"
-              : "An unknown error occurred";
+              ? "We couldn’t complete GitHub sign-in. Try again in a moment."
+              : "We couldn’t complete GitHub sign-in. Try again in a moment.";
 
     throw await redirectToLogin(session, errorMessage);
   }

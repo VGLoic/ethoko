@@ -1,6 +1,7 @@
 import {
   isRouteErrorResponse,
   Links,
+  Link,
   Meta,
   Outlet,
   Scripts,
@@ -9,6 +10,12 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import {
+  ThemePreference,
+  themeScript,
+  useThemePreference,
+} from "./components/theme-preference";
+import { Page } from "./components/ui";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -24,15 +31,22 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const preference = useThemePreference();
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      data-theme={preference === "system" ? undefined : preference}
+      suppressHydrationWarning
+    >
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <Meta />
         <Links />
       </head>
       <body>
+        <ThemePreference />
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -46,12 +60,13 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  let message = "Something went wrong";
+  let details = "We couldn’t load this page. Try again in a moment.";
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
+    message =
+      error.status === 404 ? "Page not found" : "Unable to load this page";
     details =
       error.status === 404
         ? "The requested page could not be found."
@@ -62,14 +77,15 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="pt-16 p-4 container mx-auto">
+    <Page>
       <h1>{message}</h1>
       <p>{details}</p>
+      <Link to="/">Return home</Link>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
+        <pre>
           <code>{stack}</code>
         </pre>
       )}
-    </main>
+    </Page>
   );
 }
