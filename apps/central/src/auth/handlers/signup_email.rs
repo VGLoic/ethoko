@@ -5,14 +5,15 @@ use crate::{
             SignupEmailRequestError,
         },
         principal::CentralUiBff,
+        state::AuthState,
     },
     newtypes::{email::EmailError, password::PasswordError},
-    router::{ApiError, AppState, UnprocessableEntityError},
+    router::{ApiError, UnprocessableEntityError},
 };
 use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_signup_email(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     _principal: CentralUiBff,
     Json(body): Json<HttpSignupEmailBody>,
 ) -> Result<(StatusCode, Json<HttpSignupEmailResponse>), ApiError> {

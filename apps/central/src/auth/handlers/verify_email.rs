@@ -9,13 +9,14 @@ use crate::{
             },
         },
         principal::CentralUiBff,
+        state::AuthState,
     },
     newtypes::email::EmailError,
-    router::{ApiError, AppState, UnprocessableEntityError},
+    router::{ApiError, UnprocessableEntityError},
 };
 
 pub async fn handle_verify_email(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     _principal: CentralUiBff,
     Json(body): Json<HttpVerifyEmailBody>,
 ) -> Result<(StatusCode, Json<UserResponse>), ApiError> {

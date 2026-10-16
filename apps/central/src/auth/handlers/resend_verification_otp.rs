@@ -5,14 +5,15 @@ use crate::{
             ResendVerificationOtpRequest, ResendVerificationOtpRequestError,
         },
         principal::CentralUiBff,
+        state::AuthState,
     },
     newtypes::email::EmailError,
-    router::{ApiError, AppState, UnprocessableEntityError},
+    router::{ApiError, UnprocessableEntityError},
 };
 use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_resend_verification_otp(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     _principal: CentralUiBff,
     Json(body): Json<HttpResendVerificationOtpBody>,
 ) -> Result<(StatusCode, Json<()>), ApiError> {

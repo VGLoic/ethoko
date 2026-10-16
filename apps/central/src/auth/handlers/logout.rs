@@ -1,11 +1,12 @@
 use crate::{
+    auth::state::AuthState,
     auth::{models::requests::logout::LogoutError, principal::CentralUiBffWithUser},
-    router::{ApiError, AppState},
+    router::ApiError,
 };
 use axum::{extract::State, http::StatusCode};
 
 pub async fn handle_logout(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     principal: CentralUiBffWithUser,
 ) -> Result<StatusCode, ApiError> {
     state

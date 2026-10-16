@@ -28,7 +28,6 @@ use crate::{
         },
     },
     config::OtpConfig,
-    newtypes::email::Email,
     operational_tracing::{error_chain, error_classification},
 };
 use sha2::Digest;
@@ -69,12 +68,6 @@ pub trait AuthService: Send + Sync + 'static {
         &self,
         request: ResendVerificationOtpRequest,
     ) -> Result<(), ResendVerificationOtpError>;
-
-    /// Fetches a user by their email.
-    /// # Errors
-    /// * `GetUserByEmailError::NotFound` if the user with the provided email is not found.
-    /// * `GetUserByEmailError::Unknown` for any other errors that may occur during the process.
-    async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError>;
 
     /// Logs in a user with the provided email and password_hash.
     /// # Errors
@@ -324,10 +317,6 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         );
 
         Ok(())
-    }
-
-    async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError> {
-        self.repository.get_user_by_email(email).await
     }
 
     async fn login_with_email(

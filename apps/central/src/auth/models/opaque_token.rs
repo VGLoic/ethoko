@@ -9,6 +9,7 @@ pub enum OpaqueTokenKind {
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+#[allow(dead_code)] // Retain the complete database row; auth only reads a subset of its fields.
 pub struct OpaqueToken {
     pub id: uuid::Uuid,
     pub user_id: uuid::Uuid,

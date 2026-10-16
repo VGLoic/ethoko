@@ -5,13 +5,14 @@ use crate::{
             HttpLoginGithubCallbackBody, HttpLoginGithubCallbackResponse, LoginGithubCallbackError,
             LoginGithubCallbackRequest,
         },
+        state::AuthState,
     },
-    router::{ApiError, AppState, UnprocessableEntityError},
+    router::{ApiError, UnprocessableEntityError},
 };
 use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_login_github_callback(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     _principal: CentralUiBff,
     Json(body): Json<HttpLoginGithubCallbackBody>,
 ) -> Result<(StatusCode, Json<HttpLoginGithubCallbackResponse>), ApiError> {

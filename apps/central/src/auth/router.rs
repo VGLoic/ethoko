@@ -1,3 +1,4 @@
+use super::state::AuthState;
 use crate::router::IpRateLimiter;
 use crate::{
     auth::handlers::{
@@ -8,7 +9,6 @@ use crate::{
         verify_email::handle_verify_email,
     },
     config::RateLimitConfig,
-    router::AppState,
 };
 use axum::{
     Router,
@@ -17,9 +17,13 @@ use axum::{
 use tower_governor::GovernorLayer;
 use tower_governor::governor::GovernorConfigBuilder;
 
-pub fn router(
+pub(super) fn router<S>(
+    state: AuthState,
     rate_limit_config: RateLimitConfig,
-) -> Result<(Router<AppState>, IpRateLimiter), anyhow::Error> {
+) -> Result<(Router<S>, IpRateLimiter), anyhow::Error>
+where
+    S: Clone + Send + Sync + 'static,
+{
     let auth_router_governor_conf = GovernorConfigBuilder::default()
         .per_second(rate_limit_config.replenishment_per_second)
         .burst_size(rate_limit_config.max_burst_size)
@@ -43,7 +47,8 @@ pub fn router(
         .route("/logout", post(handle_logout))
         .route("/me", get(handle_me))
         .route("/register-handle", post(handle_register_handle))
-        .layer(GovernorLayer::new(auth_router_governor_conf));
+        .layer(GovernorLayer::new(auth_router_governor_conf))
+        .with_state(state);
 
     Ok((router, IpRateLimiter::new(limiter)))
 }
