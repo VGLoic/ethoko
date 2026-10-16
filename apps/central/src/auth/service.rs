@@ -74,6 +74,7 @@ pub trait AuthService: Send + Sync + 'static {
     /// # Errors
     /// * `GetUserByEmailError::NotFound` if the user with the provided email is not found.
     /// * `GetUserByEmailError::Unknown` for any other errors that may occur during the process.
+    #[allow(dead_code)] // Retiring unused service seams is separate from hiding the implementation.
     async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError>;
 
     /// Logs in a user with the provided email and password_hash.

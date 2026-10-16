@@ -9,7 +9,7 @@ pub struct HttpRegisterHandleBody {
     pub handle: String,
 }
 
-pub struct RegisterHandleRequest {
+pub(in crate::auth) struct RegisterHandleRequest {
     pub handle: Handle,
 }
 
@@ -22,13 +22,13 @@ impl RegisterHandleRequest {
 }
 
 #[derive(Debug, Error)]
-pub enum RegisterHandleRequestError {
+pub(in crate::auth) enum RegisterHandleRequestError {
     #[error("Invalid handle")]
     InvalidHandle(HandleError),
 }
 
 #[derive(Debug, Error)]
-pub enum RegisterHandleError {
+pub(in crate::auth) enum RegisterHandleError {
     #[error("Handle {0} already exists")]
     HandleAlreadyExists(String),
     #[error("User already registered")]

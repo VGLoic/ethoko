@@ -7,7 +7,9 @@ pub enum OtpPurpose {
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct OtpRequest {
+    #[allow(dead_code)] // Retained as part of the database row.
     pub id: uuid::Uuid,
+    #[allow(dead_code)] // Retained as part of the database row.
     pub user_id: uuid::Uuid,
     pub otp_hash: [u8; 32],
     pub purpose: OtpPurpose,

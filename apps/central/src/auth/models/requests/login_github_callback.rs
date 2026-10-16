@@ -7,7 +7,7 @@ pub struct HttpLoginGithubCallbackBody {
     pub state: String,
 }
 
-pub struct LoginGithubCallbackRequest {
+pub(in crate::auth) struct LoginGithubCallbackRequest {
     pub code: String,
     pub state: String,
 }
@@ -19,7 +19,7 @@ impl LoginGithubCallbackRequest {
 }
 
 #[derive(Debug, Error)]
-pub enum LoginGithubCallbackError {
+pub(in crate::auth) enum LoginGithubCallbackError {
     #[error("Primary email is already associated to an account")]
     PrimaryEmailCollision,
     #[error("Oauth transaction has not been found")]

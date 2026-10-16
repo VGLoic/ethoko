@@ -4,12 +4,12 @@ use thiserror::Error;
 use crate::auth::models::oauth_acl::OauthState;
 
 #[derive(Debug, Error)]
-pub enum LoginGithubStartError {
+pub(in crate::auth) enum LoginGithubStartError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
 
-pub struct LoginGithubStart {
+pub(in crate::auth) struct LoginGithubStart {
     pub auth_url: String,
     pub state: OauthState,
 }

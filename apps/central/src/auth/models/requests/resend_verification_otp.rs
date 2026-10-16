@@ -9,7 +9,7 @@ pub struct HttpResendVerificationOtpBody {
     pub email: String,
 }
 
-pub struct ResendVerificationOtpRequest {
+pub(in crate::auth) struct ResendVerificationOtpRequest {
     pub email: Email,
 }
 
@@ -22,13 +22,13 @@ impl ResendVerificationOtpRequest {
 }
 
 #[derive(Error, Debug)]
-pub enum ResendVerificationOtpRequestError {
+pub(in crate::auth) enum ResendVerificationOtpRequestError {
     #[error(transparent)]
     InvalidEmail(#[from] EmailError),
 }
 
 #[derive(Debug, Error)]
-pub enum ResendVerificationOtpError {
+pub(in crate::auth) enum ResendVerificationOtpError {
     #[error("User not found")]
     UserNotFound,
     #[error("User email is already verified")]

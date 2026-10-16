@@ -4,8 +4,12 @@ use axum::Router;
 use sqlx::PgPool;
 
 use super::{
-    AuthGithubAdapter, AuthJobProcessor, AuthNotifierImpl, AuthOauthClientPort, AuthServiceImpl,
-    PsqlAuthRepository, notifier::AUTH_JOB_TOPIC, router, state::AuthState,
+    acls::{github::AuthGithubAdapter, oauth::AuthOauthClientPort},
+    notifier::{AUTH_JOB_TOPIC, AuthNotifierImpl, job_processor::AuthJobProcessor},
+    repository::PsqlAuthRepository,
+    router,
+    service::AuthServiceImpl,
+    state::AuthState,
 };
 use crate::{
     clients::github::GithubClient,
