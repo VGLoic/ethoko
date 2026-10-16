@@ -23,7 +23,7 @@ impl OauthState {
     }
 
     /// Returns the SHA-256 hash of the secret value of the underlying CSRF token.
-    pub(in crate::auth) fn hash(&self) -> [u8; 32] {
+    pub fn hash(&self) -> [u8; 32] {
         sha2::Sha256::digest(self.0.secret().as_bytes()).into()
     }
 }

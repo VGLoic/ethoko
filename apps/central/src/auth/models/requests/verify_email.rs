@@ -13,13 +13,13 @@ pub struct HttpVerifyEmailBody {
     pub otp: String,
 }
 
-pub(in crate::auth) struct VerifyEmailRequest {
+pub struct VerifyEmailRequest {
     pub email: Email,
     pub otp_hash: [u8; 32],
 }
 
 #[derive(Debug, Error)]
-pub(in crate::auth) enum VerifyEmailRequestError {
+pub enum VerifyEmailRequestError {
     #[error("Invalid email")]
     InvalidEmail(EmailError),
 }
@@ -36,7 +36,7 @@ impl VerifyEmailRequest {
 }
 
 #[derive(Debug, Error)]
-pub(in crate::auth) enum VerifyEmailError {
+pub enum VerifyEmailError {
     #[error("User not found")]
     NotFound,
     #[error("Invalid OTP")]

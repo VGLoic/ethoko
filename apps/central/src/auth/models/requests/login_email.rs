@@ -6,13 +6,13 @@ use crate::newtypes::{
     password::{Password, PasswordError},
 };
 
-pub(in crate::auth) struct LoginEmailRequest {
+pub struct LoginEmailRequest {
     pub email: Email,
     pub password: Password,
 }
 
 #[derive(Debug, Error)]
-pub(in crate::auth) enum LoginEmailRequestError {
+pub enum LoginEmailRequestError {
     #[error("Invalid email")]
     InvalidEmail(EmailError),
     #[error("Invalid password")]
@@ -28,7 +28,7 @@ impl LoginEmailRequest {
 }
 
 #[derive(Debug, Error)]
-pub(in crate::auth) enum LoginEmailError {
+pub enum LoginEmailError {
     #[error("User not found")]
     UserNotFound,
     #[error("Invalid login credentials")]

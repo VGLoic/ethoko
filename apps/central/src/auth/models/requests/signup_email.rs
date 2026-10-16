@@ -17,13 +17,13 @@ pub struct HttpSignupEmailBody {
     pub password: String,
 }
 
-pub(in crate::auth) struct SignupEmailRequest {
+pub struct SignupEmailRequest {
     pub email: Email,
     pub password_hash: PasswordHash,
 }
 
 #[derive(Debug, Error)]
-pub(in crate::auth) enum SignupEmailRequestError {
+pub enum SignupEmailRequestError {
     #[error("Invalid email")]
     InvalidEmail(EmailError),
     #[error("Invalid password")]
@@ -54,7 +54,7 @@ impl SignupEmailRequest {
 }
 
 #[derive(Debug, Error)]
-pub(in crate::auth) enum SignupEmailError {
+pub enum SignupEmailError {
     #[error("Email {0} already exists")]
     EmailAlreadyExists(String),
     #[error(transparent)]
