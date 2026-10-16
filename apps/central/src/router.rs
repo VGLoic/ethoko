@@ -1,11 +1,13 @@
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
-use crate::{auth, config::RateLimitConfig, operational_tracing::error_chain};
+use crate::{
+    auth, auth::state::AuthState, config::RateLimitConfig, operational_tracing::error_chain,
+};
 use anyhow::Context;
 use axum::{
     Json, Router,
     body::Body,
-    extract::{MatchedPath, Request},
+    extract::{FromRef, MatchedPath, Request},
     http::StatusCode,
     http::header::HeaderName,
     response::{IntoResponse, Response},
@@ -176,6 +178,16 @@ pub fn app_router(
 pub struct AppState {
     pub auth_service: Arc<dyn auth::AuthService>,
     pub central_ui_bff_shared_secret: Arc<String>,
+}
+
+impl FromRef<AppState> for AuthState {
+    /// Clones the auth dependency handles from application state. This is infallible.
+    fn from_ref(state: &AppState) -> Self {
+        Self {
+            auth_service: state.auth_service.clone(),
+            central_ui_bff_shared_secret: state.central_ui_bff_shared_secret.clone(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

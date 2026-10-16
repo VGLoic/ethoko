@@ -7,6 +7,7 @@ mod principal;
 mod repository;
 mod router;
 mod service;
+pub(crate) mod state;
 
 pub use acls::github::AuthGithubAdapter;
 pub use acls::oauth::{AuthOauthClientAdapter, AuthOauthClientPort};

@@ -1,13 +1,16 @@
 use axum::RequestPartsExt;
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRef, FromRequestParts};
 use axum_extra::{
     TypedHeader, headers,
     typed_header::{TypedHeaderRejection, TypedHeaderRejectionReason},
 };
 
 use crate::{
-    auth::models::{opaque_token::OpaqueTokenValue, user::User},
-    router::{ApiError, AppState},
+    auth::{
+        models::{opaque_token::OpaqueTokenValue, user::User},
+        state::AuthState,
+    },
+    router::ApiError,
 };
 
 const USER_AUTHORIZATION_HEADER_NAME: &str = "x-ethoko-user-authorization";
@@ -19,13 +22,18 @@ pub struct CentralUiBffWithUser {
     pub session_token_hash: [u8; 32],
 }
 
-impl FromRequestParts<AppState> for CentralUiBff {
+impl<S> FromRequestParts<S> for CentralUiBff
+where
+    AuthState: FromRef<S>,
+    S: Send + Sync,
+{
     type Rejection = ApiError;
 
     async fn from_request_parts(
         parts: &mut axum::http::request::Parts,
-        state: &AppState,
+        state: &S,
     ) -> Result<Self, Self::Rejection> {
+        let state = AuthState::from_ref(state);
         let secret = extract_bff_bearer_token(parts).await?;
 
         if secret != state.central_ui_bff_shared_secret.as_str() {
@@ -38,14 +46,19 @@ impl FromRequestParts<AppState> for CentralUiBff {
     }
 }
 
-impl FromRequestParts<AppState> for CentralUiBffWithUser {
+impl<S> FromRequestParts<S> for CentralUiBffWithUser
+where
+    AuthState: FromRef<S>,
+    S: Send + Sync,
+{
     type Rejection = ApiError;
 
     async fn from_request_parts(
         parts: &mut axum::http::request::Parts,
-        state: &AppState,
+        state: &S,
     ) -> Result<Self, Self::Rejection> {
         CentralUiBff::from_request_parts(parts, state).await?;
+        let state = AuthState::from_ref(state);
 
         let user_session_token = extract_user_session_bearer_token(parts)?;
         let opaque_session_token_value = OpaqueTokenValue::new(user_session_token)

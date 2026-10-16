@@ -2,13 +2,14 @@ use crate::{
     auth::{
         principal::CentralUiBff,
         requests::login_github_start::{HttpLoginGithubStartResponse, LoginGithubStartError},
+        state::AuthState,
     },
-    router::{ApiError, AppState},
+    router::ApiError,
 };
 use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_login_github_start(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     _principal: CentralUiBff,
 ) -> Result<(StatusCode, Json<HttpLoginGithubStartResponse>), ApiError> {
     let result = state.auth_service.start_login_with_github().await?;

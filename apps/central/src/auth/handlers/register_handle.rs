@@ -6,14 +6,15 @@ use crate::{
             HttpRegisterHandleBody, RegisterHandleError, RegisterHandleRequest,
             RegisterHandleRequestError,
         },
+        state::AuthState,
     },
     newtypes::handle::HandleError,
-    router::{ApiError, AppState, UnprocessableEntityError},
+    router::{ApiError, UnprocessableEntityError},
 };
 use axum::{Json, extract::State, http::StatusCode};
 
 pub async fn handle_register_handle(
-    State(state): State<AppState>,
+    State(state): State<AuthState>,
     principal: CentralUiBffWithUser,
     Json(body): Json<HttpRegisterHandleBody>,
 ) -> Result<(StatusCode, Json<UserResponse>), ApiError> {
