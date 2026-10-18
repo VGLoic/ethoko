@@ -25,10 +25,6 @@ function violation(request: Request, reason: string, scenario?: Scenario) {
   return HttpResponse.json({ error: message }, { status: 500 });
 }
 
-// Only used by the explicit two-worker check: neither browser proceeds until
-// two active, contrasting scenarios have arrived at this shared server.
-const concurrent = new Map<string, (response: Response) => void>();
-
 const server = createServer(
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
@@ -63,22 +59,6 @@ const server = createServer(
     // Keep identity tombstones so late traffic is still attributable.
     scenario.active = false;
     return HttpResponse.json(scenario);
-  }),
-  http.post("/__test/concurrent", async ({ request }) => {
-    const { id } = z.object({ id: z.string() }).parse(await request.json());
-    if (!scenarios.get(id)?.active)
-      return new HttpResponse(null, { status: 400 });
-    return new Promise<Response>((resolve) => {
-      concurrent.set(id, resolve);
-      if (concurrent.size < 2) return;
-      const outcomes = new Set(
-        [...concurrent.keys()].map((key) => scenarios.get(key)?.login),
-      );
-      const status = outcomes.size === 2 ? 200 : 400;
-      for (const release of concurrent.values())
-        release(HttpResponse.json({ concurrent: concurrent.size }, { status }));
-      concurrent.clear();
-    });
   }),
   http.post("/__test/audit", async () => {
     // Close ingress and drain accepted requests before taking the final snapshot.

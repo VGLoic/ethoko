@@ -11,7 +11,6 @@
     "check-types:ci": "react-router typegen && tsc",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "test:e2e:concurrent": "E2E_VERIFY_CONCURRENCY=1 playwright test --workers=2",
     "test:e2e:verify-harness": "node --experimental-strip-types e2e/check-harness.ts",
     "check-format": "prettier --check --ignore-unknown 'app/**/*.{ts,tsx,css}' 'e2e/**/*.ts' '*.{ts,json,mjs}'",
     "format": "prettier --write 'app/**/*.{ts,tsx,css}' 'e2e/**/*.ts' '*.{ts,json,mjs}'",

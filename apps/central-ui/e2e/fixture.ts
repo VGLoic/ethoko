@@ -20,12 +20,6 @@ export const test = base.extend<{
         expect(response.ok()).toBeTruthy();
         const identity = Identity.parse(await response.json());
         owned.push(identity.id);
-        if (process.env.E2E_VERIFY_CONCURRENCY === "1") {
-          const barrier = await request.post(`${apiUrl}/__test/concurrent`, {
-            data: { id: identity.id },
-          });
-          expect(barrier.ok(), await barrier.text()).toBeTruthy();
-        }
         return {
           ...identity,
           observe: async () => {

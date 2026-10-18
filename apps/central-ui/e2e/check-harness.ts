@@ -8,7 +8,6 @@ for (const probe of ["unattributed", "late", "absorbed", "cleanup"]) {
     env: {
       ...process.env,
       E2E_HARNESS_PROBE: probe,
-      E2E_VERIFY_CONCURRENCY: "0",
     },
     encoding: "utf8",
     timeout: 120_000,

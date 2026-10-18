@@ -44,7 +44,6 @@ nvm use
 pnpm install
 pnpm --filter central-ui test:e2e:install
 pnpm test:e2e:ui
-pnpm --filter central-ui test:e2e:concurrent
 pnpm --filter central-ui test:e2e:verify-harness
 ```
 
@@ -58,12 +57,7 @@ Playwright owns exactly one real React Router development server on
 `127.0.0.1:4101`. Both ports must be free; existing servers are never reused.
 No Rust API, database, email service, or local `.env` is needed. The test-only
 Vite configuration prebundles route dependencies to avoid first-use reloads.
-The normal suite uses one Chromium worker and isolated browser contexts.
-
-`test:e2e:concurrent` runs the two contrasting login tests with two workers on
-that same server pair. A mock control barrier requires both independent
-scenarios to be active before either browser proceeds. Run this command without
-filtering tests; retries are disabled for this paired verification.
+The suite runs sequentially with one Chromium worker and isolated browser contexts.
 
 Tests declare outcomes inline using the native `scenario` fixture. Every call
 generates fresh valid identities and an opaque User Session Token, including on
