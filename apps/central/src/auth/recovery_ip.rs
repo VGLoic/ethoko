@@ -12,10 +12,13 @@ pub struct RecoveryIpKeyExtractor(pub Arc<String>);
 impl KeyExtractor for RecoveryIpKeyExtractor {
     type Key = IpAddr;
 
+    /// Identifies this extractor for tracing; cannot fail.
     fn name(&self) -> &'static str {
         "trusted recovery browser IP"
     }
 
+    /// Uses the authenticated BFF's asserted browser IP for recovery, otherwise the peer IP.
+    /// Returns UnableToExtractKey if the required source address is missing or invalid.
     fn extract<T>(&self, request: &axum::http::Request<T>) -> Result<IpAddr, GovernorError> {
         let path = request.uri().path();
         if (path.ends_with("/forgot-password")

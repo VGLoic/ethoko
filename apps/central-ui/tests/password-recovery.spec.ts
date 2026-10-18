@@ -59,6 +59,18 @@ test("confirmation and backend validation do not consume a link; success clears 
   expect(
     (await context.cookies()).some((cookie) => cookie.name === "__session"),
   ).toBe(false);
+  await page.getByRole("link", { name: "Log in", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Log In to Ethoko Central" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Email:", { exact: true })
+    .fill("recovered@example.com");
+  await page.getByLabel("Password:", { exact: true }).fill("Aa1ééé");
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await expect(
+    page.getByText("recovered@example.com", { exact: true }),
+  ).toBeVisible();
   await page.goto("/reset-password?token=valid-browser-reset");
   await expect(
     page.getByText("This reset link is invalid or expired."),

@@ -1,8 +1,5 @@
 use crate::{
-    auth::notifier::{
-        AUTH_JOB_TOPIC,
-        jobs::{AuthJob, SendPasswordResetPayload},
-    },
+    auth::notifier::{enqueue_password_reset, jobs::SendPasswordResetPayload},
     auth::{
         models::{
             auth_credential::{AuthCredential, AuthCredentialPayload},
@@ -26,7 +23,6 @@ use crate::{
         },
     },
     config::{OtpConfig, PasswordRecoveryConfig},
-    jobs::{job::JobRequest, psqlqueue::enqueue_with_executor},
     newtypes::{email::Email, password_hash::PasswordHash},
 };
 use chrono::{TimeDelta, Utc};
@@ -273,19 +269,9 @@ impl AuthRepository for PsqlAuthRepository {
         let hash: [u8; 32] = sha2::Sha256::digest(token.as_bytes()).into();
         sqlx::query("INSERT INTO password_reset (user_id, token_hash, issued_at, expires_at) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id) DO UPDATE SET token_hash = $2, issued_at = $3, expires_at = $4, consumed_at = NULL")
             .bind(user_id).bind(hash).bind(now).bind(expires_at).execute(&mut *tx).await?;
-        let mut link = reqwest::Url::parse(&config.web_app_url)?.join("/reset-password")?;
-        link.query_pairs_mut().append_pair("token", token);
-        let job = JobRequest::new(
-            AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendPasswordReset(SendPasswordResetPayload {
-                email: email.clone(),
-                reset_url: link.into(),
-                expires_at,
-            }),
-        )?
-        .with_max_retries(3)
-        .with_scheduled_at(now);
-        enqueue_with_executor(&mut *tx, job).await?;
+        let delivery =
+            SendPasswordResetPayload::new(email.clone(), token, expires_at, &config.web_app_url)?;
+        enqueue_password_reset(&mut tx, delivery, now).await?;
         tx.commit().await?;
         Ok(())
     }

@@ -276,7 +276,15 @@ class EthokoCentralClient {
       throw new Error(`Failed to fetch user: ${response.statusText}`);
     }
     const data = await response.json();
-    return UserResponseSchema.parse(data);
+    // Central's tagged UserResponse serializes variant fields in snake_case.
+    // Keep the UI's existing camelCase user model at this boundary.
+    return UserResponseSchema.parse({
+      ...data,
+      suggestedHandle: data.suggested_handle,
+      emailVerified: data.email_verified,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    });
   }
 
   async logout(params: { token: string }): Promise<void> {

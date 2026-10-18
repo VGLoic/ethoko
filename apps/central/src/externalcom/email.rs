@@ -44,7 +44,7 @@ pub trait EmailService: Send + Sync + 'static {
     async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error>;
 }
 
-enum RsEmailVerificationTemplate {
+enum RsEmailTemplate {
     ResendEmailVerificationCode(RsEmailVerificationCodeVariables),
     PasswordReset {
         reset_url: String,
@@ -52,13 +52,11 @@ enum RsEmailVerificationTemplate {
     },
 }
 
-impl RsEmailVerificationTemplate {
+impl RsEmailTemplate {
     fn template_id(&self) -> &'static str {
         match self {
             Self::PasswordReset { .. } => "password-reset",
-            RsEmailVerificationTemplate::ResendEmailVerificationCode(_) => {
-                "email-verification-code"
-            }
+            RsEmailTemplate::ResendEmailVerificationCode(_) => "email-verification-code",
         }
     }
 
@@ -74,7 +72,7 @@ impl RsEmailVerificationTemplate {
                     serde_json::json!(expires_at.to_rfc3339()),
                 ),
             ]),
-            RsEmailVerificationTemplate::ResendEmailVerificationCode(vars) => {
+            RsEmailTemplate::ResendEmailVerificationCode(vars) => {
                 let mut map = HashMap::new();
                 map.insert("email".to_string(), serde_json::json!(vars.email));
                 map.insert(
@@ -107,12 +105,12 @@ impl ResendEmailService {
         }
     }
 
-    fn map_to_resend_template(&self, template: EmailTemplate) -> RsEmailVerificationTemplate {
+    fn map_to_resend_template(&self, template: EmailTemplate) -> RsEmailTemplate {
         match template {
             EmailTemplate::PasswordReset {
                 reset_url,
                 expires_at,
-            } => RsEmailVerificationTemplate::PasswordReset {
+            } => RsEmailTemplate::PasswordReset {
                 reset_url,
                 expires_at,
             },
@@ -123,12 +121,10 @@ impl ResendEmailService {
                     payload.email,
                     payload.otp.show()
                 );
-                RsEmailVerificationTemplate::ResendEmailVerificationCode(
-                    RsEmailVerificationCodeVariables {
-                        email: payload.email,
-                        verification_url,
-                    },
-                )
+                RsEmailTemplate::ResendEmailVerificationCode(RsEmailVerificationCodeVariables {
+                    email: payload.email,
+                    verification_url,
+                })
             }
         }
     }
@@ -146,10 +142,8 @@ impl EmailService for ResendEmailService {
             "Central <central@ethoko.com>",
             vec![email.to_string()],
             match &resend_template {
-                RsEmailVerificationTemplate::PasswordReset { .. } => {
-                    "[Ethoko Central] Reset your password"
-                }
-                RsEmailVerificationTemplate::ResendEmailVerificationCode(_) => {
+                RsEmailTemplate::PasswordReset { .. } => "[Ethoko Central] Reset your password",
+                RsEmailTemplate::ResendEmailVerificationCode(_) => {
                     "[Ethoko Central] Please verify your email address"
                 }
             },

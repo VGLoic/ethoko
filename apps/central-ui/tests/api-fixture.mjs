@@ -14,11 +14,32 @@ createServer(async (request, response) => {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
   const body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
-  if (!request.headers["x-ethoko-client-ip"]?.includes("127.0.0.1")) {
+  if (
+    (request.url.startsWith("/auth/reset-password") ||
+      request.url === "/auth/forgot-password") &&
+    !request.headers["x-ethoko-client-ip"]?.includes("127.0.0.1")
+  ) {
     response.writeHead(400).end("{}");
     return;
   }
-  if (request.url === "/auth/forgot-password") {
+  if (request.url === "/auth/login/email" && body.password === "Aa1ééé") {
+    response.end(JSON.stringify({ token: "etks_browser-test-session" }));
+  } else if (
+    request.url === "/auth/me" &&
+    request.headers["x-ethoko-user-authorization"] ===
+      "Bearer etks_browser-test-session"
+  ) {
+    response.end(
+      JSON.stringify({
+        state: "pending",
+        email: "recovered@example.com",
+        suggested_handle: null,
+        email_verified: false,
+        created_at: "2026-10-18T00:00:00Z",
+        updated_at: "2026-10-18T00:00:00Z",
+      }),
+    );
+  } else if (request.url === "/auth/forgot-password") {
     response.end(
       JSON.stringify({
         message:
@@ -38,13 +59,11 @@ createServer(async (request, response) => {
     }
     response.end("{}");
   } else {
-    response
-      .writeHead(422)
-      .end(
-        JSON.stringify({
-          code: "ETKARP01",
-          reason: "Invalid or expired reset link",
-        }),
-      );
+    response.writeHead(422).end(
+      JSON.stringify({
+        code: "ETKARP01",
+        reason: "Invalid or expired reset link",
+      }),
+    );
   }
 }).listen(5189, "127.0.0.1");
