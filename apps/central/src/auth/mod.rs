@@ -13,3 +13,4 @@ mod state;
 pub use acls::oauth::{AuthOauthClientAdapter, AuthOauthClientPort};
 pub use composition::Auth;
 pub use models::{http_responses, oauth_acl, requests};
+pub(crate) mod recovery_ip;

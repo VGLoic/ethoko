@@ -1,8 +1,7 @@
-import { Form, redirect } from "react-router";
+import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/login";
 import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
-import { PasswordSchema } from "~/server/newtypes.server";
 import { centralSession, githubOAuthSession } from "~/server/sessions.server";
 
 export function meta() {
@@ -39,7 +38,8 @@ export async function action({ request }: Route.ActionArgs) {
     const signupRequestParsingResult = z
       .object({
         email: z.email(),
-        password: PasswordSchema,
+        // Central owns password validation. Do not reject credentials accepted by recovery.
+        password: z.string().min(1, "Enter your password."),
       })
       .safeParse(Object.fromEntries(formData));
 
@@ -156,6 +156,7 @@ export default function Login({
         ) : null}
         <button type="submit">Log In</button>
       </Form>
+      <Link to="/forgot-password">Forgot password?</Link>
       <Form method="post" className="flex flex-col gap-4">
         <input type="hidden" name="intent" value={LOGIN_WITH_GITHUB_INTENT} />
         <button type="submit">Log In with GitHub</button>

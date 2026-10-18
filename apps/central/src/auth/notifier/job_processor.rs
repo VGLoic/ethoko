@@ -42,6 +42,18 @@ impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E>
             .map_err(|e| anyhow::Error::new(e).context("failed to deserialized job payload"))?;
 
         match payload {
+            AuthJob::SendPasswordReset(payload) => {
+                // Retries deliver the issued link unchanged; no token state is written here.
+                self.email_service
+                    .send_email(
+                        payload.email,
+                        crate::externalcom::email::EmailTemplate::PasswordReset {
+                            reset_url: payload.reset_url,
+                            expires_at: payload.expires_at,
+                        },
+                    )
+                    .await
+            }
             AuthJob::SendEmailVerificationOtp(p) => {
                 self.process_send_email_verification_otp(p)
                     .await

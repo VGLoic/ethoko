@@ -25,6 +25,23 @@ pub mod jobs;
 
 pub const AUTH_JOB_TOPIC: &str = "auth";
 
+/// Queues the issued link in the repository's transaction, keeping delivery and issuance atomic.
+/// Returns an error on serialization or queue persistence failure.
+pub(crate) async fn enqueue_password_reset(
+    connection: &mut sqlx::PgConnection,
+    delivery: jobs::SendPasswordResetPayload,
+    issued_at: chrono::DateTime<Utc>,
+) -> Result<(), anyhow::Error> {
+    let request = JobRequest::new(
+        AUTH_JOB_TOPIC.to_string(),
+        AuthJob::SendPasswordReset(delivery),
+    )?
+    .with_max_retries(3)
+    .with_scheduled_at(issued_at);
+    crate::jobs::psqlqueue::enqueue_with_executor(connection, request).await?;
+    Ok(())
+}
+
 #[async_trait::async_trait]
 /// Defines the AuthNotifier trait for auth related notifications
 pub trait AuthNotifier: Send + Sync + 'static {
