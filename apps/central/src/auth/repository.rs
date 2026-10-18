@@ -1,4 +1,8 @@
 use crate::{
+    auth::notifier::{
+        AUTH_JOB_TOPIC,
+        jobs::{AuthJob, SendPasswordResetPayload},
+    },
     auth::{
         models::{
             auth_credential::{AuthCredential, AuthCredentialPayload},
@@ -8,6 +12,7 @@ use crate::{
             otp_request::{OtpPurpose, OtpRequest},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                password_recovery::ResetPasswordError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
                 send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
@@ -20,8 +25,9 @@ use crate::{
             login_github_start::LoginGithubStartError, logout::LogoutError,
         },
     },
-    config::OtpConfig,
-    newtypes::email::Email,
+    config::{OtpConfig, PasswordRecoveryConfig},
+    jobs::{job::JobRequest, psqlqueue::enqueue_with_executor},
+    newtypes::{email::Email, password_hash::PasswordHash},
 };
 use chrono::{TimeDelta, Utc};
 use sqlx::{Executor, Pool, Postgres};
@@ -30,6 +36,25 @@ use thiserror::Error;
 /// Repository trait for auth-related operations
 #[async_trait::async_trait]
 pub trait AuthRepository: Send + Sync + 'static {
+    /// Checks link validity without consumption. Returns false for all unusable links;
+    /// database failures return an error.
+    async fn password_reset_is_valid(&self, hash: &[u8; 32]) -> Result<bool, anyhow::Error>;
+    /// Supersedes an eligible user's reset link and queues delivery atomically.
+    /// Ineligibility/cooldown succeed silently; database or queue failures return errors.
+    async fn issue_password_reset(
+        &self,
+        email: &Email,
+        token: &str,
+        config: &PasswordRecoveryConfig,
+    ) -> Result<(), anyhow::Error>;
+
+    /// Consumes a live link, replaces an existing password and revokes all sessions atomically.
+    /// Returns InvalidToken for unusable links or missing credentials, Unknown on persistence failure.
+    async fn complete_password_reset(
+        &self,
+        hash: &[u8; 32],
+        password_hash: PasswordHash,
+    ) -> Result<(), ResetPasswordError>;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
@@ -211,6 +236,82 @@ const UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME: &str = "unique_registered_handle
 
 #[async_trait::async_trait]
 impl AuthRepository for PsqlAuthRepository {
+    async fn password_reset_is_valid(&self, hash: &[u8; 32]) -> Result<bool, anyhow::Error> {
+        Ok(sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM password_reset WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > clock_timestamp())")
+            .bind(hash).fetch_one(&self.pool).await?)
+    }
+    async fn issue_password_reset(
+        &self,
+        email: &Email,
+        token: &str,
+        config: &PasswordRecoveryConfig,
+    ) -> Result<(), anyhow::Error> {
+        use sha2::Digest;
+        let mut tx = self.pool.begin().await?;
+        // Serializes first issuance and subsequent issuance across application instances.
+        let user_id: Option<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM ethoko_user WHERE email = $1 AND EXISTS (SELECT 1 FROM auth_credential WHERE user_id = ethoko_user.id AND payload->>'type' = 'password_hash') FOR UPDATE"
+        ).bind(email).fetch_optional(&mut *tx).await?;
+        let Some(user_id) = user_id else {
+            return Ok(());
+        };
+        let issued_at: Option<chrono::DateTime<Utc>> =
+            sqlx::query_scalar("SELECT issued_at FROM password_reset WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        // Use the shared database clock for cooldown, expiry and delivery scheduling.
+        let now: chrono::DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+            .fetch_one(&mut *tx)
+            .await?;
+        if issued_at
+            .is_some_and(|issued| now < issued + TimeDelta::seconds(config.cooldown_seconds.into()))
+        {
+            return Ok(());
+        }
+        let expires_at = now + TimeDelta::seconds(config.ttl_seconds.into());
+        let hash: [u8; 32] = sha2::Sha256::digest(token.as_bytes()).into();
+        sqlx::query("INSERT INTO password_reset (user_id, token_hash, issued_at, expires_at) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id) DO UPDATE SET token_hash = $2, issued_at = $3, expires_at = $4, consumed_at = NULL")
+            .bind(user_id).bind(hash).bind(now).bind(expires_at).execute(&mut *tx).await?;
+        let mut link = reqwest::Url::parse(&config.web_app_url)?.join("/reset-password")?;
+        link.query_pairs_mut().append_pair("token", token);
+        let job = JobRequest::new(
+            AUTH_JOB_TOPIC.to_string(),
+            AuthJob::SendPasswordReset(SendPasswordResetPayload {
+                email: email.clone(),
+                reset_url: link.into(),
+                expires_at,
+            }),
+        )?
+        .with_max_retries(3)
+        .with_scheduled_at(now);
+        enqueue_with_executor(&mut *tx, job).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn complete_password_reset(
+        &self,
+        hash: &[u8; 32],
+        password_hash: PasswordHash,
+    ) -> Result<(), ResetPasswordError> {
+        let mut tx = self.pool.begin().await.map_err(anyhow::Error::from)?;
+        // Conditional UPDATE locks and consumes exactly once, including concurrent submissions.
+        let user_id: Option<uuid::Uuid> = sqlx::query_scalar("UPDATE password_reset SET consumed_at = clock_timestamp() WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > clock_timestamp() RETURNING user_id")
+            .bind(hash).fetch_optional(&mut *tx).await.map_err(anyhow::Error::from)?;
+        let user_id = user_id.ok_or(ResetPasswordError::InvalidToken)?;
+        let result = sqlx::query("UPDATE auth_credential SET payload = $2 WHERE user_id = $1 AND payload->>'type' = 'password_hash'")
+            .bind(user_id).bind(AuthCredentialPayload::from_password_hash(password_hash))
+            .execute(&mut *tx).await.map_err(anyhow::Error::from)?;
+        if result.rows_affected() == 0 {
+            return Err(ResetPasswordError::InvalidToken);
+        }
+        sqlx::query("UPDATE opaque_token SET revoked_at = clock_timestamp() WHERE user_id = $1 AND kind = 'session' AND revoked_at IS NULL")
+            .bind(user_id).execute(&mut *tx).await.map_err(anyhow::Error::from)?;
+        tx.commit().await.map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
     async fn create_user_with_email_auth(
         &self,
         request: SignupEmailRequest,

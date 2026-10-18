@@ -80,6 +80,7 @@ pub fn app_router(
     let x_request_id = HeaderName::from_static(REQUEST_ID_HEADER);
 
     let global_governor_conf = GovernorConfigBuilder::default()
+        .key_extractor(auth.recovery_ip_key_extractor())
         .per_second(global_rate_limit_config.replenishment_per_second)
         .burst_size(global_rate_limit_config.max_burst_size)
         .finish()

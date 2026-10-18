@@ -81,6 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
         github_client,
         auth_oauth_github_client_adapter,
         config.otp_config.clone(),
+        config.password_recovery_config.clone(),
         config.oauth_transaction_ttl_seconds,
         config.central_ui_bff_shared_secret.clone(),
     );

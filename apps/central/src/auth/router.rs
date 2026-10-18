@@ -25,6 +25,9 @@ where
     S: Clone + Send + Sync + 'static,
 {
     let auth_router_governor_conf = GovernorConfigBuilder::default()
+        .key_extractor(super::recovery_ip::RecoveryIpKeyExtractor(
+            state.central_ui_bff_shared_secret.clone(),
+        ))
         .per_second(rate_limit_config.replenishment_per_second)
         .burst_size(rate_limit_config.max_burst_size)
         .finish()
@@ -35,6 +38,18 @@ where
     let limiter = auth_router_governor_conf.limiter().clone();
 
     let router = Router::new()
+        .route(
+            "/reset-password/validate",
+            post(crate::auth::handlers::password_recovery::handle_validate_reset),
+        )
+        .route(
+            "/forgot-password",
+            post(crate::auth::handlers::password_recovery::handle_forgot_password),
+        )
+        .route(
+            "/reset-password",
+            post(crate::auth::handlers::password_recovery::handle_reset_password),
+        )
         .route("/signup/email", post(handle_signup_email))
         .route("/verify-email", post(handle_verify_email))
         .route(

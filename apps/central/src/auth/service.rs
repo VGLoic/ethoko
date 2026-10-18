@@ -7,6 +7,7 @@ use crate::{
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
                 logout::LogoutError,
+                password_recovery::ResetPasswordError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
                 resend_verification_otp::{
                     ResendVerificationOtpError, ResendVerificationOtpRequest,
@@ -27,7 +28,8 @@ use crate::{
             login_github_start::{LoginGithubStart, LoginGithubStartError},
         },
     },
-    config::OtpConfig,
+    config::{OtpConfig, PasswordRecoveryConfig},
+    newtypes::{email::Email, password_hash::PasswordHash},
     operational_tracing::{error_chain, error_classification},
 };
 use sha2::Digest;
@@ -35,6 +37,23 @@ use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
+    /// Checks link validity without consuming it. Returns false for unusable links,
+    /// or an error on persistence failure.
+    async fn password_reset_is_valid(&self, token: &str) -> Result<bool, anyhow::Error>;
+    /// Issues and queues a reset link for eligible users, concealing ineligibility and cooldown.
+    /// Returns an error on persistence or queue failure.
+    async fn forgot_password(&self, email: Email) -> Result<(), anyhow::Error>;
+
+    /// Atomically replaces an existing password and revokes sessions.
+    /// Returns InvalidToken for unusable links, or Unknown for persistence failures.
+    async fn reset_password(
+        &self,
+        token: &str,
+        password_hash: PasswordHash,
+    ) -> Result<(), ResetPasswordError>;
+
+    /// Returns the public resend duration; cannot fail.
+    fn password_reset_cooldown_seconds(&self) -> u16;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
@@ -138,6 +157,7 @@ pub struct AuthServiceImpl<
     repository: R,
     notifier: N,
     otp_config: OtpConfig,
+    password_recovery_config: PasswordRecoveryConfig,
     github_oauth_client_port: GhOauth,
     github_oauth_transaction_ttl_seconds: u16,
     github_port: GhPort,
@@ -150,6 +170,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         repository: R,
         notifier: N,
         otp_config: OtpConfig,
+        password_recovery_config: PasswordRecoveryConfig,
         github_oauth_client_port: GhOauth,
         oauth_transaction_ttl_seconds: u16,
         github_port: GhPort,
@@ -158,6 +179,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
             repository,
             notifier,
             otp_config,
+            password_recovery_config,
             github_oauth_client_port,
             github_oauth_transaction_ttl_seconds: oauth_transaction_ttl_seconds,
             github_port,
@@ -169,6 +191,37 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOauthClientPort>
     AuthService for AuthServiceImpl<R, N, GhPort, GhOauth>
 {
+    async fn password_reset_is_valid(&self, token: &str) -> Result<bool, anyhow::Error> {
+        self.repository
+            .password_reset_is_valid(&sha2::Sha256::digest(token.as_bytes()).into())
+            .await
+    }
+    async fn forgot_password(&self, email: Email) -> Result<(), anyhow::Error> {
+        use argon2::password_hash::rand_core::{OsRng, RngCore};
+        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        let mut bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut bytes);
+        let token = format!("etkr_{}", URL_SAFE_NO_PAD.encode(bytes));
+        self.repository
+            .issue_password_reset(&email, &token, &self.password_recovery_config)
+            .await
+    }
+
+    async fn reset_password(
+        &self,
+        token: &str,
+        password_hash: PasswordHash,
+    ) -> Result<(), ResetPasswordError> {
+        let hash: [u8; 32] = sha2::Sha256::digest(token.as_bytes()).into();
+        self.repository
+            .complete_password_reset(&hash, password_hash)
+            .await
+    }
+
+    fn password_reset_cooldown_seconds(&self) -> u16 {
+        self.password_recovery_config.cooldown_seconds
+    }
+
     async fn signup_with_email(
         &self,
         request: SignupEmailRequest,

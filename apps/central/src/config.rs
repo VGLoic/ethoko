@@ -20,6 +20,8 @@ pub struct Config {
     pub log_level: Level,
     /// OTP configuration
     pub otp_config: OtpConfig,
+    /// Password recovery delivery and lifetime configuration.
+    pub password_recovery_config: PasswordRecoveryConfig,
     /// Global rate limit configuration
     pub global_rate_limit_config: RateLimitConfig,
     /// Auth rate limit configuration for specific public routes, e.g. re-send verification OTP
@@ -51,6 +53,13 @@ pub struct OtpConfig {
     pub ttl_seconds: u16,
     /// Cooldown between two OTP for a single user in seconds
     pub cooldown_seconds: u16,
+}
+
+#[derive(Clone, Debug)]
+pub struct PasswordRecoveryConfig {
+    pub cooldown_seconds: u16,
+    pub ttl_seconds: u16,
+    pub web_app_url: String,
 }
 
 #[derive(Clone, Debug)]
@@ -146,6 +155,13 @@ impl Config {
             }
         };
 
+        let recovery_cooldown = match parse_env_variable::<u16>("PASSWORD_RESET_COOLDOWN_SECONDS") {
+            Ok(value) => value.unwrap_or(60),
+            Err(error) => {
+                errors.push(error);
+                60
+            }
+        };
         errors.extend(github_oauth_errors);
         if !errors.is_empty() {
             return Err(errors);
@@ -167,6 +183,11 @@ impl Config {
         };
 
         Ok(Config {
+            password_recovery_config: PasswordRecoveryConfig {
+                cooldown_seconds: recovery_cooldown,
+                ttl_seconds: 3600,
+                web_app_url: web_app_url.clone(),
+            },
             self_url,
             web_app_url,
             port,

@@ -26,6 +26,9 @@ pub struct Auth {
 }
 
 impl Auth {
+    pub(crate) fn recovery_ip_key_extractor(&self) -> super::recovery_ip::RecoveryIpKeyExtractor {
+        super::recovery_ip::RecoveryIpKeyExtractor(self.state.central_ui_bff_shared_secret.clone())
+    }
     /// Assembles auth without performing I/O or fallible configuration.
     #[allow(clippy::too_many_arguments)]
     pub fn compose(
@@ -35,6 +38,7 @@ impl Auth {
         github_client: impl GithubClient,
         oauth_client: impl AuthOauthClientPort,
         otp_config: OtpConfig,
+        password_recovery_config: crate::config::PasswordRecoveryConfig,
         oauth_transaction_ttl_seconds: u16,
         central_ui_bff_shared_secret: String,
     ) -> Self {
@@ -45,6 +49,7 @@ impl Auth {
             repository.clone(),
             notifier,
             otp_config.clone(),
+            password_recovery_config,
             oauth_client,
             oauth_transaction_ttl_seconds,
             github_adapter,

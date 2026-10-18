@@ -8,6 +8,10 @@ use tracing::debug;
 #[derive(Debug, Clone)]
 pub enum EmailTemplate {
     EmailVerificationCode(EmailVerificationCodePayload),
+    PasswordReset {
+        reset_url: String,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -42,11 +46,16 @@ pub trait EmailService: Send + Sync + 'static {
 
 enum RsEmailVerificationTemplate {
     ResendEmailVerificationCode(RsEmailVerificationCodeVariables),
+    PasswordReset {
+        reset_url: String,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    },
 }
 
 impl RsEmailVerificationTemplate {
     fn template_id(&self) -> &'static str {
         match self {
+            Self::PasswordReset { .. } => "password-reset",
             RsEmailVerificationTemplate::ResendEmailVerificationCode(_) => {
                 "email-verification-code"
             }
@@ -55,6 +64,16 @@ impl RsEmailVerificationTemplate {
 
     fn serialize_variables(&self) -> HashMap<String, serde_json::Value> {
         match self {
+            Self::PasswordReset {
+                reset_url,
+                expires_at,
+            } => HashMap::from([
+                ("reset_url".to_string(), serde_json::json!(reset_url)),
+                (
+                    "expires_at".to_string(),
+                    serde_json::json!(expires_at.to_rfc3339()),
+                ),
+            ]),
             RsEmailVerificationTemplate::ResendEmailVerificationCode(vars) => {
                 let mut map = HashMap::new();
                 map.insert("email".to_string(), serde_json::json!(vars.email));
@@ -90,6 +109,13 @@ impl ResendEmailService {
 
     fn map_to_resend_template(&self, template: EmailTemplate) -> RsEmailVerificationTemplate {
         match template {
+            EmailTemplate::PasswordReset {
+                reset_url,
+                expires_at,
+            } => RsEmailVerificationTemplate::PasswordReset {
+                reset_url,
+                expires_at,
+            },
             EmailTemplate::EmailVerificationCode(payload) => {
                 let verification_url = format!(
                     "{}/verify-email?email={}&otp={}",
@@ -119,7 +145,14 @@ impl EmailService for ResendEmailService {
         let opts = CreateEmailBaseOptions::new(
             "Central <central@ethoko.com>",
             vec![email.to_string()],
-            "[Ethoko Central] Please verify your email address",
+            match &resend_template {
+                RsEmailVerificationTemplate::PasswordReset { .. } => {
+                    "[Ethoko Central] Reset your password"
+                }
+                RsEmailVerificationTemplate::ResendEmailVerificationCode(_) => {
+                    "[Ethoko Central] Please verify your email address"
+                }
+            },
         )
         .with_template(template);
 

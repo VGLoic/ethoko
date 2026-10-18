@@ -56,11 +56,13 @@ impl PsqlQueue {
 
 const TRUNCATE_SUBSECS: u16 = 3;
 
-#[async_trait::async_trait]
-impl Queue for PsqlQueue {
-    async fn enqueue(&self, job_request: JobRequest) -> Result<Job, QueueError> {
-        let job = sqlx::query_as::<_, Job>(
-            r#"
+/// Inserts a job using the caller's transaction, so domain state and delivery commit together.
+pub(crate) async fn enqueue_with_executor<'a, E: sqlx::Executor<'a, Database = Postgres>>(
+    executor: E,
+    job_request: JobRequest,
+) -> Result<Job, QueueError> {
+    let job = sqlx::query_as::<_, Job>(
+        r#"
             INSERT INTO "ethoko_job" (
                 topic,
                 payload,
@@ -82,16 +84,23 @@ impl Queue for PsqlQueue {
                 created_at,
                 updated_at
             "#,
-        )
-        .bind(job_request.topic)
-        .bind(job_request.payload)
-        .bind(job_request.scheduled_at.trunc_subsecs(TRUNCATE_SUBSECS))
-        .bind(job_request.processing_timeout_seconds)
-        .bind(job_request.max_retries)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| anyhow::anyhow!(e).context("failed to insert job into psql queue"))?;
+    )
+    .bind(job_request.topic)
+    .bind(job_request.payload)
+    .bind(job_request.scheduled_at.trunc_subsecs(TRUNCATE_SUBSECS))
+    .bind(job_request.processing_timeout_seconds)
+    .bind(job_request.max_retries)
+    .fetch_one(executor)
+    .await
+    .map_err(|e| anyhow::anyhow!(e).context("failed to insert job into psql queue"))?;
 
+    Ok(job)
+}
+
+#[async_trait::async_trait]
+impl Queue for PsqlQueue {
+    async fn enqueue(&self, job_request: JobRequest) -> Result<Job, QueueError> {
+        let job = enqueue_with_executor(&self.pool, job_request).await?;
         debug!(event = "jobs.enqueue.succeeded", backend = "postgres", job_id = %job.id, topic = %job.topic, "Enqueued job");
         Ok(job)
     }

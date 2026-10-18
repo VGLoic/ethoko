@@ -85,3 +85,7 @@ This template comes with [Tailwind CSS](https://tailwindcss.com/) already config
 ---
 
 Built with ❤️ using React Router.
+# Password recovery
+
+Recovery setup, trusted source-IP handling, Resend template variables and test commands:
+[Central password recovery](../central/docs/password-recovery.md).

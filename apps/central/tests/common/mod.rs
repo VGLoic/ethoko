@@ -34,6 +34,8 @@ pub struct InstanceState {
     pub github_client: FakeGithubClient,
     pub github_oauth_client: FakeOauthClient,
     pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
+    pub recovery_job_worker:
+        ManualWorker<ethoko_central::jobs::psqlqueue::PsqlQueue, RootProcessor>,
 }
 
 pub struct TestConfigBuilder {
@@ -53,6 +55,11 @@ impl TestConfigBuilder {
                 otp_config: OtpConfig {
                     ttl_seconds: 10 * 60,
                     cooldown_seconds: 60,
+                },
+                password_recovery_config: ethoko_central::config::PasswordRecoveryConfig {
+                    cooldown_seconds: 60,
+                    ttl_seconds: 3600,
+                    web_app_url: "http://localhost:5173".into(),
                 },
                 global_rate_limit_config: ethoko_central::config::RateLimitConfig {
                     replenishment_per_second: 100,
@@ -102,6 +109,34 @@ impl TestConfigBuilder {
 
     pub fn with_otp_ttl(mut self, ttl_seconds: u16) -> Self {
         self.config.otp_config.ttl_seconds = ttl_seconds;
+        self
+    }
+
+    /// Isolates PostgreSQL-backed delivery jobs while preserving the existing HTTP test helpers.
+    pub async fn with_isolated_database(mut self) -> Self {
+        let pool = PgPoolOptions::new()
+            .connect(&self.config.database_url)
+            .await
+            .unwrap();
+        let name = format!("recovery_{}", uuid::Uuid::new_v4().simple());
+        sqlx::query(&format!("CREATE DATABASE {name}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut url = reqwest::Url::parse(&self.config.database_url).unwrap();
+        url.set_path(&name);
+        self.config.database_url = url.into();
+        pool.close().await;
+        self
+    }
+
+    pub fn with_recovery_cooldown(mut self, seconds: u16) -> Self {
+        self.config.password_recovery_config.cooldown_seconds = seconds;
+        self
+    }
+
+    pub fn with_recovery_ttl(mut self, seconds: u16) -> Self {
+        self.config.password_recovery_config.ttl_seconds = seconds;
         self
     }
 
@@ -160,17 +195,22 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
 
     let auth_oauth_github_client_adapter = FakeOauthClient::default();
     let auth = auth::Auth::compose(
-        pool,
+        pool.clone(),
         job_queue.clone(),
         email_service.clone(),
         github_client.clone(),
         auth_oauth_github_client_adapter.clone(),
         config.otp_config.clone(),
+        config.password_recovery_config.clone(),
         config.oauth_transaction_ttl_seconds,
         config.central_ui_bff_shared_secret.clone(),
     );
 
     let root_processor = RootProcessor::new(HashMap::from([auth.job_registration()]));
+    let recovery_job_worker = ManualWorker::new(
+        ethoko_central::jobs::psqlqueue::PsqlQueue::new(1, pool),
+        RootProcessor::new(HashMap::from([auth.job_registration()])),
+    );
     let job_worker = ManualWorker::new(job_queue, root_processor);
 
     let port = config.port;
@@ -205,6 +245,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     Ok(InstanceState {
         server_url,
         job_worker,
+        recovery_job_worker,
         email_service,
         github_client,
         github_oauth_client: auth_oauth_github_client_adapter,

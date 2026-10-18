@@ -5,6 +5,14 @@ use crate::{auth::models::user::User, newtypes::email::Email};
 #[derive(Serialize, Deserialize, Debug)]
 pub enum AuthJob {
     SendEmailVerificationOtp(SendEmailVerificationOtpPayload),
+    SendPasswordReset(SendPasswordResetPayload),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SendPasswordResetPayload {
+    pub email: Email,
+    pub reset_url: String,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -61,6 +61,61 @@ type ApiResult<TData, TUnprocessableEntityReason> =
 class EthokoCentralClient {
   constructor(private baseUrl: string) {}
 
+  private async recoveryRequest(path: string, body: object, clientIp: string) {
+    const response = await fetch(`${this.baseUrl}/auth/${path}`, {
+      method: "POST",
+      headers: { ...this.createBffHeaders(), "X-Ethoko-Client-IP": clientIp },
+      body: JSON.stringify(body),
+    });
+    if (response.status === 429)
+      throw new Response("Too many requests", { status: 429 });
+    return response;
+  }
+
+  async forgotPassword(
+    email: string,
+    clientIp: string,
+  ): Promise<
+    ApiResult<{ message: string; cooldownSeconds: number }, "unknown">
+  > {
+    const response = await this.recoveryRequest(
+      "forgot-password",
+      { email },
+      clientIp,
+    );
+    return this.handleResponse(
+      response,
+      z.object({
+        message: z.string(),
+        cooldownSeconds: z.number().int().nonnegative(),
+      }),
+      {},
+    );
+  }
+
+  async validatePasswordReset(token: string, clientIp: string) {
+    const response = await this.recoveryRequest(
+      "reset-password/validate",
+      { token },
+      clientIp,
+    );
+    return this.handleResponse(response, null, {
+      ETKARP01: "invalid-link" as const,
+    });
+  }
+
+  async resetPassword(token: string, password: string, clientIp: string) {
+    const response = await this.recoveryRequest(
+      "reset-password",
+      { token, password },
+      clientIp,
+    );
+    return this.handleResponse(response, null, {
+      ETKARP01: "invalid-link" as const,
+      ETKAG01: "invalid-password" as const,
+    });
+  }
+
   private createBffHeaders(params?: {
     userSessionToken?: string;
   }): HeadersInit {

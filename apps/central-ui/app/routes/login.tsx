@@ -1,4 +1,4 @@
-import { Form, redirect } from "react-router";
+import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/login";
 import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
@@ -156,6 +156,7 @@ export default function Login({
         ) : null}
         <button type="submit">Log In</button>
       </Form>
+      <Link to="/forgot-password">Forgot password?</Link>
       <Form method="post" className="flex flex-col gap-4">
         <input type="hidden" name="intent" value={LOGIN_WITH_GITHUB_INTENT} />
         <button type="submit">Log In with GitHub</button>
