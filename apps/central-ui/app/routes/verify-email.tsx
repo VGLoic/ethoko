@@ -3,6 +3,11 @@ import type { Route } from "./+types/verify-email";
 import { OtpSchema } from "~/server/newtypes.server";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 import { Form } from "react-router";
+import { Feedback, Field, Page, SubmitButton } from "~/components/ui";
+
+export function meta() {
+  return [{ title: "Verify email · Ethoko Central" }];
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { searchParams } = new URL(request.url);
@@ -61,13 +66,13 @@ export async function action({ request }: Route.ActionArgs) {
       if (verifyEmailResult.variant === "unprocessable-entity") {
         const errorReason =
           verifyEmailResult.reason === "email-already-verified"
-            ? "The email associated with this account is already verified."
+            ? "Your email is already verified. You can sign in."
             : verifyEmailResult.reason === "invalid-otp"
               ? "The provided code is invalid. Request a new one."
               : verifyEmailResult.reason === "expired-otp"
                 ? "The provided code has expired. Request a new one."
                 : verifyEmailResult.reason === "unknown"
-                  ? "An unknown error occurred."
+                  ? "We couldn’t verify your email. Try again in a moment."
                   : `Unknown reason ${verifyEmailResult.reason satisfies never}`;
         return {
           intent: VERIFY_EMAIL_INTENT,
@@ -84,7 +89,8 @@ export async function action({ request }: Route.ActionArgs) {
         intent: VERIFY_EMAIL_INTENT,
         success: false,
         errors: {
-          reason: "An error occurred during email verification.",
+          reason:
+            "The verification service is unavailable. Try again in a moment.",
         },
       };
     }
@@ -119,11 +125,11 @@ export async function action({ request }: Route.ActionArgs) {
       if (resendResult.variant === "unprocessable-entity") {
         const errorReason =
           resendResult.reason === "email-already-verified"
-            ? "The email has already been verified."
+            ? "Your email is already verified. You can sign in."
             : resendResult.reason === "cooldown-period-not-elapsed"
-              ? "A code has been requested recently, please wait before trying again."
+              ? "A code was requested recently. Wait a moment, then try again."
               : resendResult.reason === "unknown"
-                ? "An unknown error occurred."
+                ? "We couldn’t send a new code. Try again in a moment."
                 : `Unknown reason ${resendResult.reason satisfies never}`;
         return {
           intent: RESEND_VERIFICATION_INTENT,
@@ -140,7 +146,8 @@ export async function action({ request }: Route.ActionArgs) {
         intent: RESEND_VERIFICATION_INTENT,
         success: false,
         errors: {
-          reason: "An error occurred while resending the verification email.",
+          reason:
+            "The email service is unavailable. Try requesting a new code in a moment.",
         },
       };
     }
@@ -154,50 +161,65 @@ export default function VerifyEmail({
   if (actionData?.success) {
     if (actionData?.intent === VERIFY_EMAIL_INTENT) {
       return (
-        <main className="flex flex-col items-center justify-center min-h-screen">
-          <h1>Email Verified Successfully</h1>
-        </main>
+        <Page>
+          <h1>Email verified</h1>
+          <Feedback tone="success">
+            Your email is verified. You can sign in to Ethoko Central.
+          </Feedback>
+        </Page>
       );
     }
     if (actionData?.intent === RESEND_VERIFICATION_INTENT) {
       return (
-        <main className="flex flex-col items-center justify-center min-h-screen">
-          <h1>Verification Email Resent Successfully</h1>
-        </main>
+        <Page>
+          <h1>Check your email</h1>
+          <Feedback tone="success">
+            We sent a new verification code. Follow the link in your email to
+            verify it.
+          </Feedback>
+        </Page>
       );
     }
   }
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-16">
-      <h1>Verify Email</h1>
-      <Form method="post" className="flex flex-col gap-4">
+    <Page>
+      <h1>Verify email</h1>
+      <Form method="post">
         <input type="hidden" name="email" value={loaderData.email} />
-        {actionData?.errors?.email && (
-          <p className="text-red-500">{actionData.errors.email}</p>
-        )}
+        <Feedback>{actionData?.errors?.email}</Feedback>
         <input type="hidden" name="intent" value={VERIFY_EMAIL_INTENT} />
-        <label>
-          OTP:
-          <input name="otp" defaultValue={loaderData.otp ?? ""} />
-          {actionData?.errors?.otp && (
-            <p className="text-red-500">{actionData.errors.otp}</p>
-          )}
-        </label>
+        <Field
+          label="Verification code"
+          name="otp"
+          autoComplete="one-time-code"
+          className="identifier"
+          defaultValue={loaderData.otp ?? ""}
+          error={actionData?.errors?.otp}
+          hint={`Enter the code sent to ${loaderData.email}.`}
+        />
         {actionData?.intent === VERIFY_EMAIL_INTENT &&
           actionData?.errors?.reason && (
-            <p className="text-red-500">{actionData.errors.reason}</p>
+            <Feedback>{actionData.errors.reason}</Feedback>
           )}
-        <button type="submit">Verify Email</button>
+        <SubmitButton intent={VERIFY_EMAIL_INTENT} pendingLabel="Verifying…">
+          Verify email
+        </SubmitButton>
       </Form>
-      <Form method="post" className="flex flex-col gap-4">
+      <Form method="post">
         {actionData?.intent === RESEND_VERIFICATION_INTENT &&
           actionData?.errors?.reason && (
-            <p className="text-red-500">{actionData.errors.reason}</p>
+            <Feedback>{actionData.errors.reason}</Feedback>
           )}
         <input type="hidden" name="email" value={loaderData.email} />
         <input type="hidden" name="intent" value={RESEND_VERIFICATION_INTENT} />
-        <button type="submit">Resend Verification Email</button>
+        <SubmitButton
+          intent={RESEND_VERIFICATION_INTENT}
+          secondary
+          pendingLabel="Sending…"
+        >
+          Resend verification email
+        </SubmitButton>
       </Form>
-    </main>
+    </Page>
   );
 }

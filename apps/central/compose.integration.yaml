@@ -1,5 +1,5 @@
 services:
-  db:
+  integration-db:
     container_name: integration-db
     image: postgres:16.6
     restart: always

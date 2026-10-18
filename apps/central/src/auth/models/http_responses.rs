@@ -5,10 +5,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[serde(tag = "state")]
 pub enum UserResponse {
-    #[serde(rename = "pending")]
+    #[serde(rename = "pending", rename_all = "camelCase")]
     Pending {
         email: Email,
         suggested_handle: Option<String>,
@@ -16,7 +15,7 @@ pub enum UserResponse {
         created_at: chrono::DateTime<chrono::Utc>,
         updated_at: chrono::DateTime<chrono::Utc>,
     },
-    #[serde(rename = "registered")]
+    #[serde(rename = "registered", rename_all = "camelCase")]
     Registered {
         email: Email,
         handle: Handle,

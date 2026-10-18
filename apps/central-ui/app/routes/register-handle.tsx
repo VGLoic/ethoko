@@ -4,10 +4,11 @@ import type { Route } from "./+types/register-handle";
 import { getSessionTokenOrRedirect } from "~/server/auth.server";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
 import { HandleSchema } from "~/server/newtypes.server";
+import { Feedback, Field, Page, SubmitButton } from "~/components/ui";
 
 export function meta() {
   return [
-    { title: "Register Handle" },
+    { title: "Register handle · Ethoko Central" },
     { name: "description", content: "Register your Ethoko Central handle." },
   ];
 }
@@ -54,7 +55,7 @@ export async function action({ request }: Route.ActionArgs) {
         return {
           success: false as const,
           errors: {
-            handle: "This handle is not available",
+            handle: "This handle is taken. Choose another handle.",
           },
         };
       }
@@ -63,7 +64,7 @@ export async function action({ request }: Route.ActionArgs) {
         return {
           success: false as const,
           errors: {
-            handle: "This handle is not allowed",
+            handle: "This handle is not allowed. Choose another handle.",
           },
         };
       }
@@ -87,7 +88,7 @@ export async function action({ request }: Route.ActionArgs) {
     return {
       success: false as const,
       errors: {
-        reason: "An error occurred while registering the handle.",
+        reason: "We couldn’t register your handle. Try again in a moment.",
       },
     };
   }
@@ -99,10 +100,10 @@ export default function RegisterHandle({
 }: Route.ComponentProps) {
   if (loaderData.user.state === "registered") {
     return (
-      <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
-        <h1 className="flex justify-center">Register Handle</h1>
-        <p className="text-center">Your handle is already registered.</p>
-      </main>
+      <Page>
+        <h1>Register handle</h1>
+        <Feedback tone="notice">Your handle is already registered.</Feedback>
+      </Page>
     );
   }
 
@@ -110,31 +111,27 @@ export default function RegisterHandle({
     actionData?.success === false ? actionData.errors : undefined;
 
   return (
-    <main className="flex flex-col pt-16 pb-4 px-8 gap-8">
-      <h1 className="flex justify-center">Register Handle</h1>
-      <p className="text-center">
-        Choose your permanent handle. Suggested handles are not reserved until
-        you submit one successfully.
+    <Page>
+      <h1>Register handle</h1>
+      <p>
+        Your handle becomes your namespace. It’s permanent, so choose one you’ll
+        keep.
       </p>
-      <Form method="post" className="flex flex-col gap-4">
-        <label>
-          Handle:
-          <input
-            type="text"
-            name="handle"
-            required
-            defaultValue={loaderData.user.suggestedHandle ?? ""}
-            className="border p-2"
-          />
-          {formErrors?.handle ? (
-            <p className="text-red-500">{formErrors.handle}</p>
-          ) : null}
-        </label>
-        {formErrors?.reason ? (
-          <p className="text-red-500">{formErrors.reason}</p>
-        ) : null}
-        <button type="submit">Register Handle</button>
+      <Form method="post">
+        <Field
+          label="Handle"
+          type="text"
+          name="handle"
+          className="identifier"
+          autoComplete="username"
+          required
+          defaultValue={loaderData.user.suggestedHandle ?? ""}
+          error={formErrors?.handle}
+          hint="Suggested handles are not reserved until you register successfully."
+        />
+        <Feedback>{formErrors?.reason}</Feedback>
+        <SubmitButton pendingLabel="Registering…">Register handle</SubmitButton>
       </Form>
-    </main>
+    </Page>
   );
 }
