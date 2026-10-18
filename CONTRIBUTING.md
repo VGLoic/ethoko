@@ -30,6 +30,9 @@ Check the available scripts in the root `package.json` file. The most used ones 
 - `check-types`: typecheck all packages,
 - `test:e2e:core`: run end-to-end tests for @ethoko/cli-beacon,
 - `test:e2e:apps`: run end-to-end tests for integration apps.
+- `test:e2e:ui`: run Central UI Chromium tests against a standalone mock API.
+  See [Central UI browser testing](apps/central-ui/README.md#browser-tests) for
+  browser installation, two-worker isolation checks, and harness diagnostics.
 
 ### Changesets
 

@@ -34,6 +34,61 @@ npm run dev
 
 Your application will be available at `http://localhost:5173`.
 
+## Browser tests
+
+Browser tooling requires **Node 22+** (22.22+ with the current React Router
+dependency); use the repository's pinned Node 24 in `.nvmrc`. From the repository root:
+
+```bash
+nvm use
+pnpm install
+pnpm --filter central-ui test:e2e:install
+pnpm test:e2e:ui
+pnpm --filter central-ui test:e2e:concurrent
+pnpm --filter central-ui test:e2e:verify-harness
+```
+
+On Linux, install system dependencies with
+`pnpm --filter central-ui exec playwright install --with-deps chromium`.
+Inside this package, `pnpm test:e2e` is the canonical browser-test command;
+append Playwright arguments to select a test or enable headed mode.
+
+Playwright owns exactly one real React Router development server on
+`127.0.0.1:5174` and one standalone `@msw/serve` API server on
+`127.0.0.1:4101`. Both ports must be free; existing servers are never reused.
+No Rust API, database, email service, or local `.env` is needed. The test-only
+Vite configuration prebundles route dependencies to avoid first-use reloads.
+The normal suite uses one Chromium worker and isolated browser contexts.
+
+`test:e2e:concurrent` runs the two contrasting login tests with two workers on
+that same server pair. A mock control barrier requires both independent
+scenarios to be active before either browser proceeds. Run this command without
+filtering tests; retries are disabled for this paired verification.
+
+Tests declare outcomes inline using the native `scenario` fixture. Every call
+generates fresh valid identities and an opaque User Session Token, including on
+retries. Email and token select scenario-local responses; the shared Machine
+Credential does not. The test-only HTTP control API creates, observes, and
+retires only the owning scenario. Retired identities remain as tombstones to
+diagnose late requests. There is no global reset or response queue. Only email
+login, current User, and logout are implemented in this initial slice.
+
+Unexpected traffic is recorded even if the BFF absorbs the error. Fixture
+teardown retires scenarios after failed assertions and attaches their traffic.
+The suite audit fails on all violations (including unattributed/late requests)
+or unretired scenarios and saves `test-results/mock-api.json`. Failure traces
+are in `test-results/`; view the HTML report with
+`pnpm exec playwright show-report`. Server output is included in command/CI logs.
+`test:e2e:verify-harness` deliberately launches failing subprocesses to prove
+unattributed traffic, late traffic, absorbed logout errors, and cleanup after an
+assertion failure. It succeeds only if those child runs fail as intended and
+leak no active scenarios; their diagnostics/traces are saved in `harness-results/`.
+PR CI installs Chromium, runs these checks, and retains failure artifacts.
+
+**Review checkpoint:** the login tests, scenario helper, and handlers are
+provisional. A maintainer must review this first slice (#167) before sibling
+tickets expand it; simplify the helper if that review exposes excess indirection.
+
 ## Building for Production
 
 Create a production build:

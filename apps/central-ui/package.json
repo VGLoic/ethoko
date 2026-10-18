@@ -9,9 +9,14 @@
     "start": "react-router-serve ./build/server/index.js",
     "check-types": "react-router typegen && tsc",
     "check-types:ci": "react-router typegen && tsc",
-    "check-format": "prettier --check --ignore-unknown 'app/**/*.{ts,tsx,css}'",
-    "format": "prettier --write 'app/**/*.{ts,tsx,css}'",
-    "lint": "eslint 'app/**/*.{ts,tsx,css}'"
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "test:e2e:concurrent": "E2E_VERIFY_CONCURRENCY=1 playwright test --workers=2",
+    "test:e2e:verify-harness": "node --experimental-strip-types e2e/check-harness.ts",
+    "check-format": "prettier --check --ignore-unknown 'app/**/*.{ts,tsx,css}' 'e2e/**/*.ts' '*.{ts,json,mjs}'",
+    "format": "prettier --write 'app/**/*.{ts,tsx,css}' 'e2e/**/*.ts' '*.{ts,json,mjs}'",
+    "lint": "eslint --max-warnings=0 'app/**/*.{ts,tsx,css}' 'e2e/**/*.ts' '*.ts'",
+    "lint:ci": "pnpm lint"
   },
   "dependencies": {
     "@react-router/node": "^8.4.0",
@@ -25,12 +30,15 @@
   "devDependencies": {
     "@ethoko/eslint-config": "workspace:*",
     "@ethoko/typescript-config": "workspace:*",
+    "@msw/serve": "^0.11.0",
+    "@playwright/test": "^1.64.1",
     "@react-router/dev": "^8.4.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^22",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "eslint": "^9.39.5",
+    "msw": "^3.0.3",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
     "vite": "^8.0.3"
