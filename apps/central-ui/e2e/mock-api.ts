@@ -8,6 +8,7 @@ type Scenario = z.infer<typeof Identity> & {
   login: z.infer<typeof ScenarioInput>["login"];
   signup: z.infer<typeof ScenarioInput>["signup"];
   registration: z.infer<typeof ScenarioInput>["registration"];
+  verification: z.infer<typeof ScenarioInput>["verification"];
   active: boolean;
   loggedIn: boolean;
   requests: string[];
@@ -24,6 +25,8 @@ const apiHandlers = [
   http.get(`${apiUrl}/auth/me`, handleCurrentUser),
   http.post(`${apiUrl}/auth/logout`, handleLogout),
   http.post(`${apiUrl}/auth/register-handle`, handleRegisterHandle),
+  http.post(`${apiUrl}/auth/verify-email`, handleEmailVerification),
+  http.post(`${apiUrl}/auth/resend-verification-otp`, handleEmailVerification),
 ];
 
 function violation(request: Request, reason: string, scenario?: Scenario) {
@@ -141,6 +144,73 @@ async function handleEmailLogin({ request }: { request: Request }) {
   return HttpResponse.json({ token: scenario.token });
 }
 
+async function handleEmailVerification({ request }: { request: Request }) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return violation(request, "malformed JSON", findScenarioByToken(request));
+  }
+  const email = z.object({ email: z.string() }).safeParse(body);
+  const scenario = email.success
+    ? findScenarioByEmail(email.data.email)
+    : undefined;
+  if (!scenario) {
+    return violation(
+      request,
+      `unknown identity (email=${email.success ? email.data.email : "missing"})`,
+      findScenarioByToken(request),
+    );
+  }
+  const error = validateScenarioRequest(request, scenario);
+  if (error) return error;
+  const resend =
+    new URL(request.url).pathname === "/auth/resend-verification-otp";
+  const payload = (
+    resend
+      ? z.object({ email: z.email() }).strict()
+      : z
+          .object({ email: z.email(), otp: z.string().regex(/^[0-9]{6}$/) })
+          .strict()
+  ).safeParse(body);
+  if (
+    !payload.success ||
+    request.headers.has("X-Ethoko-User-Authorization") ||
+    !request.headers.get("Content-Type")?.includes("application/json")
+  ) {
+    return violation(
+      request,
+      "invalid email verification payload, headers, or configuration",
+      scenario,
+    );
+  }
+  if (resend) return new HttpResponse(null, { status: 204 });
+  if (
+    !scenario.verification ||
+    !("otp" in payload.data) ||
+    payload.data.otp !== scenario.verification.code
+  ) {
+    return violation(
+      request,
+      "unexpected verification code or missing configuration",
+      scenario,
+    );
+  }
+  if (scenario.verification.outcome === "invalid-code") {
+    return HttpResponse.json(
+      { code: "ETKAVE02", reason: "Invalid verification code" },
+      { status: 422 },
+    );
+  }
+  if (scenario.verification.outcome === "expired-code") {
+    return HttpResponse.json(
+      { code: "ETKAVE03", reason: "Expired verification code" },
+      { status: 422 },
+    );
+  }
+  return new HttpResponse(null, { status: 204 });
+}
+
 async function handleEmailSignup({ request }: { request: Request }) {
   let body: unknown;
   try {
@@ -256,7 +326,7 @@ const controlHandlers = [
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
     const input = ScenarioInput.parse(await request.json());
-    const { identity, login, signup, registration } = input;
+    const { identity, login, signup, registration, verification } = input;
     if (
       [...scenarios.values()].some(
         (scenario) =>
@@ -275,6 +345,7 @@ const controlHandlers = [
       login,
       signup,
       registration,
+      verification,
       active: true,
       loggedIn: false,
       requests: [],

@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: process.env.E2E_HARNESS_PROBE
     ? "harness.spec.ts"
-    : ["login.spec.ts", "signup.spec.ts", "register-handle.spec.ts"],
+    : ["login.spec.ts", "signup.spec.ts", "register-handle.spec.ts", "verification.spec.ts"],
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,

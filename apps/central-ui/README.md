@@ -45,6 +45,7 @@ pnpm install
 pnpm --filter central-ui test:e2e:install
 pnpm test:e2e:ui
 pnpm --filter central-ui test:e2e:verify-harness
+pnpm --filter central-ui test:e2e verification.spec.ts --workers=2
 ```
 
 On Linux, install system dependencies with
@@ -84,7 +85,8 @@ Email and token select scenario-local responses; the shared Machine
 Credential does not. The test-only HTTP control API creates, observes, and
 retires only the owning scenario. Retired identities remain as tombstones to
 diagnose late requests. There is no global reset or response queue. Email login,
-current User, logout, email signup, and handle registration are implemented. Signup tests explicitly
+current User, logout, email signup, handle registration, email verification, and
+verification-code resend are implemented. Signup tests explicitly
 opt into `signup: "success"`; an unconfigured signup is unexpected traffic.
 Login defaults to success when omitted. Signup returns the API's email,
 emailVerified, createdAt, and updatedAt fields (no User state or session token);
@@ -97,8 +99,14 @@ Success updates only the token-selected scenario to Registered User; taken-handl
 feedback leaves it pending. Profile reads are stable, and neither outcome changes
 email verification. There is no shared handle-ownership simulation.
 
+Verification tests configure the submitted six-digit code and
+success, invalid-code, or expired-code outcome inline. Query parameters prefill
+the form; tests explicitly submit it. No email delivery or verification-state
+transition is modeled.
+
 `mock-api.ts` lists Central API methods and URLs in `apiHandlers`, with a separate
-handler for each operation. Test-control routes live in `controlHandlers`; the
+handler for each operation (verification and resend share payload validation).
+Test-control routes live in `controlHandlers`; the
 catch-all only reports unexpected requests. Add new operations as explicit MSW
 handlers, with any configurable outcomes declared in the test's scenario.
 
