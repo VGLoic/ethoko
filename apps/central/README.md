@@ -36,6 +36,25 @@ The application can also be run using a single `docker compose` command:
 docker compose -f compose.app.yaml up --build
 ```
 
+### Runtime environment and email transport
+
+The existing `central-server` binary reads these settings from the environment (or `.env`):
+
+| Variable | Values / requirement | Default |
+| --- | --- | --- |
+| `CENTRAL_ENVIRONMENT` | `production` or `development` | `production` |
+| `CENTRAL_EMAIL_TRANSPORT` | `resend` or `local-capture` | `resend` |
+| `RESEND_API_KEY` | Required for Resend in either environment | None |
+| `CENTRAL_EMAIL_CAPTURE_DIR` | Nonempty directory path required for local capture | None |
+
+Omitted or empty optional settings use their defaults. Unknown environment or transport values fail configuration parsing. `NODE_ENV`, Rust build profiles, and development mode alone do not select local capture.
+
+Local capture requires both `CENTRAL_ENVIRONMENT=development` and an explicit `CENTRAL_EMAIL_TRANSPORT=local-capture`, plus a capture directory. It does not require a Resend key. **The local-capture adapter is not implemented yet**, so this selection currently fails with an explicit unavailable error, even with otherwise valid development configuration. It never falls back to Resend. No capture directory is created by configuration validation.
+
+`Config` validates these cross-field constraints before the server opens a database connection, starts workers, or binds a listener. Production rejects local capture, including when `CENTRAL_ENVIRONMENT` is omitted.
+
+Production deployment configuration must explicitly retain `CENTRAL_ENVIRONMENT=production`. This runtime guard cannot prevent an operator from explicitly declaring a production deployment to be `development`. Compile-time exclusion of local capture is outside this configuration guard's scope.
+
 ### Integration tests
 
 Run integration tests through the Central package script. It starts the integration database, waits for it to become healthy, runs the tests, and tears the database down afterward:

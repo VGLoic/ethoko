@@ -1,5 +1,6 @@
 use std::{
     env::{self, VarError},
+    path::PathBuf,
     str::FromStr,
 };
 
@@ -8,6 +9,12 @@ use tracing::Level;
 
 /// Public application configuration
 pub struct Config {
+    /// Runtime environment; defaults to production independently of build profile.
+    pub environment: Environment,
+    /// Explicit email delivery selection; defaults to Resend.
+    pub email_transport: EmailTransport,
+    /// Directory for local email capture, required only for local capture.
+    pub email_capture_dir: Option<PathBuf>,
     /// Self URL of the server, e.g. `https://example.com`
     pub self_url: String,
     /// URL of the web application, e.g. `https://app.example.com`
@@ -24,7 +31,7 @@ pub struct Config {
     pub global_rate_limit_config: RateLimitConfig,
     /// Auth rate limit configuration for specific public routes, e.g. re-send verification OTP
     pub auth_rate_limit_config: RateLimitConfig,
-    /// Resend API key for sending emails
+    /// Resend API key for sending emails, required only for Resend
     pub resend_api_key: String,
     /// Shared secret used by the Central UI BFF to authenticate to Central
     pub central_ui_bff_shared_secret: String,
@@ -34,6 +41,52 @@ pub struct Config {
     pub oauth_transaction_ttl_seconds: u16,
     /// GitHub API base URL
     pub github_api_url: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Environment {
+    Development,
+    #[default]
+    Production,
+}
+
+impl FromStr for Environment {
+    type Err = std::io::Error;
+
+    /// Parse a runtime environment; reject values other than development or production.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "development" => Ok(Self::Development),
+            "production" => Ok(Self::Production),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "expected development or production",
+            )),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum EmailTransport {
+    #[default]
+    Resend,
+    LocalCapture,
+}
+
+impl FromStr for EmailTransport {
+    type Err = std::io::Error;
+
+    /// Parse an email transport; reject values other than resend or local-capture.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "resend" => Ok(Self::Resend),
+            "local-capture" => Ok(Self::LocalCapture),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "expected resend or local-capture",
+            )),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -67,9 +120,31 @@ const GITHUB_API_URL: &str = "https://api.github.com";
 
 impl Config {
     pub fn parse_from_env() -> Result<Self, Vec<anyhow::Error>> {
+        Self::parse_from_lookup(&|key| env::var(key))
+    }
+
+    fn parse_from_lookup(
+        lookup: &impl Fn(&str) -> Result<String, VarError>,
+    ) -> Result<Self, Vec<anyhow::Error>> {
         let mut errors = Vec::new();
 
-        let self_url = match parse_required_env_variable::<String>("SELF_URL") {
+        let environment = match parse_env_variable::<Environment>(lookup, "CENTRAL_ENVIRONMENT") {
+            Ok(v) => v.unwrap_or_default(),
+            Err(e) => {
+                errors.push(e);
+                Environment::default()
+            }
+        };
+        let email_transport =
+            match parse_env_variable::<EmailTransport>(lookup, "CENTRAL_EMAIL_TRANSPORT") {
+                Ok(v) => v.unwrap_or_default(),
+                Err(e) => {
+                    errors.push(e);
+                    EmailTransport::default()
+                }
+            };
+
+        let self_url = match parse_required_env_variable::<String>(lookup, "SELF_URL") {
             Ok(v) => v,
             Err(e) => {
                 errors.push(e);
@@ -77,7 +152,7 @@ impl Config {
             }
         };
 
-        let web_app_url = match parse_required_env_variable::<String>("WEB_APP_URL") {
+        let web_app_url = match parse_required_env_variable::<String>(lookup, "WEB_APP_URL") {
             Ok(v) => v,
             Err(e) => {
                 errors.push(e);
@@ -85,7 +160,7 @@ impl Config {
             }
         };
 
-        let port = match parse_env_variable::<u16>("PORT") {
+        let port = match parse_env_variable::<u16>(lookup, "PORT") {
             Ok(v) => v.unwrap_or(3000),
             Err(e) => {
                 errors.push(e);
@@ -93,7 +168,7 @@ impl Config {
             }
         };
 
-        let database_url = match parse_required_env_variable::<String>("DATABASE_URL") {
+        let database_url = match parse_required_env_variable::<String>(lookup, "DATABASE_URL") {
             Ok(v) => v,
             Err(e) => {
                 errors.push(e);
@@ -101,7 +176,7 @@ impl Config {
             }
         };
 
-        let log_level = match parse_env_variable::<Level>("LOG_LEVEL") {
+        let log_level = match parse_env_variable::<Level>(lookup, "LOG_LEVEL") {
             Ok(v) => v.unwrap_or(Level::INFO),
             Err(e) => {
                 errors.push(e);
@@ -109,16 +184,25 @@ impl Config {
             }
         };
 
-        let resend_api_key = match parse_required_env_variable::<String>("RESEND_API_KEY") {
-            Ok(v) => v,
+        let resend_api_key = match parse_env_variable::<String>(lookup, "RESEND_API_KEY") {
+            Ok(v) => v.unwrap_or_default(),
             Err(e) => {
                 errors.push(e);
                 EMPTY_STRING.into()
             }
         };
 
+        let email_capture_dir =
+            match parse_env_variable::<PathBuf>(lookup, "CENTRAL_EMAIL_CAPTURE_DIR") {
+                Ok(v) => v,
+                Err(e) => {
+                    errors.push(e);
+                    None
+                }
+            };
+
         let central_ui_bff_shared_secret =
-            match parse_required_env_variable::<String>("CENTRAL_UI_BFF_SHARED_SECRET") {
+            match parse_required_env_variable::<String>(lookup, "CENTRAL_UI_BFF_SHARED_SECRET") {
                 Ok(v) => v,
                 Err(e) => {
                     errors.push(e);
@@ -126,10 +210,11 @@ impl Config {
                 }
             };
 
-        let (github_oauth_client_config, github_oauth_errors) = parse_github_oauth_client_config();
+        let (github_oauth_client_config, github_oauth_errors) =
+            parse_github_oauth_client_config(lookup);
 
         let oauth_transaction_ttl_seconds =
-            match parse_env_variable::<u16>("OAUTH_TRANSACTION_TTL_SECONDS") {
+            match parse_env_variable::<u16>(lookup, "OAUTH_TRANSACTION_TTL_SECONDS") {
                 Ok(Some(v)) => v,
                 Ok(None) => 600, // default to 10 minutes
                 Err(e) => {
@@ -138,7 +223,7 @@ impl Config {
                 }
             };
 
-        let github_api_url = match parse_env_variable::<String>("GITHUB_API_URL") {
+        let github_api_url = match parse_env_variable::<String>(lookup, "GITHUB_API_URL") {
             Ok(v) => v.unwrap_or(GITHUB_API_URL.into()),
             Err(e) => {
                 errors.push(e);
@@ -166,7 +251,10 @@ impl Config {
             max_burst_size: 2,
         };
 
-        Ok(Config {
+        let config = Config {
+            environment,
+            email_transport,
+            email_capture_dir,
             self_url,
             web_app_url,
             port,
@@ -180,14 +268,58 @@ impl Config {
             github_oauth_client_config,
             oauth_transaction_ttl_seconds,
             github_api_url,
-        })
+        };
+        config.validate()?;
+        Ok(config)
+    }
+
+    /// Check cross-field runtime constraints before opening application resources.
+    /// Returns all inconsistent or currently unsupported configuration choices.
+    pub fn validate(&self) -> Result<(), Vec<anyhow::Error>> {
+        let mut errors = Vec::new();
+        match self.email_transport {
+            EmailTransport::Resend => {
+                if self.resend_api_key.is_empty() {
+                    errors.push(anyhow::anyhow!(
+                        "Required environment variable RESEND_API_KEY is not set or is empty"
+                    ));
+                }
+            }
+            EmailTransport::LocalCapture => {
+                if self.environment != Environment::Development {
+                    errors.push(anyhow::anyhow!(
+                        "local-capture requires CENTRAL_ENVIRONMENT=development"
+                    ));
+                }
+                if self
+                    .email_capture_dir
+                    .as_ref()
+                    .is_none_or(|path| path.as_os_str().is_empty())
+                {
+                    errors.push(anyhow::anyhow!(
+                        "local-capture requires CENTRAL_EMAIL_CAPTURE_DIR"
+                    ));
+                }
+                // Remove this rejection when the local-capture adapter is implemented.
+                errors.push(anyhow::anyhow!(
+                    "local-capture email transport is unavailable: adapter is not implemented"
+                ));
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 
-fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
+fn parse_github_oauth_client_config(
+    lookup: &impl Fn(&str) -> Result<String, VarError>,
+) -> (OauthClientConfig, Vec<Error>) {
     let mut errors = Vec::new();
 
-    let client_id = match parse_required_env_variable::<String>("GITHUB_OAUTH_CLIENT_ID") {
+    let client_id = match parse_required_env_variable::<String>(lookup, "GITHUB_OAUTH_CLIENT_ID") {
         Ok(v) => v,
         Err(e) => {
             errors.push(e);
@@ -196,22 +328,24 @@ fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
     };
     let client_id = oauth2::ClientId::new(client_id);
 
-    let client_secret = match parse_required_env_variable::<String>("GITHUB_OAUTH_CLIENT_SECRET") {
-        Ok(v) => v,
-        Err(e) => {
-            errors.push(e);
-            EMPTY_STRING.into()
-        }
-    };
+    let client_secret =
+        match parse_required_env_variable::<String>(lookup, "GITHUB_OAUTH_CLIENT_SECRET") {
+            Ok(v) => v,
+            Err(e) => {
+                errors.push(e);
+                EMPTY_STRING.into()
+            }
+        };
     let client_secret = oauth2::ClientSecret::new(client_secret);
 
-    let callback_url = match parse_required_env_variable::<String>("GITHUB_OAUTH_CALLBACK_URL") {
-        Ok(v) => v,
-        Err(e) => {
-            errors.push(e);
-            DUMMY_URL.into()
-        }
-    };
+    let callback_url =
+        match parse_required_env_variable::<String>(lookup, "GITHUB_OAUTH_CALLBACK_URL") {
+            Ok(v) => v,
+            Err(e) => {
+                errors.push(e);
+                DUMMY_URL.into()
+            }
+        };
     let callback_url = match oauth2::RedirectUrl::new(callback_url) {
         Ok(v) => v,
         Err(e) => {
@@ -220,7 +354,7 @@ fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
         }
     };
 
-    let auth_url = match parse_required_env_variable::<String>("GITHUB_OAUTH_AUTH_URL") {
+    let auth_url = match parse_required_env_variable::<String>(lookup, "GITHUB_OAUTH_AUTH_URL") {
         Ok(v) => v,
         Err(e) => {
             errors.push(e);
@@ -235,14 +369,14 @@ fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
         }
     };
 
-    let auth_token_url = match parse_required_env_variable::<String>("GITHUB_OAUTH_AUTH_TOKEN_URL")
-    {
-        Ok(v) => v,
-        Err(e) => {
-            errors.push(e);
-            EMPTY_STRING.into()
-        }
-    };
+    let auth_token_url =
+        match parse_required_env_variable::<String>(lookup, "GITHUB_OAUTH_AUTH_TOKEN_URL") {
+            Ok(v) => v,
+            Err(e) => {
+                errors.push(e);
+                EMPTY_STRING.into()
+            }
+        };
     let auth_token_url = match oauth2::TokenUrl::new(auth_token_url) {
         Ok(v) => v,
         Err(e) => {
@@ -262,17 +396,23 @@ fn parse_github_oauth_client_config() -> (OauthClientConfig, Vec<Error>) {
     (oauth_client_config, errors)
 }
 
-fn parse_required_env_variable<T>(key: &str) -> Result<T, anyhow::Error>
+fn parse_required_env_variable<T>(
+    lookup: &impl Fn(&str) -> Result<String, VarError>,
+    key: &str,
+) -> Result<T, anyhow::Error>
 where
     T: FromStr,
     <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
 {
-    parse_env_variable(key)?.ok_or_else(|| {
+    parse_env_variable(lookup, key)?.ok_or_else(|| {
         anyhow::anyhow!("Required environment variable {key} is not set or is empty")
     })
 }
 
-fn parse_env_variable<T>(key: &str) -> Result<Option<T>, anyhow::Error>
+fn parse_env_variable<T>(
+    lookup: &impl Fn(&str) -> Result<String, VarError>,
+    key: &str,
+) -> Result<Option<T>, anyhow::Error>
 where
     T: FromStr,
     <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
@@ -284,7 +424,7 @@ where
         anyhow::anyhow!("[{key}]: {e}")
     }
 
-    let env_value = match env::var(key) {
+    let env_value = match lookup(key) {
         Ok(v) => {
             if v.is_empty() {
                 Ok(None)
@@ -303,4 +443,165 @@ where
     env_value
         .map(|v| v.parse::<T>().map_err(|e| map_err(key, e)))
         .transpose()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(overrides: &[(&str, Option<&str>)]) -> Result<Config, Vec<Error>> {
+        let mut variables = std::collections::HashMap::from([
+            ("SELF_URL", "https://central.example.com"),
+            ("WEB_APP_URL", "https://app.example.com"),
+            ("DATABASE_URL", "postgresql://localhost/central"),
+            ("RESEND_API_KEY", "test-key"),
+            ("CENTRAL_UI_BFF_SHARED_SECRET", "test-secret"),
+            ("GITHUB_OAUTH_CLIENT_ID", "test-client"),
+            ("GITHUB_OAUTH_CLIENT_SECRET", "test-secret"),
+            (
+                "GITHUB_OAUTH_CALLBACK_URL",
+                "https://central.example.com/callback",
+            ),
+            (
+                "GITHUB_OAUTH_AUTH_URL",
+                "https://github.com/login/oauth/authorize",
+            ),
+            (
+                "GITHUB_OAUTH_AUTH_TOKEN_URL",
+                "https://github.com/login/oauth/access_token",
+            ),
+        ]);
+        for (key, value) in overrides {
+            if let Some(value) = value {
+                variables.insert(key, value);
+            } else {
+                variables.remove(key);
+            }
+        }
+        Config::parse_from_lookup(&|key| {
+            variables
+                .get(key)
+                .map(|value| value.to_string())
+                .ok_or(VarError::NotPresent)
+        })
+    }
+
+    #[test]
+    fn omitted_environment_and_transport_preserve_production_resend_defaults() {
+        let config = config(&[]).unwrap();
+        assert_eq!(config.environment, Environment::Production);
+        assert_eq!(config.email_transport, EmailTransport::Resend);
+        assert_eq!(config.resend_api_key, "test-key");
+    }
+
+    #[test]
+    fn production_rejects_local_capture_even_when_environment_is_omitted() {
+        for environment in [None, Some("production")] {
+            let errors = config(&[
+                ("CENTRAL_ENVIRONMENT", environment),
+                ("CENTRAL_EMAIL_TRANSPORT", Some("local-capture")),
+                ("CENTRAL_EMAIL_CAPTURE_DIR", Some("./captured-emails")),
+            ])
+            .err()
+            .expect("production must reject local capture");
+            assert!(errors.iter().any(|error| {
+                error
+                    .to_string()
+                    .contains("local-capture requires CENTRAL_ENVIRONMENT=development")
+            }));
+        }
+    }
+
+    #[test]
+    fn development_local_capture_requires_directory_and_is_explicitly_unavailable() {
+        for directory in [None, Some(""), Some("./captured-emails")] {
+            let errors = config(&[
+                ("CENTRAL_ENVIRONMENT", Some("development")),
+                ("CENTRAL_EMAIL_TRANSPORT", Some("local-capture")),
+                ("CENTRAL_EMAIL_CAPTURE_DIR", directory),
+                ("RESEND_API_KEY", None),
+            ])
+            .err()
+            .expect("local adapter is not available yet");
+            let messages: Vec<_> = errors.iter().map(ToString::to_string).collect();
+            assert!(messages.iter().any(|message| message.contains("local-capture email transport is unavailable")), "{messages:?}");
+            assert_eq!(
+                messages
+                    .iter()
+                    .any(|message| message.contains("CENTRAL_EMAIL_CAPTURE_DIR")),
+                directory.is_none_or(str::is_empty)
+            );
+            assert!(
+                !messages
+                    .iter()
+                    .any(|message| message.contains("RESEND_API_KEY")),
+                "{messages:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resend_requires_provider_configuration_in_every_environment() {
+        for environment in [None, Some("production"), Some("development")] {
+            for transport in [None, Some("resend")] {
+                let settings = [
+                    ("CENTRAL_ENVIRONMENT", environment),
+                    ("CENTRAL_EMAIL_TRANSPORT", transport),
+                ];
+                let valid = config(&settings).unwrap();
+                assert_eq!(valid.email_transport, EmailTransport::Resend);
+                assert_eq!(
+                    valid.environment,
+                    if environment == Some("development") {
+                        Environment::Development
+                    } else {
+                        Environment::Production
+                    }
+                );
+                for key in [None, Some("")] {
+                    let errors = config(&[settings[0], settings[1], ("RESEND_API_KEY", key)])
+                        .err()
+                        .expect("Resend needs a key");
+                    assert!(
+                        errors
+                            .iter()
+                            .any(|error| error.to_string().contains("RESEND_API_KEY"))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_environment_and_transport_fail_validation() {
+        for (name, value) in [
+            ("CENTRAL_ENVIRONMENT", "staging"),
+            ("CENTRAL_ENVIRONMENT", "Development"),
+            ("CENTRAL_EMAIL_TRANSPORT", "smtp"),
+        ] {
+            let errors = config(&[(name, Some(value))])
+                .err()
+                .expect("unknown setting must fail");
+            assert!(errors.iter().any(|error| error.to_string().contains(name)));
+        }
+    }
+
+    #[test]
+    fn validation_checks_config_values_independently_of_environment_parsing() {
+        let mut config = config(&[]).unwrap();
+        config.resend_api_key.clear();
+        assert!(config.validate().is_err());
+        config.email_transport = EmailTransport::LocalCapture;
+        config.email_capture_dir = Some(PathBuf::from("./captured-emails"));
+        let errors = config.validate().unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error
+                .to_string()
+                .contains("requires CENTRAL_ENVIRONMENT=development")
+        }));
+        config.environment = Environment::Development;
+        let errors = config.validate().unwrap_err();
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].to_string().contains("unavailable"));
+    }
 }

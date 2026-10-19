@@ -45,6 +45,9 @@ impl TestConfigBuilder {
     pub fn new() -> Self {
         Self {
             config: Config {
+                environment: ethoko_central::config::Environment::Production,
+                email_transport: ethoko_central::config::EmailTransport::Resend,
+                email_capture_dir: None,
                 self_url: "http://localhost".into(),
                 web_app_url: "http://localhost:5173".into(),
                 port: 0,
