@@ -85,9 +85,9 @@ retires only the owning scenario. Retired identities remain as tombstones to
 diagnose late requests. There is no global reset or response queue. Email login,
 current User, logout, and email signup are implemented. Signup tests explicitly
 opt into `signup: "success"`; an unconfigured signup is unexpected traffic.
-Login defaults to success when omitted. Signup returns an unverified Pending User
-without creating a session; confirmation mismatch stays within the real UI/BFF
-and must produce no API traffic.
+Login defaults to success when omitted. Signup returns the API's email,
+emailVerified, createdAt, and updatedAt fields (no User state or session token);
+confirmation mismatch stays within the real UI/BFF and must produce no API traffic.
 
 `mock-api.ts` lists Central API methods and URLs in `apiHandlers`, with a separate
 handler for each operation. Test-control routes live in `controlHandlers`; the

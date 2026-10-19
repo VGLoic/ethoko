@@ -183,7 +183,6 @@ async function handleEmailSignup({ request }: { request: Request }) {
   }
   return HttpResponse.json(
     {
-      state: "pending",
       email: scenario.email,
       emailVerified: false,
       createdAt: scenario.createdAt,

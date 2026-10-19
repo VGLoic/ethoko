@@ -25,6 +25,14 @@ const UserResponseSchema = z.discriminatedUnion("state", [
 ]);
 type UserResponse = z.infer<typeof UserResponseSchema>;
 
+const SignupResponseSchema = z.object({
+  email: z.email(),
+  emailVerified: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+type SignupResponse = z.infer<typeof SignupResponseSchema>;
+
 const LoginResponseSchema = z.object({
   token: z.string(),
 });
@@ -125,13 +133,13 @@ class EthokoCentralClient {
   async signup(signupRequest: {
     email: string;
     password: string;
-  }): Promise<ApiResult<UserResponse, "email-already-registered">> {
+  }): Promise<ApiResult<SignupResponse, "email-already-registered">> {
     const response = await fetch(`${this.baseUrl}/auth/signup/email`, {
       method: "POST",
       headers: this.createBffHeaders(),
       body: JSON.stringify(signupRequest),
     });
-    return await this.handleResponse(response, UserResponseSchema, {
+    return await this.handleResponse(response, SignupResponseSchema, {
       ETKAS01: "email-already-registered",
     });
   }
