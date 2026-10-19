@@ -1,7 +1,11 @@
 use dotenvy::dotenv;
 use ethoko_central::{
-    auth, clients, config::Config, externalcom::email::ResendEmailService,
-    httpserver::serve_http_server, jobs, router::app_router,
+    auth, clients,
+    config::{Config, EmailTransport},
+    externalcom::email::{EmailService, LocalEmailService, ResendEmailService},
+    httpserver::serve_http_server,
+    jobs,
+    router::app_router,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::{collections::HashMap, time::Duration};
@@ -68,8 +72,19 @@ async fn main() -> Result<(), anyhow::Error> {
         info!("Gracefully exiting job queue handle")
     });
 
-    let email_service =
-        ResendEmailService::new(config.web_app_url.clone(), config.resend_api_key.clone());
+    let email_service: Box<dyn EmailService> = match config.email_transport {
+        EmailTransport::Resend => Box::new(ResendEmailService::new(
+            config.web_app_url.clone(),
+            config.resend_api_key.clone(),
+        )),
+        EmailTransport::LocalCapture => Box::new(LocalEmailService::new(
+            config.web_app_url.clone(),
+            config
+                .email_capture_dir
+                .clone()
+                .expect("validated capture directory"),
+        )),
+    };
     let github_client = clients::github::GithubClientImpl::new(&config.github_api_url);
 
     let auth_oauth_github_client_adapter =

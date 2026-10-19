@@ -49,7 +49,9 @@ The existing `central-server` binary reads these settings from the environment (
 
 Omitted or empty optional settings use their defaults. Unknown environment or transport values fail configuration parsing. `NODE_ENV`, Rust build profiles, and development mode alone do not select local capture.
 
-Local capture requires both `CENTRAL_ENVIRONMENT=development` and an explicit `CENTRAL_EMAIL_TRANSPORT=local-capture`, plus a capture directory. It does not require a Resend key. **The local-capture adapter is not implemented yet**, so this selection currently fails with an explicit unavailable error, even with otherwise valid development configuration. It never falls back to Resend. No capture directory is created by configuration validation.
+Local capture requires both `CENTRAL_ENVIRONMENT=development` and an explicit `CENTRAL_EMAIL_TRANSPORT=local-capture`, plus a capture directory. It does not require a Resend key and never falls back to Resend. The normal worker writes one readable JSON file per delivery with `recipient`, `kind`, `delivered_at` (RFC 3339), and `verification_url`. The link uses the same construction as Resend, including query-parameter encoding. Capture failures propagate through normal job handling; delivery succeeds only after the file has been written and published. Configuration validation does not create the directory; delivery creates it as needed.
+
+Captures are email content, not operational logs: they contain email addresses and verification secrets. Keep them private and do not commit or publish them. On Unix, newly created directories/files use owner-only permissions. Completed captures have a `.json` extension; `.tmp` files may remain from interrupted or failed deliveries. See [Central playground](../../docs/central-playground.md) for local startup and retrieval.
 
 `Config` validates these cross-field constraints before the server opens a database connection, starts workers, or binds a listener. Production rejects local capture, including when `CENTRAL_ENVIRONMENT` is omitted.
 

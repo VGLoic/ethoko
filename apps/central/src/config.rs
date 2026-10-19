@@ -274,7 +274,7 @@ impl Config {
     }
 
     /// Check cross-field runtime constraints before opening application resources.
-    /// Returns all inconsistent or currently unsupported configuration choices.
+    /// Returns all inconsistent configuration choices.
     pub fn validate(&self) -> Result<(), Vec<anyhow::Error>> {
         let mut errors = Vec::new();
         match self.email_transport {
@@ -300,10 +300,6 @@ impl Config {
                         "local-capture requires CENTRAL_EMAIL_CAPTURE_DIR"
                     ));
                 }
-                // Remove this rejection when the local-capture adapter is implemented.
-                errors.push(anyhow::anyhow!(
-                    "local-capture email transport is unavailable: adapter is not implemented"
-                ));
             }
         }
         if errors.is_empty() {
@@ -513,8 +509,8 @@ mod tests {
     }
 
     #[test]
-    fn development_local_capture_requires_directory_and_is_explicitly_unavailable() {
-        for directory in [None, Some(""), Some("./captured-emails")] {
+    fn development_local_capture_requires_directory() {
+        for directory in [None, Some("")] {
             let errors = config(&[
                 ("CENTRAL_ENVIRONMENT", Some("development")),
                 ("CENTRAL_EMAIL_TRANSPORT", Some("local-capture")),
@@ -522,9 +518,8 @@ mod tests {
                 ("RESEND_API_KEY", None),
             ])
             .err()
-            .expect("local adapter is not available yet");
+            .expect("capture directory is required");
             let messages: Vec<_> = errors.iter().map(ToString::to_string).collect();
-            assert!(messages.iter().any(|message| message.contains("local-capture email transport is unavailable")), "{messages:?}");
             assert_eq!(
                 messages
                     .iter()
@@ -538,6 +533,19 @@ mod tests {
                 "{messages:?}"
             );
         }
+    }
+
+    #[test]
+    fn development_local_capture_needs_no_resend_key() {
+        let config = config(&[
+            ("CENTRAL_ENVIRONMENT", Some("development")),
+            ("CENTRAL_EMAIL_TRANSPORT", Some("local-capture")),
+            ("CENTRAL_EMAIL_CAPTURE_DIR", Some("./captured-emails")),
+            ("RESEND_API_KEY", None),
+        ])
+        .unwrap();
+        assert_eq!(config.email_transport, EmailTransport::LocalCapture);
+        assert!(config.resend_api_key.is_empty());
     }
 
     #[test]
@@ -600,8 +608,6 @@ mod tests {
                 .contains("requires CENTRAL_ENVIRONMENT=development")
         }));
         config.environment = Environment::Development;
-        let errors = config.validate().unwrap_err();
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].to_string().contains("unavailable"));
+        assert!(config.validate().is_ok());
     }
 }

@@ -166,6 +166,7 @@ async function inspect(record) {
     containerInspectionError,
     urls: record.urls,
     logs: record.logs,
+    emailCaptureDirectory: record.emailCaptureDirectory,
     launcher: record.state === "starting" ? record.launcher : null,
     resourceRecord: recordPath,
     configuration: record.configFile,
@@ -225,6 +226,7 @@ async function start() {
     launcher: process.pid,
     composeFile: join(directory, "compose.json"),
     configFile: join(directory, "environment.json"),
+    emailCaptureDirectory: join(directory, "emails"),
     urls: {},
     logs: {
       api: join(directory, "api.log"),
@@ -332,9 +334,9 @@ async function start() {
       PORT: String(apiPort),
       DATABASE_URL: `postgresql://playground:playground-local-only@127.0.0.1:${dbPort}/central`,
       CENTRAL_ENVIRONMENT: "development",
-      CENTRAL_EMAIL_TRANSPORT: "resend",
-      CENTRAL_EMAIL_CAPTURE_DIR: "",
-      RESEND_API_KEY: "re_playground_non_live_placeholder",
+      CENTRAL_EMAIL_TRANSPORT: "local-capture",
+      CENTRAL_EMAIL_CAPTURE_DIR: record.emailCaptureDirectory,
+      RESEND_API_KEY: "",
       LOG_LEVEL: "INFO",
       CENTRAL_UI_BFF_SHARED_SECRET: secret,
       ETHOKO_CENTRAL_URL: record.urls.api,
@@ -414,7 +416,7 @@ async function start() {
       throw new Error("Applications lost readiness before startup completed");
     console.log(JSON.stringify(report, null, 2));
     console.log(
-      "Startup-only playground: signup/email delivery and GitHub flows are not supported. Stop with pnpm playground:stop.",
+      "Local email delivery enabled; capture directory is reported above. GitHub flows are not supported. Stop with pnpm playground:stop.",
     );
   } catch (error) {
     console.error(
