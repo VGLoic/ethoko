@@ -16,10 +16,11 @@ export type Identity = z.infer<typeof Identity>;
 export const ScenarioInput = z
   .object({
     identity: Identity,
-    login: z.enum(["success", "invalid-credentials"]),
+    login: z.enum(["success", "invalid-credentials"]).default("success"),
+    signup: z.literal("success").optional(),
   })
   .strict();
-export type ScenarioInput = z.infer<typeof ScenarioInput>;
+export type ScenarioInput = z.input<typeof ScenarioInput>;
 
 export const Observation = z.object({
   active: z.boolean(),

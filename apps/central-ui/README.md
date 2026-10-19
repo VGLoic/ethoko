@@ -57,7 +57,13 @@ Playwright owns exactly one real React Router development server on
 `127.0.0.1:4101`. Both ports must be free; existing servers are never reused.
 No Rust API, database, email service, or local `.env` is needed. The test-only
 Vite configuration prebundles route dependencies to avoid first-use reloads.
-The suite runs sequentially with one Chromium worker and isolated browser contexts.
+The suite defaults to one Chromium worker and isolated browser contexts.
+The signup tests allow within-file parallel execution. Verify contrasting signup
+outcomes genuinely concurrently on the same server pair with:
+
+```bash
+pnpm --filter central-ui test:e2e signup.spec.ts --workers=2
+```
 
 Tests supply their complete identity and declare outcomes inline using the native
 `scenario` fixture. Identity generation is optional and explicit in the test:
@@ -76,8 +82,12 @@ credentials, and token. Duplicate scenario IDs, emails, or tokens are rejected.
 Email and token select scenario-local responses; the shared Machine
 Credential does not. The test-only HTTP control API creates, observes, and
 retires only the owning scenario. Retired identities remain as tombstones to
-diagnose late requests. There is no global reset or response queue. Only email
-login, current User, and logout are implemented in this initial slice.
+diagnose late requests. There is no global reset or response queue. Email login,
+current User, logout, and email signup are implemented. Signup tests explicitly
+opt into `signup: "success"`; an unconfigured signup is unexpected traffic.
+Login defaults to success when omitted. Signup returns an unverified Pending User
+without creating a session; confirmation mismatch stays within the real UI/BFF
+and must produce no API traffic.
 
 `mock-api.ts` lists Central API methods and URLs in `apiHandlers`, with a separate
 handler for each operation. Test-control routes live in `controlHandlers`; the

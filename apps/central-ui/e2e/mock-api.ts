@@ -6,6 +6,7 @@ import { apiUrl, machineCredential } from "./settings.ts";
 
 type Scenario = z.infer<typeof Identity> & {
   login: z.infer<typeof ScenarioInput>["login"];
+  signup: z.infer<typeof ScenarioInput>["signup"];
   active: boolean;
   loggedIn: boolean;
   requests: string[];
@@ -17,6 +18,7 @@ const violations: string[] = [];
 const pending = new Set<Promise<void>>();
 
 const apiHandlers = [
+  http.post(`${apiUrl}/auth/signup/email`, handleEmailSignup),
   http.post(`${apiUrl}/auth/login/email`, handleEmailLogin),
   http.get(`${apiUrl}/auth/me`, handleCurrentUser),
   http.post(`${apiUrl}/auth/logout`, handleLogout),
@@ -136,6 +138,61 @@ async function handleEmailLogin({ request }: { request: Request }) {
   return HttpResponse.json({ token: scenario.token });
 }
 
+async function handleEmailSignup({ request }: { request: Request }) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return violation(request, "malformed JSON", findScenarioByToken(request));
+  }
+  const email = z.object({ email: z.string() }).safeParse(body);
+  const scenario = email.success
+    ? findScenarioByEmail(email.data.email)
+    : undefined;
+  if (!scenario) {
+    return violation(
+      request,
+      `unknown identity (email=${email.success ? email.data.email : "missing"})`,
+      findScenarioByToken(request),
+    );
+  }
+  const error = validateScenarioRequest(request, scenario);
+  if (error) return error;
+  const payload = z
+    .object({ email: z.email(), password: z.string() })
+    .strict()
+    .safeParse(body);
+  if (
+    !payload.success ||
+    payload.data.password !== scenario.password ||
+    request.headers.has("X-Ethoko-User-Authorization") ||
+    !request.headers.get("Content-Type")?.includes("application/json")
+  ) {
+    return violation(
+      request,
+      "invalid email signup payload or headers",
+      scenario,
+    );
+  }
+  if (scenario.signup !== "success") {
+    return violation(
+      request,
+      "signup not configured for this scenario",
+      scenario,
+    );
+  }
+  return HttpResponse.json(
+    {
+      state: "pending",
+      email: scenario.email,
+      emailVerified: false,
+      createdAt: scenario.createdAt,
+      updatedAt: scenario.updatedAt,
+    },
+    { status: 201 },
+  );
+}
+
 async function handleCurrentUser({ request }: { request: Request }) {
   const scenario = await authenticatedScenario(request);
   if (scenario instanceof Response) return scenario;
@@ -160,7 +217,7 @@ const controlHandlers = [
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
     const input = ScenarioInput.parse(await request.json());
-    const { identity, login } = input;
+    const { identity, login, signup } = input;
     if (
       [...scenarios.values()].some(
         (scenario) =>
@@ -177,6 +234,7 @@ const controlHandlers = [
     scenarios.set(identity.id, {
       ...identity,
       login,
+      signup,
       active: true,
       loggedIn: false,
       requests: [],
