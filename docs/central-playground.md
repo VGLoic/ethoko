@@ -30,7 +30,7 @@ Ports are selected automatically; PostgreSQL and UI bind loopback. Optional `CEN
 
 Status emits JSON after pnpm's script banner, including the originating checkout, readiness/running state, launcher PID during startup, application process/group IDs and children, container IDs, URLs, configuration/resource-record paths, and UI/API/worker log paths. Worker logs share the API log because the worker runs within that binary. `degraded` means resources are recorded but not all application readiness/process checks pass. Docker inspection failures are reported without hiding the recorded process/log information.
 
-Start reserves a checkout-local resource record. A second start refuses to overwrite it; inspect and explicitly stop the recorded playground first. An existing playground Docker stack also blocks startup from another checkout: stop it from its originating checkout first. Healthy-instance reuse, reset, and automatic stale-resource recovery are deferred to the lifecycle ticket.
+Start reserves a checkout-local resource record. A second start refuses to overwrite it; inspect and explicitly stop the recorded playground first. An existing playground Docker stack also blocks startup from another checkout: stop it from its originating checkout first. A stopped Docker reservation container (`ethoko-central-playground-reservation`) atomically reserves the shared stack name, including during concurrent starts from separate checkouts; it is tracked by run token and removed on stop. Healthy-instance reuse, reset, and automatic stale-resource recovery are deferred to the lifecycle ticket.
 
 ## Isolation, persistence, and cleanup
 

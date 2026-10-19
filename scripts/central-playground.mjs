@@ -22,6 +22,7 @@ const base = join(checkout, ".central-playground");
 const active = join(base, "active");
 const recordPath = join(active, "resources.json");
 const project = "ethoko-central-playground";
+const reservationName = `${project}-reservation`;
 const cleanEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key]) =>
     /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|LANG|LC_.*|CARGO_HOME|RUSTUP_HOME|RUSTUP_TOOLCHAIN|DOCKER_HOST|DOCKER_CONTEXT|DOCKER_CONFIG)$/.test(
@@ -41,6 +42,22 @@ const load = async () => {
     throw error;
   }
 };
+async function reservation(record) {
+  try {
+    const { stdout } = await run("docker", ["inspect", reservationName]);
+    const container = JSON.parse(stdout)[0];
+    return container.Config.Labels?.["ethoko.playground.run"] === record.token
+      ? container.Id
+      : null;
+  } catch (error) {
+    if (error.stderr?.includes("No such object")) return null;
+    throw error;
+  }
+}
+async function releaseReservation(record) {
+  const id = await reservation(record);
+  if (id) await run("docker", ["rm", "-v", id]);
+}
 async function save(record) {
   await writeFile(`${recordPath}.tmp`, JSON.stringify(record, null, 2), {
     mode: 0o600,
@@ -115,6 +132,8 @@ async function inspect(record) {
           container.State.Health?.Status === "healthy",
       );
     }
+    const id = await reservation(record);
+    if (id) containers.push(id);
   } catch {
     containerInspectionError =
       "Container inspection unavailable; check Docker and the recorded Compose file";
@@ -176,6 +195,7 @@ async function cleanup(record) {
   // Keepers intentionally remain alive through TERM so group identity can be
   // checked before escalation, even if pnpm or the application exits first.
   await compose(record, ["down", "--timeout", "5"]);
+  await releaseReservation(record);
   await writeFile(
     join(dirname(record.composeFile), "stopped.json"),
     JSON.stringify(record, null, 2),
@@ -213,6 +233,7 @@ async function start() {
     },
   };
   let interrupted = false;
+  let reservationAttempted = false;
   const interrupt = () => {
     interrupted = true;
   };
@@ -246,6 +267,18 @@ async function start() {
         "A playground Docker stack already exists. Stop it from its originating checkout before starting here.",
       );
     }
+    // Docker atomically reserves this name across checkouts, while every file
+    // remains checkout-local. Never remove a reservation with another run token.
+    reservationAttempted = true;
+    await run("docker", [
+      "create",
+      "--name",
+      reservationName,
+      "--label",
+      `ethoko.playground.run=${token}`,
+      "postgres:18",
+      "true",
+    ]);
     await run("pnpm", ["--version"]);
     await run("cargo", ["--version"]);
     const apiPort =
@@ -393,6 +426,7 @@ async function start() {
       await cleanup(record);
     } catch (cleanupError) {
       if (cleanupError.code === "ENOENT" && record.services.length === 0) {
+        if (reservationAttempted) await releaseReservation(record);
         await unlink(recordPath).catch(() => {});
         await rmdir(active);
       } else {
