@@ -105,7 +105,7 @@ the form; tests explicitly submit it. No email delivery or verification-state
 transition is modeled.
 
 `mock-api.ts` lists Central API methods and URLs in `apiHandlers`, with a separate
-handler for each operation (verification and resend share payload validation).
+handler for each operation (email-based operations share identity/header validation).
 Test-control routes live in `controlHandlers`; the
 catch-all only reports unexpected requests. Add new operations as explicit MSW
 handlers, with any configurable outcomes declared in the test's scenario.
