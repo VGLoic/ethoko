@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { createServer } from "node:net";
+import { createServer } from "node:http";
 import { once } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -67,7 +67,9 @@ test(
   "failed application startup reports its stage and removes its resources",
   { timeout: 300_000 },
   async () => {
-    const occupied = createServer();
+    const occupied = createServer((_request, response) => {
+      response.end("An unrelated HTTP service");
+    });
     occupied.listen(0, "127.0.0.1");
     await once(occupied, "listening");
     try {

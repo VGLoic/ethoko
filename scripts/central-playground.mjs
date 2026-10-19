@@ -66,15 +66,15 @@ function keeperIn(table, resource, token) {
       p.command.includes(`_service ${token} ${resource.name} `),
   );
 }
-async function freePort() {
+async function freePort(port = 0, host = "127.0.0.1") {
   const server = createServer();
   await new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
+    server.listen(port, host, resolve);
   });
-  const port = server.address().port;
+  const selected = server.address().port;
   await new Promise((resolve) => server.close(resolve));
-  return port;
+  return selected;
 }
 function configuredPort(key) {
   const value = process.env[key];
@@ -103,10 +103,19 @@ async function inspect(record) {
       .map((p) => ({ ...p, service: service.name }));
   });
   let containers = [];
+  let databaseReady = false;
   let containerInspectionError;
   try {
     const { stdout } = await compose(record, ["ps", "-aq"]);
     containers = stdout.trim().split(/\s+/).filter(Boolean);
+    if (containers.length) {
+      const inspected = await run("docker", ["inspect", ...containers]);
+      databaseReady = JSON.parse(inspected.stdout).every(
+        (container) =>
+          container.State.Running &&
+          container.State.Health?.Status === "healthy",
+      );
+    }
   } catch {
     containerInspectionError =
       "Container inspection unavailable; check Docker and the recorded Compose file";
@@ -126,6 +135,7 @@ async function inspect(record) {
         processes.some((p) => p.service === s.name && p.pid !== s.pid),
       ) &&
       containers.length &&
+      databaseReady &&
       healthy
         ? "running"
         : record.state === "starting"
@@ -318,34 +328,28 @@ async function start() {
       while (Date.now() < deadline) {
         await sleep(500);
         check();
-        try {
-          const response = await fetch(url, {
-            signal: AbortSignal.timeout(1000),
-          });
-          await response.arrayBuffer();
-          if (response.ok) return;
-        } catch {
-          /* Compilation and HTTP startup may still be in progress. */
-        }
         const table = await processTable();
         const keeper = record.services.find((s) => s.name === name);
-        if (
-          Date.now() > deadline - 175_000 &&
-          !table.some((p) => p.pgid === keeper.pid && p.pid !== keeper.pid)
-        ) {
+        const hasChildren = table.some(
+          (p) => p.pgid === keeper.pid && p.pid !== keeper.pid,
+        );
+        if (Date.now() > deadline - 175_000 && !hasChildren) {
           throw new Error(
             `${name} exited before readiness; see ${record.logs[name]}`,
           );
         }
+        if (hasChildren && (await reachable(url))) return;
       }
       throw new Error(
         `Readiness timed out for ${url}; see ${record.logs[name]}`,
       );
     }
     await stage("API migrations, queue/worker and HTTP readiness");
+    await freePort(apiPort, "0.0.0.0");
     await application("api", ["--filter", "central", "dev"]);
     await readiness(`${record.urls.api}/health`, "api");
     await stage("UI/BFF readiness");
+    await freePort(uiPort);
     await application("ui", [
       "--filter",
       "central-ui",
@@ -363,6 +367,8 @@ async function start() {
     await save(record);
     const report = await inspect(record);
     check();
+    if (report.state !== "running")
+      throw new Error("Applications lost readiness before startup completed");
     console.log(JSON.stringify(report, null, 2));
     console.log(
       "Startup-only playground: signup/email delivery and GitHub flows are not supported. Stop with pnpm playground:stop.",
