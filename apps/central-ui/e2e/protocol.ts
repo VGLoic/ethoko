@@ -19,6 +19,13 @@ export const ScenarioInput = z
     login: z.enum(["success", "invalid-credentials"]).default("success"),
     signup: z.literal("success").optional(),
     registration: z.enum(["success", "taken"]).default("success"),
+    verification: z
+      .object({
+        code: z.string().regex(/^[0-9]{6}$/),
+        outcome: z.enum(["success", "invalid-code", "expired-code"]),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ScenarioInput = z.input<typeof ScenarioInput>;

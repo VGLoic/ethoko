@@ -8,6 +8,7 @@ type Scenario = z.infer<typeof Identity> & {
   login: z.infer<typeof ScenarioInput>["login"];
   signup: z.infer<typeof ScenarioInput>["signup"];
   registration: z.infer<typeof ScenarioInput>["registration"];
+  verification: z.infer<typeof ScenarioInput>["verification"];
   active: boolean;
   loggedIn: boolean;
   requests: string[];
@@ -24,6 +25,8 @@ const apiHandlers = [
   http.get(`${apiUrl}/auth/me`, handleCurrentUser),
   http.post(`${apiUrl}/auth/logout`, handleLogout),
   http.post(`${apiUrl}/auth/register-handle`, handleRegisterHandle),
+  http.post(`${apiUrl}/auth/verify-email`, handleEmailVerification),
+  http.post(`${apiUrl}/auth/resend-verification-otp`, handleVerificationResend),
 ];
 
 function violation(request: Request, reason: string, scenario?: Scenario) {
@@ -95,7 +98,7 @@ async function authenticatedScenario(
   return scenario;
 }
 
-async function handleEmailLogin({ request }: { request: Request }) {
+async function emailScenario(request: Request) {
   let body: unknown;
   try {
     body = await request.json();
@@ -115,16 +118,28 @@ async function handleEmailLogin({ request }: { request: Request }) {
   }
   const error = validateScenarioRequest(request, scenario);
   if (error) return error;
+  if (
+    request.headers.has("X-Ethoko-User-Authorization") ||
+    !request.headers.get("Content-Type")?.includes("application/json")
+  ) {
+    return violation(
+      request,
+      "invalid anonymous email request headers",
+      scenario,
+    );
+  }
+  return { scenario, body };
+}
+
+async function handleEmailLogin({ request }: { request: Request }) {
+  const result = await emailScenario(request);
+  if (result instanceof Response) return result;
+  const { scenario, body } = result;
   const payload = z
     .object({ email: z.email(), password: z.string() })
     .strict()
     .safeParse(body);
-  if (
-    !payload.success ||
-    payload.data.password !== scenario.password ||
-    request.headers.has("X-Ethoko-User-Authorization") ||
-    !request.headers.get("Content-Type")?.includes("application/json")
-  ) {
+  if (!payload.success || payload.data.password !== scenario.password) {
     return violation(
       request,
       "invalid email login payload or headers",
@@ -139,6 +154,52 @@ async function handleEmailLogin({ request }: { request: Request }) {
   }
   scenario.loggedIn = true;
   return HttpResponse.json({ token: scenario.token });
+}
+
+async function handleEmailVerification({ request }: { request: Request }) {
+  const result = await emailScenario(request);
+  if (result instanceof Response) return result;
+  const { scenario, body } = result;
+  const payload = z
+    .object({ email: z.email(), otp: z.string().regex(/^[0-9]{6}$/) })
+    .strict()
+    .safeParse(body);
+  if (!payload.success) {
+    return violation(request, "invalid email verification payload", scenario);
+  }
+  if (
+    !scenario.verification ||
+    payload.data.otp !== scenario.verification.code
+  ) {
+    return violation(
+      request,
+      "unexpected verification code or missing configuration",
+      scenario,
+    );
+  }
+  if (scenario.verification.outcome === "invalid-code") {
+    return HttpResponse.json(
+      { code: "ETKAVE02", reason: "Invalid verification code" },
+      { status: 422 },
+    );
+  }
+  if (scenario.verification.outcome === "expired-code") {
+    return HttpResponse.json(
+      { code: "ETKAVE03", reason: "Expired verification code" },
+      { status: 422 },
+    );
+  }
+  return new HttpResponse(null, { status: 204 });
+}
+
+async function handleVerificationResend({ request }: { request: Request }) {
+  const result = await emailScenario(request);
+  if (result instanceof Response) return result;
+  const { scenario, body } = result;
+  if (!z.object({ email: z.email() }).strict().safeParse(body).success) {
+    return violation(request, "invalid verification resend payload", scenario);
+  }
+  return new HttpResponse(null, { status: 204 });
 }
 
 async function handleEmailSignup({ request }: { request: Request }) {
@@ -256,7 +317,7 @@ const controlHandlers = [
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
     const input = ScenarioInput.parse(await request.json());
-    const { identity, login, signup, registration } = input;
+    const { identity, login, signup, registration, verification } = input;
     if (
       [...scenarios.values()].some(
         (scenario) =>
@@ -275,6 +336,7 @@ const controlHandlers = [
       login,
       signup,
       registration,
+      verification,
       active: true,
       loggedIn: false,
       requests: [],
