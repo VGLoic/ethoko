@@ -39,10 +39,11 @@ for (const probe of ["unattributed", "late", "absorbed", "cleanup"]) {
     assert.match(
       audit.violations[0],
       probe === "unattributed"
-        ? /unknown identity.*unattributed/
+        ? /unexpected operation.*unattributed/
         : /request after scenario retirement/,
     );
     assert.match(output, /Mock API audit failed/);
+    if (probe === "late") assert.equal(audit.scenarios[0].violations.length, 1);
     if (probe !== "absorbed") assert.match(output, /1 passed/);
   }
   console.log(

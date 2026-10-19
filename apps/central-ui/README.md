@@ -79,6 +79,11 @@ retires only the owning scenario. Retired identities remain as tombstones to
 diagnose late requests. There is no global reset or response queue. Only email
 login, current User, and logout are implemented in this initial slice.
 
+`mock-api.ts` lists Central API methods and URLs in `apiHandlers`, with a separate
+handler for each operation. Test-control routes live in `controlHandlers`; the
+catch-all only reports unexpected requests. Add new operations as explicit MSW
+handlers, with any configurable outcomes declared in the test's scenario.
+
 Unexpected traffic is recorded even if the BFF absorbs the error. Fixture
 teardown retires scenarios after failed assertions and attaches their traffic.
 The suite audit fails on all violations (including unattributed/late requests)

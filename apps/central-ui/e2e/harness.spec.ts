@@ -22,8 +22,10 @@ test("the harness rejects otherwise hidden failures", async ({
     expect(response.ok()).toBeTruthy();
     expect(await response.json()).toEqual(user);
     await request.delete(`${apiUrl}/__test/scenarios/${user.id}`);
-    await request.post(`${apiUrl}/auth/login/email`, {
-      data: { email: user.email, password: user.password },
+    // Even a malformed authenticated request without a token should be
+    // attributable when its payload contains this scenario's email.
+    await request.post(`${apiUrl}/auth/logout`, {
+      data: { email: user.email },
     });
     return; // No fixture owns this retired scenario; only the suite audit catches it.
   }
