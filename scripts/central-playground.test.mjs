@@ -6,8 +6,16 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import {
+  readFile,
+  readdir,
+  mkdtemp,
+  mkdir,
+  copyFile,
+  rm,
+} from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const exec = promisify(execFile);
 const command = (name, options = {}) =>
@@ -16,6 +24,23 @@ const status = async () => {
   const { stdout } = await command("status");
   return JSON.parse(stdout.slice(stdout.indexOf("{")));
 };
+async function waitForCapturedEmail(directory, recipient) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const files = await readdir(directory).catch((error) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
+    for (const file of files.filter((name) => name.endsWith(".json"))) {
+      const capture = JSON.parse(await readFile(join(directory, file), "utf8"));
+      if (capture.recipient === recipient) return capture;
+    }
+    await sleep(250);
+  }
+  assert.fail(
+    "normal PostgreSQL queue/worker delivers the email within 30 seconds",
+  );
+}
 
 test(
   "public commands deliver verification email through the worker, authenticate and stop their resources",
@@ -28,7 +53,7 @@ test(
     );
     try {
       await command("start");
-      const running = await status();
+      let running = await status();
       assert.equal(running.state, "running");
       assert.equal(running.checkout, process.cwd());
       for (const path of [
@@ -55,7 +80,7 @@ test(
       assert.equal(login.status, 200);
       assert.match(await login.text(), /Check your email and password/);
 
-      const configuration = JSON.parse(
+      let configuration = JSON.parse(
         await readFile(running.configuration, "utf8"),
       );
       assert.equal(configuration.CENTRAL_ENVIRONMENT, "development");
@@ -85,24 +110,11 @@ test(
         return response.json();
       };
       await request("/auth/signup/email", { email, password }, undefined, 201);
-      let message;
-      const deadline = Date.now() + 30_000;
-      while (!message && Date.now() < deadline) {
-        let files = [];
-        try {
-          files = await readdir(running.emailCaptureDirectory);
-        } catch (error) {
-          if (error.code !== "ENOENT") throw error;
-        }
-        for (const file of files.filter((name) => name.endsWith(".json"))) {
-          const capture = JSON.parse(
-            await readFile(join(running.emailCaptureDirectory, file), "utf8"),
-          );
-          if (capture.recipient === email) message = capture;
-        }
-        if (!message) await sleep(250);
-      }
-      assert.ok(message, "normal PostgreSQL queue/worker delivers the email");
+      const message = await waitForCapturedEmail(
+        running.emailCaptureDirectory,
+        email,
+      );
+      const originalCaptureDirectory = running.emailCaptureDirectory;
       assert.equal(message.kind, "email-verification-code");
       const link = new URL(message.verification_url);
       assert.equal(link.origin, running.urls.ui);
@@ -133,7 +145,91 @@ test(
       const me = await request("/auth/me", undefined, token);
       assert.equal(me.state, "registered");
       assert.equal(me.emailVerified, true);
-      await assert.rejects(command("start"), /already exists/);
+      await command("start");
+      const reused = await status();
+      assert.deepEqual(reused.processes, running.processes);
+      assert.deepEqual(reused.containers, running.containers);
+      assert.deepEqual(reused.urls, running.urls);
+      const other = await mkdtemp(
+        join(tmpdir(), "central-playground-checkout-"),
+      );
+      try {
+        await mkdir(join(other, "scripts"));
+        await copyFile(
+          "scripts/central-playground.mjs",
+          join(other, "scripts/central-playground.mjs"),
+        );
+        await assert.rejects(
+          exec(process.execPath, [
+            join(other, "scripts/central-playground.mjs"),
+            "start",
+          ]),
+          (error) => {
+            assert.ok(
+              error.stderr.includes(process.cwd()),
+              "reports the originating checkout",
+            );
+            assert.match(error.stderr, /pnpm playground:stop/);
+            return true;
+          },
+        );
+        assert.deepEqual((await status()).processes, running.processes);
+      } finally {
+        await rm(other, { recursive: true });
+      }
+      await command("stop");
+      await command("start");
+      running = await status();
+      configuration = JSON.parse(await readFile(running.configuration, "utf8"));
+      const resumed = await request("/auth/login/email", { email, password });
+      const persisted = await request("/auth/me", undefined, resumed.token);
+      assert.equal(persisted.handle, handle);
+      assert.equal(persisted.emailVerified, true);
+      const oldCapture = message;
+      const preservedEmails = running.emailCaptureDirectory;
+      const preservedLogs = Object.values(running.logs);
+      await command("reset");
+      running = await status();
+      assert.equal(running.state, "running");
+      assert.notEqual(running.emailCaptureDirectory, preservedEmails);
+      for (const log of preservedLogs) assert.ok((await readFile(log)).length);
+      const historicalCaptures = await Promise.all(
+        (await readdir(originalCaptureDirectory))
+          .filter((name) => name.endsWith(".json"))
+          .map(async (name) =>
+            JSON.parse(
+              await readFile(join(originalCaptureDirectory, name), "utf8"),
+            ),
+          ),
+      );
+      assert.ok(
+        historicalCaptures.some(
+          (capture) => capture.verification_url === oldCapture.verification_url,
+        ),
+      );
+      configuration = JSON.parse(await readFile(running.configuration, "utf8"));
+      await request("/auth/login/email", { email, password }, undefined, 422);
+      await request("/auth/signup/email", { email, password }, undefined, 201);
+      const freshMessage = await waitForCapturedEmail(
+        running.emailCaptureDirectory,
+        email,
+      );
+      assert.notEqual(
+        freshMessage.verification_url,
+        oldCapture.verification_url,
+      );
+      await request(
+        "/auth/verify-email",
+        Object.fromEntries(new URL(freshMessage.verification_url).searchParams),
+      );
+      const freshLogin = await request("/auth/login/email", {
+        email,
+        password,
+      });
+      assert.equal(
+        (await request("/auth/me", undefined, freshLogin.token)).state,
+        "pending",
+      );
       await command("stop");
       assert.equal((await status()).state, "stopped");
       for (const url of Object.values(running.urls)) {
@@ -186,6 +282,237 @@ test(
       );
     } finally {
       occupied.close();
+      await command("stop");
+    }
+  },
+);
+
+test(
+  "hard launcher termination leaves identifiable partial resources for explicit stop",
+  { timeout: 300_000 },
+  async () => {
+    const unrelated = spawn(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { stdio: "ignore" },
+    );
+    const child = spawn(
+      process.execPath,
+      ["scripts/central-playground.mjs", "start"],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const finished = once(child, "exit");
+    let output = "";
+    child.stdout.on("data", (data) => {
+      output += data;
+    });
+    child.stderr.on("data", (data) => {
+      output += data;
+    });
+    try {
+      const deadline = Date.now() + 120_000;
+      while (!output.includes("UI/BFF readiness")) {
+        assert.ok(Date.now() < deadline && child.exitCode === null, output);
+        await sleep(20);
+      }
+      child.kill("SIGKILL");
+      await finished;
+      const partial = await status();
+      assert.equal(partial.state, "degraded");
+      assert.ok(partial.processes.length > 1);
+      assert.ok(partial.containers.length);
+      await assert.rejects(command("start"), /already exists/);
+      // A missing database must not make status report the healthy HTTP
+      // listeners as a healthy playground.
+      const { stdout } = await exec("docker", [
+        "ps",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=ethoko-central-playground",
+      ]);
+      for (const id of stdout.trim().split(/\s+/).filter(Boolean))
+        await exec("docker", ["rm", "-f", id]);
+      assert.equal((await status()).state, "degraded");
+      await command("stop");
+      await command("stop");
+      assert.equal((await status()).state, "stopped");
+      for (const resource of partial.processes)
+        assert.throws(() => process.kill(resource.pid, 0));
+      assert.equal(process.kill(unrelated.pid, 0), true);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
+      await command("stop");
+      unrelated.kill();
+    }
+  },
+);
+
+test(
+  "stop waits for orphaned Compose startup before removing its resources",
+  { timeout: 300_000 },
+  async () => {
+    const child = spawn(
+      process.execPath,
+      ["scripts/central-playground.mjs", "start"],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const finished = once(child, "exit");
+    let output = "";
+    let database;
+    let operations = [];
+    child.stdout.on("data", (data) => {
+      output += data;
+    });
+    child.stderr.on("data", (data) => {
+      output += data;
+    });
+    try {
+      const deadline = Date.now() + 120_000;
+      while (!database) {
+        assert.ok(Date.now() < deadline && child.exitCode === null, output);
+        const { stdout } = await exec("docker", [
+          "ps",
+          "-q",
+          "--filter",
+          "label=com.docker.compose.project=ethoko-central-playground",
+        ]);
+        database = stdout.trim();
+        if (!database) await sleep(20);
+      }
+      await exec("docker", ["pause", database]);
+      const { stdout: processes } = await exec("ps", ["-axo", "pid=,command="]);
+      operations = processes
+        .split("\n")
+        .filter((line) =>
+          /docker.*compose.*ethoko-central-playground.* up -d --wait/.test(
+            line,
+          ),
+        )
+        .map((line) => Number(line.trim().split(/\s+/)[0]));
+      assert.ok(operations.length);
+      // Freeze the observable in-flight CLI to deterministically keep its
+      // resource-creation window open across launcher termination.
+      for (const pid of operations) process.kill(pid, "SIGSTOP");
+      child.kill("SIGKILL");
+      await finished;
+      let stopped = false;
+      const stopping = command("stop").then(() => {
+        stopped = true;
+      });
+      try {
+        await sleep(4000);
+        assert.equal(
+          stopped,
+          false,
+          "stop keeps tracking while Compose can still create resources",
+        );
+      } finally {
+        for (const pid of operations) process.kill(pid, "SIGCONT");
+        await exec("docker", ["unpause", database]);
+        await stopping;
+      }
+      assert.equal((await status()).state, "stopped");
+      await assert.rejects(exec("docker", ["inspect", database]));
+      const { stdout } = await exec("docker", [
+        "ps",
+        "-aq",
+        "--filter",
+        "label=com.docker.compose.project=ethoko-central-playground",
+      ]);
+      assert.equal(stdout.trim(), "");
+    } finally {
+      if (child.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
+      for (const pid of operations) {
+        try {
+          process.kill(pid, "SIGCONT");
+        } catch (error) {
+          if (error.code !== "ESRCH") throw error;
+        }
+      }
+      if (database) await exec("docker", ["unpause", database]).catch(() => {});
+      await command("stop");
+    }
+  },
+);
+
+test(
+  "stop refuses an unidentifiable surviving process group rather than signalling it",
+  { timeout: 300_000 },
+  async () => {
+    let group;
+    try {
+      await command("start");
+      const running = await status();
+      const keeper = running.processes.find(
+        (p) => p.service === "ui" && p.pid === p.pgid,
+      );
+      group = keeper.pid;
+      const children = running.processes.filter(
+        (p) => p.pgid === group && p.pid !== group,
+      );
+      assert.ok(children.length);
+      process.kill(keeper.pid, "SIGKILL");
+      await sleep(250);
+      assert.equal((await status()).state, "degraded");
+      await assert.rejects(
+        command("stop"),
+        /Cannot safely identify ui process group/,
+      );
+      for (const child of children)
+        assert.equal(process.kill(child.pid, 0), true);
+      assert.equal((await fetch(`${running.urls.ui}/login`)).status, 200);
+    } finally {
+      // This test deliberately destroys the keeper. Only the test, which
+      // observed the live group before doing so, can safely finish recovery.
+      if (group) {
+        try {
+          process.kill(-group, "SIGKILL");
+        } catch (error) {
+          if (error.code !== "ESRCH") throw error;
+        }
+        await sleep(500);
+      }
+      await command("stop");
+    }
+  },
+);
+
+test(
+  "stop interrupts a reset launcher without racing its new resources",
+  { timeout: 300_000 },
+  async () => {
+    await command("start");
+    const child = spawn(
+      process.execPath,
+      ["scripts/central-playground.mjs", "reset"],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const finished = once(child, "exit");
+    let output = "";
+    child.stdout.on("data", (data) => {
+      output += data;
+    });
+    child.stderr.on("data", (data) => {
+      output += data;
+    });
+    try {
+      const deadline = Date.now() + 120_000;
+      while (
+        !output.includes("API migrations, queue/worker and HTTP readiness")
+      ) {
+        assert.ok(Date.now() < deadline && child.exitCode === null, output);
+        await sleep(20);
+      }
+      assert.equal((await status()).state, "starting");
+      await command("stop");
+      await finished;
+      assert.match(output, /Launcher interrupted/);
+      assert.equal((await status()).state, "stopped");
+    } finally {
+      if (child.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
       await command("stop");
     }
   },
