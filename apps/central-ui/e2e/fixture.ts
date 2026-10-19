@@ -1,27 +1,26 @@
 import { test as base, expect } from "@playwright/test";
 import { z } from "zod";
-import { Identity, Observation, type ScenarioInput } from "./protocol";
+import { Observation, type ScenarioInput } from "./protocol";
 import { apiUrl } from "./settings";
 
-type Scenario = z.infer<typeof Identity> & {
+type Scenario = {
   observe: () => Promise<z.infer<typeof Observation>>;
 };
 
 export const test = base.extend<{
-  scenario: (outcome: ScenarioInput) => Promise<Scenario>;
+  scenario: (input: ScenarioInput) => Promise<Scenario>;
 }>({
   scenario: async ({ request }, use, testInfo) => {
     const owned: string[] = [];
     try {
-      await use(async (outcome) => {
+      await use(async (input) => {
         const response = await request.post(`${apiUrl}/__test/scenarios`, {
-          data: outcome,
+          data: input,
         });
-        expect(response.ok()).toBeTruthy();
-        const identity = Identity.parse(await response.json());
+        expect(response.ok(), await response.text()).toBeTruthy();
+        const identity = input.identity;
         owned.push(identity.id);
         return {
-          ...identity,
           observe: async () => {
             const response = await request.get(
               `${apiUrl}/__test/scenarios/${identity.id}`,

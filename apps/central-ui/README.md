@@ -59,9 +59,21 @@ No Rust API, database, email service, or local `.env` is needed. The test-only
 Vite configuration prebundles route dependencies to avoid first-use reloads.
 The suite runs sequentially with one Chromium worker and isolated browser contexts.
 
-Tests declare outcomes inline using the native `scenario` fixture. Every call
-generates fresh valid identities and an opaque User Session Token, including on
-retries. Email and token select scenario-local responses; the shared Machine
+Tests supply their complete identity and declare outcomes inline using the native
+`scenario` fixture. Identity generation is optional and explicit in the test:
+
+```ts
+const user = fakeIdentity({ handle: "alice", emailVerified: false });
+const login = await scenario({ identity: user, login: "success" });
+// Fill the form using user.email and user.password; inspect login.observe().
+```
+
+`fakeIdentity` supplies valid defaults for all identity fields and accepts overrides.
+Call it inside the test so each attempt/retry gets fresh email addresses and opaque
+User Session Tokens. A test can also supply a complete identity object directly.
+The mock server never generates identity data; it uses the supplied profile,
+credentials, and token. Duplicate scenario IDs, emails, or tokens are rejected.
+Email and token select scenario-local responses; the shared Machine
 Credential does not. The test-only HTTP control API creates, observes, and
 retires only the owning scenario. Retired identities remain as tombstones to
 diagnose late requests. There is no global reset or response queue. Only email

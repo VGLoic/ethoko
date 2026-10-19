@@ -1,10 +1,12 @@
 import { test, expect } from "./fixture";
+import { fakeIdentity } from "./fake-identity";
 
 test("email login displays this User's home; logout protects it again", async ({
   page,
   scenario,
 }) => {
-  const user = await scenario({ login: "success" });
+  const user = fakeIdentity({ handle: "alice", emailVerified: false });
+  const login = await scenario({ identity: user, login: "success" });
   await page.goto("/login");
   await page.getByLabel("Email", { exact: true }).fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);
@@ -13,6 +15,9 @@ test("email login displays this User's home; logout protects it again", async ({
   await expect(page).toHaveURL("/");
   await expect(page.getByText(user.email, { exact: true })).toBeVisible();
   await expect(page.getByText(user.handle, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Verify email", exact: true }),
+  ).toBeVisible();
   await page.reload();
   await expect(page.getByText(user.email, { exact: true })).toBeVisible();
 
@@ -23,7 +28,7 @@ test("email login displays this User's home; logout protects it again", async ({
   await expect(
     page.getByRole("heading", { name: "Sign in to Ethoko Central" }),
   ).toBeVisible();
-  const observations = await user.observe();
+  const observations = await login.observe();
   expect(observations.requests).toEqual(
     expect.arrayContaining([
       "POST /auth/login/email",
@@ -37,7 +42,11 @@ test("invalid email credentials show corrective feedback without a session", asy
   page,
   scenario,
 }) => {
-  const user = await scenario({ login: "invalid-credentials" });
+  const user = fakeIdentity({ handle: "bob" });
+  const login = await scenario({
+    identity: user,
+    login: "invalid-credentials",
+  });
   await page.goto("/login");
   await page.getByLabel("Email", { exact: true }).fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);
@@ -49,5 +58,5 @@ test("invalid email credentials show corrective feedback without a session", asy
   await expect(page).toHaveURL("/login");
   await page.goto("/");
   await expect(page).toHaveURL("/login");
-  expect((await user.observe()).requests).toEqual(["POST /auth/login/email"]);
+  expect((await login.observe()).requests).toEqual(["POST /auth/login/email"]);
 });

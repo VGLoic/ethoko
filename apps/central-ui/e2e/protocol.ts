@@ -1,19 +1,25 @@
 import { z } from "zod";
 
-export const ScenarioInput = z
-  .object({
-    login: z.enum(["success", "invalid-credentials"]),
-  })
-  .strict();
-export type ScenarioInput = z.infer<typeof ScenarioInput>;
-
 export const Identity = z.object({
   id: z.uuid(),
   email: z.email(),
   password: z.string(),
   handle: z.string(),
   token: z.string(),
+  state: z.literal("registered"),
+  emailVerified: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
+export type Identity = z.infer<typeof Identity>;
+
+export const ScenarioInput = z
+  .object({
+    identity: Identity,
+    login: z.enum(["success", "invalid-credentials"]),
+  })
+  .strict();
+export type ScenarioInput = z.infer<typeof ScenarioInput>;
 
 export const Observation = z.object({
   active: z.boolean(),

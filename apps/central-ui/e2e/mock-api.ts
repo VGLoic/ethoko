@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { createServer } from "@msw/serve";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
@@ -29,17 +28,23 @@ const server = createServer(
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
     const input = ScenarioInput.parse(await request.json());
-    const id = randomUUID();
-    const identity = {
-      id,
-      email: `user-${id}@example.com`,
-      password: `Pw1!${randomUUID()}`,
-      handle: `user-${id.slice(0, 18)}`,
-      token: randomUUID(),
-    };
-    scenarios.set(id, {
+    const { identity, login } = input;
+    if (
+      [...scenarios.values()].some(
+        (scenario) =>
+          scenario.id === identity.id ||
+          scenario.email === identity.email ||
+          scenario.token === identity.token,
+      )
+    ) {
+      return HttpResponse.json(
+        { error: "Scenario id, email, or token already in use" },
+        { status: 409 },
+      );
+    }
+    scenarios.set(identity.id, {
       ...identity,
-      ...input,
+      login,
       active: true,
       loggedIn: false,
       requests: [],
@@ -155,12 +160,12 @@ const server = createServer(
         return new HttpResponse(null, { status: 204 });
       }
       return HttpResponse.json({
-        state: "registered",
+        state: scenario.state,
         email: scenario.email,
         handle: scenario.handle,
-        emailVerified: true,
-        createdAt: "2026-01-01T00:00:00Z",
-        updatedAt: "2026-01-01T00:00:00Z",
+        emailVerified: scenario.emailVerified,
+        createdAt: scenario.createdAt,
+        updatedAt: scenario.updatedAt,
       });
     }
     return violation(request, "unexpected operation", scenario);

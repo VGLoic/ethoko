@@ -1,5 +1,5 @@
 import { test, expect } from "./fixture";
-import { Identity } from "./protocol";
+import { fakeIdentity } from "./fake-identity";
 import { apiUrl } from "./settings";
 
 // These deliberately failing runs are launched only by check-harness.ts.
@@ -14,18 +14,20 @@ test("the harness rejects otherwise hidden failures", async ({
     expect(response.status()).toBe(500);
     return; // Test passes; the suite audit must still fail.
   }
+  const user = fakeIdentity();
   if (probe === "late") {
     const response = await request.post(`${apiUrl}/__test/scenarios`, {
-      data: { login: "success" },
+      data: { identity: user, login: "success" },
     });
-    const identity = Identity.parse(await response.json());
-    await request.delete(`${apiUrl}/__test/scenarios/${identity.id}`);
+    expect(response.ok()).toBeTruthy();
+    expect(await response.json()).toEqual(user);
+    await request.delete(`${apiUrl}/__test/scenarios/${user.id}`);
     await request.post(`${apiUrl}/auth/login/email`, {
-      data: { email: identity.email, password: identity.password },
+      data: { email: user.email, password: user.password },
     });
     return; // No fixture owns this retired scenario; only the suite audit catches it.
   }
-  const user = await scenario({ login: "success" });
+  await scenario({ identity: user, login: "success" });
   if (probe === "cleanup") {
     expect(
       false,
