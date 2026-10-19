@@ -5,6 +5,9 @@ import { once } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 
 const exec = promisify(execFile);
 const command = (name, options = {}) =>
@@ -15,7 +18,7 @@ const status = async () => {
 };
 
 test(
-  "public commands start a connected page/API and stop their resources",
+  "public commands deliver verification email through the worker, authenticate and stop their resources",
   { timeout: 300_000 },
   async () => {
     assert.equal(
@@ -51,6 +54,85 @@ test(
       });
       assert.equal(login.status, 200);
       assert.match(await login.text(), /Check your email and password/);
+
+      const configuration = JSON.parse(
+        await readFile(running.configuration, "utf8"),
+      );
+      assert.equal(configuration.CENTRAL_ENVIRONMENT, "development");
+      assert.equal(configuration.CENTRAL_EMAIL_TRANSPORT, "local-capture");
+      assert.equal(
+        configuration.CENTRAL_EMAIL_CAPTURE_DIR,
+        running.emailCaptureDirectory,
+      );
+      assert.equal(configuration.RESEND_API_KEY, "");
+      const email = `playground+${randomUUID()}@example.com`;
+      const password = "PlaygroundPassword123!";
+      const request = async (path, body, token, expectedStatus = 200) => {
+        // Respect the real API's rate limits; no test-only configuration.
+        await sleep(2100);
+        const response = await fetch(`${running.urls.api}${path}`, {
+          method: body ? "POST" : "GET",
+          headers: {
+            Authorization: `Bearer ${configuration.CENTRAL_UI_BFF_SHARED_SECRET}`,
+            "Content-Type": "application/json",
+            ...(token
+              ? { "X-Ethoko-User-Authorization": `Bearer ${token}` }
+              : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        assert.equal(response.status, expectedStatus, `${path} succeeds`);
+        return response.json();
+      };
+      await request("/auth/signup/email", { email, password }, undefined, 201);
+      let message;
+      const deadline = Date.now() + 30_000;
+      while (!message && Date.now() < deadline) {
+        let files = [];
+        try {
+          files = await readdir(running.emailCaptureDirectory);
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+        for (const file of files.filter((name) => name.endsWith(".json"))) {
+          const capture = JSON.parse(
+            await readFile(join(running.emailCaptureDirectory, file), "utf8"),
+          );
+          if (capture.recipient === email) message = capture;
+        }
+        if (!message) await sleep(250);
+      }
+      assert.ok(message, "normal PostgreSQL queue/worker delivers the email");
+      assert.equal(message.kind, "email-verification-code");
+      const link = new URL(message.verification_url);
+      assert.equal(link.origin, running.urls.ui);
+      assert.equal(link.pathname, "/verify-email");
+      assert.equal(link.searchParams.get("email"), email);
+      await request(
+        "/auth/verify-email",
+        Object.fromEntries(link.searchParams),
+      );
+      const { token } = await request("/auth/login/email", { email, password });
+      assert.ok(token.startsWith("etks_"), "API issues a User Session Token");
+      const pending = await request("/auth/me", undefined, token);
+      assert.equal(pending.email, email);
+      assert.equal(pending.emailVerified, true);
+      assert.equal(
+        pending.state,
+        "pending",
+        "email verification does not register a handle",
+      );
+      const handle = `pg${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+      const registered = await request(
+        "/auth/register-handle",
+        { handle },
+        token,
+      );
+      assert.equal(registered.state, "registered");
+      assert.equal(registered.handle, handle);
+      const me = await request("/auth/me", undefined, token);
+      assert.equal(me.state, "registered");
+      assert.equal(me.emailVerified, true);
       await assert.rejects(command("start"), /already exists/);
       await command("stop");
       assert.equal((await status()).state, "stopped");
