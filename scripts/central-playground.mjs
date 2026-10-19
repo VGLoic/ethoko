@@ -10,7 +10,6 @@ import {
   rmdir,
   open,
 } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
@@ -19,7 +18,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const exec = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
 const checkout = resolve(dirname(script), "..");
-const base = join(homedir(), ".local/state/ethoko-central-playground");
+const base = join(checkout, ".central-playground");
 const active = join(base, "active");
 const recordPath = join(active, "resources.json");
 const project = "ethoko-central-playground";
@@ -236,6 +235,17 @@ async function start() {
       throw new Error("POSIX process groups require macOS or Linux");
     await run("docker", ["info"]);
     await run("docker", ["compose", "version"]);
+    const existing = await run("docker", [
+      "ps",
+      "-aq",
+      "--filter",
+      `label=com.docker.compose.project=${project}`,
+    ]);
+    if (existing.stdout.trim()) {
+      throw new Error(
+        "A playground Docker stack already exists. Stop it from its originating checkout before starting here.",
+      );
+    }
     await run("pnpm", ["--version"]);
     await run("cargo", ["--version"]);
     const apiPort =

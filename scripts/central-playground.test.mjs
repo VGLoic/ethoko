@@ -28,6 +28,13 @@ test(
       const running = await status();
       assert.equal(running.state, "running");
       assert.equal(running.checkout, process.cwd());
+      for (const path of [
+        running.resourceRecord,
+        running.configuration,
+        ...Object.values(running.logs),
+      ]) {
+        assert.ok(path.startsWith(`${process.cwd()}/.central-playground/`));
+      }
       assert.ok(running.processes.length >= 2);
       assert.ok(running.containers.length >= 1);
       assert.equal((await fetch(`${running.urls.api}/health`)).status, 200);
