@@ -6,7 +6,7 @@ export const Identity = z.object({
   password: z.string(),
   handle: z.string(),
   token: z.string(),
-  state: z.literal("registered"),
+  state: z.enum(["pending", "registered"]),
   emailVerified: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -18,6 +18,7 @@ export const ScenarioInput = z
     identity: Identity,
     login: z.enum(["success", "invalid-credentials"]).default("success"),
     signup: z.literal("success").optional(),
+    registration: z.enum(["success", "taken"]).default("success"),
   })
   .strict();
 export type ScenarioInput = z.input<typeof ScenarioInput>;

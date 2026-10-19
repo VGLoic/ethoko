@@ -7,6 +7,7 @@ import { apiUrl, machineCredential } from "./settings.ts";
 type Scenario = z.infer<typeof Identity> & {
   login: z.infer<typeof ScenarioInput>["login"];
   signup: z.infer<typeof ScenarioInput>["signup"];
+  registration: z.infer<typeof ScenarioInput>["registration"];
   active: boolean;
   loggedIn: boolean;
   requests: string[];
@@ -22,6 +23,7 @@ const apiHandlers = [
   http.post(`${apiUrl}/auth/login/email`, handleEmailLogin),
   http.get(`${apiUrl}/auth/me`, handleCurrentUser),
   http.post(`${apiUrl}/auth/logout`, handleLogout),
+  http.post(`${apiUrl}/auth/register-handle`, handleRegisterHandle),
 ];
 
 function violation(request: Request, reason: string, scenario?: Scenario) {
@@ -55,6 +57,7 @@ function validateScenarioRequest(request: Request, scenario: Scenario) {
 
 async function authenticatedScenario(
   request: Request,
+  allowPayload = false,
 ): Promise<Scenario | Response> {
   let scenario = findScenarioByToken(request);
   if (!scenario) {
@@ -81,7 +84,7 @@ async function authenticatedScenario(
     request.headers.get("X-Ethoko-User-Authorization") !==
       `Bearer ${scenario.token}` ||
     !scenario.loggedIn ||
-    (await request.text())
+    (!allowPayload && (await request.text()))
   ) {
     return violation(
       request,
@@ -192,17 +195,54 @@ async function handleEmailSignup({ request }: { request: Request }) {
   );
 }
 
-async function handleCurrentUser({ request }: { request: Request }) {
-  const scenario = await authenticatedScenario(request);
-  if (scenario instanceof Response) return scenario;
-  return HttpResponse.json({
+function profile(scenario: Scenario) {
+  return {
     state: scenario.state,
     email: scenario.email,
-    handle: scenario.handle,
+    ...(scenario.state === "registered" ? { handle: scenario.handle } : {}),
     emailVerified: scenario.emailVerified,
     createdAt: scenario.createdAt,
     updatedAt: scenario.updatedAt,
-  });
+  };
+}
+
+async function handleCurrentUser({ request }: { request: Request }) {
+  const scenario = await authenticatedScenario(request);
+  if (scenario instanceof Response) return scenario;
+  return HttpResponse.json(profile(scenario));
+}
+
+async function handleRegisterHandle({ request }: { request: Request }) {
+  const scenario = await authenticatedScenario(request, true);
+  if (scenario instanceof Response) return scenario;
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return violation(request, "malformed JSON", scenario);
+  }
+  const payload = z.object({ handle: z.string() }).strict().safeParse(body);
+  if (
+    !payload.success ||
+    payload.data.handle !== scenario.handle ||
+    scenario.state !== "pending" ||
+    !request.headers.get("Content-Type")?.includes("application/json")
+  ) {
+    return violation(
+      request,
+      "invalid handle registration payload, state, or headers",
+      scenario,
+    );
+  }
+  if (scenario.registration === "taken") {
+    return HttpResponse.json(
+      { code: "ETKARH01", reason: "Handle already registered" },
+      { status: 422 },
+    );
+  }
+  scenario.state = "registered";
+  scenario.handle = payload.data.handle;
+  return HttpResponse.json(profile(scenario));
 }
 
 async function handleLogout({ request }: { request: Request }) {
@@ -216,7 +256,7 @@ const controlHandlers = [
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
     const input = ScenarioInput.parse(await request.json());
-    const { identity, login, signup } = input;
+    const { identity, login, signup, registration } = input;
     if (
       [...scenarios.values()].some(
         (scenario) =>
@@ -234,6 +274,7 @@ const controlHandlers = [
       ...identity,
       login,
       signup,
+      registration,
       active: true,
       loggedIn: false,
       requests: [],

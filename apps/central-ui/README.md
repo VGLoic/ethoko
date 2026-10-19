@@ -58,11 +58,12 @@ Playwright owns exactly one real React Router development server on
 No Rust API, database, email service, or local `.env` is needed. The test-only
 Vite configuration prebundles route dependencies to avoid first-use reloads.
 The suite defaults to one Chromium worker and isolated browser contexts.
-The signup tests allow within-file parallel execution. Verify contrasting signup
-outcomes genuinely concurrently on the same server pair with:
+The signup and contrasting handle-registration tests allow within-file parallel
+execution. Verify their isolation with two workers on the same server pair:
 
 ```bash
 pnpm --filter central-ui test:e2e signup.spec.ts --workers=2
+pnpm --filter central-ui test:e2e register-handle.spec.ts --workers=2
 ```
 
 Tests supply their complete identity and declare outcomes inline using the native
@@ -83,11 +84,18 @@ Email and token select scenario-local responses; the shared Machine
 Credential does not. The test-only HTTP control API creates, observes, and
 retires only the owning scenario. Retired identities remain as tombstones to
 diagnose late requests. There is no global reset or response queue. Email login,
-current User, logout, and email signup are implemented. Signup tests explicitly
+current User, logout, email signup, and handle registration are implemented. Signup tests explicitly
 opt into `signup: "success"`; an unconfigured signup is unexpected traffic.
 Login defaults to success when omitted. Signup returns the API's email,
 emailVerified, createdAt, and updatedAt fields (no User state or session token);
 confirmation mismatch stays within the real UI/BFF and must produce no API traffic.
+
+For handle registration, use `fakeIdentity({ state: "pending" })` and declare
+`registration: "success"` or `registration: "taken"` beside the test. The identity's
+generated handle is the expected submission, not a handle owned by a Pending User.
+Success updates only the token-selected scenario to Registered User; taken-handle
+feedback leaves it pending. Profile reads are stable, and neither outcome changes
+email verification. There is no shared handle-ownership simulation.
 
 `mock-api.ts` lists Central API methods and URLs in `apiHandlers`, with a separate
 handler for each operation. Test-control routes live in `controlHandlers`; the
