@@ -11,6 +11,8 @@
 
 ## What is Ethoko?
 
+Developing Central? See the [connected Central playground workflow](docs/central-playground.md) for start, status, stop, and machine prerequisites.
+
 Ethoko enables teams to **store** and **share** versioned smart-contract compilation artifacts.  
 As such, it decouples the compilation process from the operation processes.
 
