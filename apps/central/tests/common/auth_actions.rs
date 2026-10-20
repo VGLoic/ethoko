@@ -24,7 +24,8 @@ pub trait AuthActions {
 
 impl AuthActions for InstanceState {
     async fn signup_user(&self) -> (HttpSignupEmailResponse, Password) {
-        let email = Faker.fake::<Email>();
+        // Integration tests share a database; fixtures must not collide across test binaries.
+        let email = Email::new(&format!("test-{}@example.com", uuid::Uuid::new_v4())).unwrap();
         let password = Faker.fake::<Password>();
 
         let signup_body = HttpSignupEmailBody {

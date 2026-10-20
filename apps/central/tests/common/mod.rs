@@ -57,6 +57,7 @@ impl TestConfigBuilder {
                     ttl_seconds: 10 * 60,
                     cooldown_seconds: 60,
                 },
+                password_reset_cooldown_seconds: 60,
                 global_rate_limit_config: ethoko_central::config::RateLimitConfig {
                     replenishment_per_second: 100,
                     max_burst_size: 1_000,
@@ -171,6 +172,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         config.otp_config.clone(),
         config.oauth_transaction_ttl_seconds,
         config.central_ui_bff_shared_secret.clone(),
+        config.password_reset_cooldown_seconds,
     );
 
     let root_processor = RootProcessor::new(HashMap::from([auth.job_registration()]));

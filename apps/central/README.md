@@ -118,3 +118,31 @@ This repository uses [`sqlx`](https://github.com/launchbadge/sqlx) for database 
 
 - If you encounter connection errors, verify that your database is running and your `.env` configuration is correct.
 - For more details, see the [`sqlx-cli` documentation](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md) and the [`sqlx` docs](https://github.com/launchbadge/sqlx).
+## Password recovery deployment
+
+Central UI serves `/forgot-password` and `/reset-password`. Central accepts
+`POST /auth/forgot-password` (`email`) and `POST /auth/reset-password` (`token`,
+`password`); both require the Central UI BFF Machine Credential, not a User
+Session Token. Recovery only replaces an existing password credential.
+
+Set `WEB_APP_URL` to the public Central UI origin before deploying. Provision and
+publish a Resend template with identifier **`password-reset`**, subject
+`[Ethoko Central] Reset your password`, and these variables:
+
+- `reset_url`: the complete, encoded `/reset-password?token=…` link.
+- `expiry_minutes`: numeric `60` (one hour from worker issuance).
+
+**Provider-hosted template provisioning is an external deployment prerequisite;
+it is not performed by this repository.** Development `local-capture` delivery
+writes `password-reset` messages with `reset_url` and `expiry_minutes` to the
+configured private email-capture directory, without requiring a provider template.
+
+`PASSWORD_RESET_COOLDOWN_SECONDS` configures resend cooldown (default `60`).
+Generic confirmations always return the configured `cooldownSeconds`, including
+unknown emails, GitHub-only Users, and cooldown-suppressed requests.
+
+Recovery reuses `otp_request`, retaining consumed history so superseded links
+never become usable again. Worker delivery precedes recording, as in verification:
+retries may generate replacement links and request order does not determine token
+order. Queuing alone does not invalidate a recorded link. These accepted delivery
+and cooldown limitations are tracked in #189.

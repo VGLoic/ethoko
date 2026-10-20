@@ -39,6 +39,7 @@ async fn test_resend_verification_email_200() {
         .get(1)
         .map(|t| match t {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+            _ => panic!("Expected verification email"),
         })
         .expect("Expected a second OTP email to be sent");
 
@@ -119,6 +120,7 @@ async fn test_resend_verification_email_user_already_verified_422() {
         .first()
         .map(|t| match t {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+            _ => panic!("Expected verification email"),
         })
         .expect("Expected a first OTP email to be sent");
 

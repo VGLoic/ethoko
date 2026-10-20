@@ -1,4 +1,4 @@
-import { Form, redirect } from "react-router";
+import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/login";
 import z from "zod";
 import { ethokoCentralClient } from "~/server/ethoko-central-api/index.server";
@@ -128,6 +128,7 @@ export default function Login({
     <Page>
       <Feedback>{loaderData?.error}</Feedback>
       <h1>Sign in to Ethoko Central</h1>
+      <Link to="/forgot-password">Forgot password?</Link>
       <Form method="post">
         <Field
           label="Email"

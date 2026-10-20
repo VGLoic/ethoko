@@ -11,7 +11,7 @@ use crate::{
             },
             user::User,
         },
-        notifier::jobs::{AuthJob, SendEmailVerificationOtpPayload},
+        notifier::jobs::{AuthEmailDeliveryPayload, AuthJob},
         requests::login_github_callback::LoginGithubCallbackError,
     },
     jobs::{
@@ -28,6 +28,8 @@ pub const AUTH_JOB_TOPIC: &str = "auth";
 #[async_trait::async_trait]
 /// Defines the AuthNotifier trait for auth related notifications
 pub trait AuthNotifier: Send + Sync + 'static {
+    /// Enqueues password recovery delivery; returns serialization or queue errors.
+    async fn user_requested_password_reset(&self, user: &User) -> Result<(), anyhow::Error>;
     /// Triggers a notification when user signed up with email
     /// # Errors
     /// * `SignupEmailError::Unknown` for any errors that may occur during the process.
@@ -84,6 +86,19 @@ impl<Q: Queue> AuthNotifierImpl<Q> {
 
 #[async_trait::async_trait]
 impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
+    async fn user_requested_password_reset(&self, user: &User) -> Result<(), anyhow::Error> {
+        let job = JobRequest::new(
+            AUTH_JOB_TOPIC.to_string(),
+            AuthJob::SendPasswordReset(AuthEmailDeliveryPayload::new(user)),
+        )?
+        .with_max_retries(3)
+        .with_scheduled_at(Utc::now());
+        self.queue
+            .enqueue(job)
+            .await
+            .map_err(|QueueError::Unknown(error)| error)?;
+        Ok(())
+    }
     async fn user_signed_up_with_email(
         &self,
         user: &User,
@@ -97,7 +112,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         );
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+            AuthJob::SendEmailVerificationOtp(AuthEmailDeliveryPayload::new(user)),
         )?
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());
@@ -139,7 +154,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
 
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+            AuthJob::SendEmailVerificationOtp(AuthEmailDeliveryPayload::new(user)),
         )?
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());
@@ -191,7 +206,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         );
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+            AuthJob::SendEmailVerificationOtp(AuthEmailDeliveryPayload::new(user)),
         )?
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());

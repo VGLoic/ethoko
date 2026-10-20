@@ -8,7 +8,31 @@ use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub enum EmailTemplate {
+    PasswordReset(PasswordResetPayload),
     EmailVerificationCode(EmailVerificationCodePayload),
+}
+
+#[derive(Clone)]
+pub struct PasswordResetPayload {
+    pub token: String,
+}
+
+// Recovery credentials must not appear in operational logs.
+impl std::fmt::Debug for PasswordResetPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("PasswordResetPayload([REDACTED])")
+    }
+}
+
+impl PasswordResetPayload {
+    pub fn reset_url(&self, web_app_url: &str) -> Result<String, anyhow::Error> {
+        let mut url = reqwest::Url::parse(&format!(
+            "{}/reset-password",
+            web_app_url.trim_end_matches('/')
+        ))?;
+        url.query_pairs_mut().append_pair("token", &self.token);
+        Ok(url.into())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,13 +102,21 @@ impl LocalEmailService {
 #[async_trait::async_trait]
 impl EmailService for LocalEmailService {
     async fn send_email(&self, email: Email, template: EmailTemplate) -> Result<(), anyhow::Error> {
-        let EmailTemplate::EmailVerificationCode(payload) = template;
-        let message = serde_json::json!({
-            "recipient": email,
-            "kind": "email-verification-code",
-            "delivered_at": chrono::Utc::now(),
-            "verification_url": payload.verification_url(&self.web_app_url)?,
-        });
+        let message = match template {
+            EmailTemplate::PasswordReset(payload) => serde_json::json!({
+                "recipient": email,
+                "kind": "password-reset",
+                "delivered_at": chrono::Utc::now(),
+                "reset_url": payload.reset_url(&self.web_app_url)?,
+                "expiry_minutes": 60,
+            }),
+            EmailTemplate::EmailVerificationCode(payload) => serde_json::json!({
+                "recipient": email,
+                "kind": "email-verification-code",
+                "delivered_at": chrono::Utc::now(),
+                "verification_url": payload.verification_url(&self.web_app_url)?,
+            }),
+        };
         let mut directory = tokio::fs::DirBuilder::new();
         directory.recursive(true);
         #[cfg(unix)]
@@ -106,7 +138,7 @@ impl EmailService for LocalEmailService {
         debug!(
             event = "externalcom.email.send_succeeded",
             provider = "local-capture",
-            template = "email-verification-code",
+            template = message["kind"].as_str(),
             "Captured email locally"
         );
         Ok(())
@@ -114,12 +146,14 @@ impl EmailService for LocalEmailService {
 }
 
 enum RsEmailVerificationTemplate {
+    PasswordReset(String),
     ResendEmailVerificationCode(RsEmailVerificationCodeVariables),
 }
 
 impl RsEmailVerificationTemplate {
     fn template_id(&self) -> &'static str {
         match self {
+            Self::PasswordReset(_) => "password-reset",
             RsEmailVerificationTemplate::ResendEmailVerificationCode(_) => {
                 "email-verification-code"
             }
@@ -128,6 +162,10 @@ impl RsEmailVerificationTemplate {
 
     fn serialize_variables(&self) -> HashMap<String, serde_json::Value> {
         match self {
+            Self::PasswordReset(url) => HashMap::from([
+                ("reset_url".into(), serde_json::json!(url)),
+                ("expiry_minutes".into(), serde_json::json!(60)),
+            ]),
             RsEmailVerificationTemplate::ResendEmailVerificationCode(vars) => {
                 let mut map = HashMap::new();
                 map.insert("email".to_string(), serde_json::json!(vars.email));
@@ -166,6 +204,9 @@ impl ResendEmailService {
         template: EmailTemplate,
     ) -> Result<RsEmailVerificationTemplate, anyhow::Error> {
         match template {
+            EmailTemplate::PasswordReset(payload) => Ok(
+                RsEmailVerificationTemplate::PasswordReset(payload.reset_url(&self.web_app_url)?),
+            ),
             EmailTemplate::EmailVerificationCode(payload) => {
                 let verification_url = payload.verification_url(&self.web_app_url)?;
                 Ok(RsEmailVerificationTemplate::ResendEmailVerificationCode(
@@ -190,7 +231,12 @@ impl EmailService for ResendEmailService {
         let opts = CreateEmailBaseOptions::new(
             "Central <central@ethoko.com>",
             vec![email.to_string()],
-            "[Ethoko Central] Please verify your email address",
+            match &resend_template {
+                RsEmailVerificationTemplate::PasswordReset(_) => {
+                    "[Ethoko Central] Reset your password"
+                }
+                _ => "[Ethoko Central] Please verify your email address",
+            },
         )
         .with_template(template);
 
