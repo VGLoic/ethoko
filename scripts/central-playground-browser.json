@@ -1,0 +1,11 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "userDataDir": ".central-playground/browser/profile",
+    "launchOptions": {
+      "channel": "chromium",
+      "headless": true
+    }
+  },
+  "outputDir": ".central-playground/browser/evidence"
+}

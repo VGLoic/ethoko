@@ -21,6 +21,7 @@
     "playground:status": "node scripts/central-playground.mjs status",
     "playground:stop": "node scripts/central-playground.mjs stop",
     "playground:reset": "node scripts/central-playground.mjs reset",
+    "playground:browser:install": "pnpm exec playwright install chromium",
     "test:playground": "node --test scripts/central-playground.test.mjs",
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -39,6 +40,8 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
+    "@playwright/mcp": "0.0.83",
+    "playwright": "1.64.0-alpha-1790635538000",
     "prettier": "^3.7.4",
     "turbo": "^2.8.0",
     "typescript": "5.9.2"
