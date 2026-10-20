@@ -98,6 +98,7 @@ async fn main() -> Result<(), anyhow::Error> {
         config.otp_config.clone(),
         config.oauth_transaction_ttl_seconds,
         config.central_ui_bff_shared_secret.clone(),
+        config.password_reset_cooldown_seconds,
     );
 
     let auth_job_registration = auth.job_registration();

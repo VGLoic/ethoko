@@ -30,6 +30,23 @@ use thiserror::Error;
 /// Repository trait for auth-related operations
 #[async_trait::async_trait]
 pub trait AuthRepository: Send + Sync + 'static {
+    /// Records a reset hash after delivery, checking eligibility and purpose-specific cooldown.
+    /// Returns storage errors; suppressed requests are not recorded.
+    async fn register_password_reset(
+        &self,
+        user_id: uuid::Uuid,
+        hash: [u8; 32],
+        expires_at: chrono::DateTime<Utc>,
+        cooldown_seconds: u16,
+    ) -> Result<(), anyhow::Error>;
+
+    /// Atomically consumes the current reset token, replaces the password and revokes sessions.
+    /// Returns InvalidToken for unusable tokens or missing password credentials; Unknown for storage errors.
+    async fn complete_password_reset(
+        &self,
+        hash: [u8; 32],
+        password: crate::newtypes::password_hash::PasswordHash,
+    ) -> Result<(), super::requests::password_recovery::ResetPasswordError>;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
@@ -97,6 +114,7 @@ pub trait AuthRepository: Send + Sync + 'static {
     async fn get_last_otp_request_by_user_id(
         &self,
         user_id: uuid::Uuid,
+        purpose: OtpPurpose,
     ) -> Result<Option<OtpRequest>, GetLastOtpRequestError>;
 
     /// Gets the user and auth credentials for a user by their email address.
@@ -209,8 +227,128 @@ const UNIQUE_VIOLATION_ERROR_CODE: &str = "23505";
 const UNIQUE_EMAIL_CONSTRAINT_NAME: &str = "unique_email";
 const UNIQUE_REGISTERED_HANDLE_CONSTRAINT_NAME: &str = "unique_registered_handle";
 
+#[derive(sqlx::FromRow)]
+struct PasswordResetCompletionRow {
+    id: uuid::Uuid,
+    otp_hash: Vec<u8>,
+    expires_at: chrono::DateTime<Utc>,
+    consumed_at: Option<chrono::DateTime<Utc>>,
+}
+
 #[async_trait::async_trait]
 impl AuthRepository for PsqlAuthRepository {
+    async fn register_password_reset(
+        &self,
+        user_id: uuid::Uuid,
+        hash: [u8; 32],
+        expires_at: chrono::DateTime<Utc>,
+        cooldown_seconds: u16,
+    ) -> Result<(), anyhow::Error> {
+        let mut transaction = self.pool.begin().await?;
+        // Issuance and completion serialize on the User, so completion checks the latest recorded token.
+        let exists = sqlx::query_scalar::<_, uuid::Uuid>(
+            "SELECT id FROM ethoko_user WHERE id = $1 FOR UPDATE",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if exists.is_none() {
+            return Ok(());
+        }
+        let eligible = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM auth_credential WHERE user_id = $1 AND payload->>'type' = 'password_hash')",
+        )
+        .bind(user_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if !eligible {
+            return Ok(());
+        }
+        let last =
+            get_last_otp_request_by_user_id(user_id, OtpPurpose::PasswordReset, &mut *transaction)
+                .await?;
+        if last.is_some_and(|otp| {
+            Utc::now().signed_duration_since(otp.created_at)
+                < TimeDelta::seconds(cooldown_seconds.into())
+        }) {
+            return Ok(());
+        }
+        sqlx::query("INSERT INTO otp_request (user_id, otp_hash, purpose, expires_at) VALUES ($1, $2, 'password_reset', $3)")
+            .bind(user_id)
+            .bind(hash)
+            .bind(expires_at)
+            .execute(&mut *transaction)
+            .await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    async fn complete_password_reset(
+        &self,
+        hash: [u8; 32],
+        password: crate::newtypes::password_hash::PasswordHash,
+    ) -> Result<(), super::requests::password_recovery::ResetPasswordError> {
+        use super::requests::password_recovery::ResetPasswordError;
+        // Keep the transaction boundary here: no credential/session mutation can escape a failed reset.
+        let mut transaction = self.pool.begin().await.map_err(anyhow::Error::from)?;
+        let user_id = sqlx::query_scalar::<_, uuid::Uuid>(
+            "SELECT user_id FROM otp_request WHERE otp_hash = $1 AND purpose = 'password_reset'",
+        )
+        .bind(hash)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(anyhow::Error::from)?
+        .ok_or(ResetPasswordError::InvalidToken)?;
+
+        sqlx::query("SELECT id FROM ethoko_user WHERE id = $1 FOR UPDATE")
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(anyhow::Error::from)?;
+        let current = sqlx::query_as::<_, PasswordResetCompletionRow>(
+            r#"
+            SELECT id, otp_hash, expires_at, consumed_at
+            FROM otp_request
+            WHERE user_id = $1 AND purpose = 'password_reset'
+            ORDER BY issuance_order DESC
+            LIMIT 1 FOR UPDATE
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(anyhow::Error::from)?;
+        if current.otp_hash != hash
+            || current.expires_at <= Utc::now()
+            || current.consumed_at.is_some()
+        {
+            return Err(ResetPasswordError::InvalidToken);
+        }
+
+        let updated = sqlx::query(
+            "UPDATE auth_credential SET payload = $2, updated_at = NOW() WHERE user_id = $1 AND payload->>'type' = 'password_hash'",
+        )
+        .bind(user_id)
+        .bind(AuthCredentialPayload::from_password_hash(password))
+        .execute(&mut *transaction)
+        .await
+        .map_err(anyhow::Error::from)?;
+        if updated.rows_affected() == 0 {
+            return Err(ResetPasswordError::InvalidToken);
+        }
+        sqlx::query("UPDATE otp_request SET consumed_at = NOW() WHERE id = $1")
+            .bind(current.id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(anyhow::Error::from)?;
+        sqlx::query("UPDATE opaque_token SET revoked_at = NOW() WHERE user_id = $1 AND kind = 'session' AND revoked_at IS NULL")
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(anyhow::Error::from)?;
+        transaction.commit().await.map_err(anyhow::Error::from)?;
+        Ok(())
+    }
     async fn create_user_with_email_auth(
         &self,
         request: SignupEmailRequest,
@@ -430,9 +568,13 @@ impl AuthRepository for PsqlAuthRepository {
             return Err(SendEmailVerificationOtpError::EmailAlreadyVerified);
         }
 
-        let last_otp_request = get_last_otp_request_by_user_id(user_id, &mut *transaction)
-            .await
-            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
+        let last_otp_request = get_last_otp_request_by_user_id(
+            user_id,
+            OtpPurpose::EmailVerification,
+            &mut *transaction,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
 
         if let Some(otp_request) = last_otp_request {
             let cooldown_limit = otp_request
@@ -502,9 +644,13 @@ impl AuthRepository for PsqlAuthRepository {
             return Err(VerifyEmailError::EmailAlreadyVerified);
         }
 
-        let otp_request = get_last_otp_request_by_user_id(user.id(), &mut *transaction)
-            .await
-            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
+        let otp_request = get_last_otp_request_by_user_id(
+            user.id(),
+            OtpPurpose::EmailVerification,
+            &mut *transaction,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
 
         let otp_request = match otp_request {
             Some(otp_request) => otp_request,
@@ -563,8 +709,9 @@ impl AuthRepository for PsqlAuthRepository {
     async fn get_last_otp_request_by_user_id(
         &self,
         user_id: uuid::Uuid,
+        purpose: OtpPurpose,
     ) -> Result<Option<OtpRequest>, GetLastOtpRequestError> {
-        get_last_otp_request_by_user_id(user_id, &self.pool)
+        get_last_otp_request_by_user_id(user_id, purpose, &self.pool)
             .await
             .map_err(|e| {
                 anyhow::anyhow!(e)
@@ -887,6 +1034,7 @@ impl AuthRepository for PsqlAuthRepository {
 
 async fn get_last_otp_request_by_user_id<'a, E: Executor<'a, Database = Postgres>>(
     user_id: uuid::Uuid,
+    purpose: OtpPurpose,
     executor: E,
 ) -> Result<Option<OtpRequest>, sqlx::Error> {
     let otp_request = sqlx::query_as::<_, OtpRequest>(
@@ -899,12 +1047,15 @@ async fn get_last_otp_request_by_user_id<'a, E: Executor<'a, Database = Postgres
             created_at,
             expires_at
         FROM otp_request
-        WHERE user_id = $1
-        ORDER BY created_at DESC
+        WHERE user_id = $1 AND purpose = $2
+        -- Preserve verification ordering for rows issued before issuance_order existed.
+        ORDER BY CASE WHEN purpose = 'email_verification' THEN created_at END DESC,
+                 issuance_order DESC
         LIMIT 1
         "#,
     )
     .bind(user_id)
+    .bind(purpose)
     .fetch_optional(executor)
     .await?;
 

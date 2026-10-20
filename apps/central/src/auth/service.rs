@@ -35,6 +35,20 @@ use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
+    /// Enqueues recovery for eligible users, hiding eligibility and cooldown suppression.
+    /// Returns infrastructure errors when lookup or enqueue fails.
+    async fn forgot_password(
+        &self,
+        email: crate::newtypes::email::Email,
+    ) -> Result<u16, anyhow::Error>;
+
+    /// Replaces an existing password and revokes sessions atomically.
+    /// Returns InvalidToken for unusable tokens, or Unknown on storage failure.
+    async fn reset_password(
+        &self,
+        token: &str,
+        hash: crate::newtypes::password_hash::PasswordHash,
+    ) -> Result<(), super::requests::password_recovery::ResetPasswordError>;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
@@ -138,6 +152,7 @@ pub struct AuthServiceImpl<
     repository: R,
     notifier: N,
     otp_config: OtpConfig,
+    password_reset_cooldown_seconds: u16,
     github_oauth_client_port: GhOauth,
     github_oauth_transaction_ttl_seconds: u16,
     github_port: GhPort,
@@ -153,6 +168,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         github_oauth_client_port: GhOauth,
         oauth_transaction_ttl_seconds: u16,
         github_port: GhPort,
+        password_reset_cooldown_seconds: u16,
     ) -> Self {
         Self {
             repository,
@@ -161,6 +177,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
             github_oauth_client_port,
             github_oauth_transaction_ttl_seconds: oauth_transaction_ttl_seconds,
             github_port,
+            password_reset_cooldown_seconds,
         }
     }
 }
@@ -169,6 +186,52 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOauthClientPort>
     AuthService for AuthServiceImpl<R, N, GhPort, GhOauth>
 {
+    async fn forgot_password(
+        &self,
+        email: crate::newtypes::email::Email,
+    ) -> Result<u16, anyhow::Error> {
+        let cooldown = self.password_reset_cooldown_seconds;
+        let (user, credentials) = match self.repository.get_auth_credentials_by_email(&email).await
+        {
+            Ok(value) => value,
+            Err(GetAuthCredentialError::NotFound) => return Ok(cooldown),
+            Err(GetAuthCredentialError::Unknown(error)) => return Err(error),
+        };
+        if !credentials.iter().any(|credential| {
+            matches!(
+                credential.payload,
+                AuthCredentialPayload::PasswordHash { .. }
+            )
+        }) {
+            return Ok(cooldown);
+        }
+        let last = self
+            .repository
+            .get_last_otp_request_by_user_id(
+                user.id(),
+                super::models::otp_request::OtpPurpose::PasswordReset,
+            )
+            .await
+            .map_err(|GetLastOtpRequestError::Unknown(error)| error)?;
+        if last.is_some_and(|otp| {
+            chrono::Utc::now().signed_duration_since(otp.created_at)
+                < chrono::Duration::seconds(cooldown.into())
+        }) {
+            return Ok(cooldown);
+        }
+        self.notifier.user_requested_password_reset(&user).await?;
+        Ok(cooldown)
+    }
+
+    async fn reset_password(
+        &self,
+        token: &str,
+        hash: crate::newtypes::password_hash::PasswordHash,
+    ) -> Result<(), super::requests::password_recovery::ResetPasswordError> {
+        self.repository
+            .complete_password_reset(sha2::Sha256::digest(token.as_bytes()).into(), hash)
+            .await
+    }
     async fn signup_with_email(
         &self,
         request: SignupEmailRequest,
@@ -267,7 +330,10 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         }
         let last_otp = self
             .repository
-            .get_last_otp_request_by_user_id(user.id())
+            .get_last_otp_request_by_user_id(
+                user.id(),
+                super::models::otp_request::OtpPurpose::EmailVerification,
+            )
             .await
             .map_err(|e| match e {
                 GetLastOtpRequestError::Unknown(err) => {

@@ -10,6 +10,7 @@ export default defineConfig({
         "signup.spec.ts",
         "register-handle.spec.ts",
         "verification.spec.ts",
+        "password-recovery.spec.ts",
       ],
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

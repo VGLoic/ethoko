@@ -37,6 +37,7 @@ impl Auth {
         otp_config: OtpConfig,
         oauth_transaction_ttl_seconds: u16,
         central_ui_bff_shared_secret: String,
+        password_reset_cooldown_seconds: u16,
     ) -> Self {
         let repository = PsqlAuthRepository::new(pool);
         let notifier = AuthNotifierImpl::new(job_queue);
@@ -48,8 +49,14 @@ impl Auth {
             oauth_client,
             oauth_transaction_ttl_seconds,
             github_adapter,
+            password_reset_cooldown_seconds,
         );
-        let job_processor = AuthJobProcessor::new(repository, email_service, otp_config);
+        let job_processor = AuthJobProcessor::new(
+            repository,
+            email_service,
+            otp_config,
+            password_reset_cooldown_seconds,
+        );
 
         Self {
             state: AuthState {

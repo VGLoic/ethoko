@@ -18,6 +18,14 @@ export const ScenarioInput = z
     identity: Identity,
     login: z.enum(["success", "invalid-credentials"]).default("success"),
     signup: z.literal("success").optional(),
+    recovery: z
+      .object({
+        token: z.string().regex(/^[a-f0-9]{64}$/),
+        outcome: z.enum(["success", "invalid-token"]),
+        cooldownSeconds: z.number().int().nonnegative().default(60),
+      })
+      .strict()
+      .optional(),
     registration: z.enum(["success", "taken"]).default("success"),
     verification: z
       .object({

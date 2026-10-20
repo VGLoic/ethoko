@@ -9,6 +9,7 @@ type Scenario = z.infer<typeof Identity> & {
   signup: z.infer<typeof ScenarioInput>["signup"];
   registration: z.infer<typeof ScenarioInput>["registration"];
   verification: z.infer<typeof ScenarioInput>["verification"];
+  recovery: z.infer<typeof ScenarioInput>["recovery"];
   active: boolean;
   loggedIn: boolean;
   requests: string[];
@@ -21,6 +22,8 @@ const pending = new Set<Promise<void>>();
 
 const apiHandlers = [
   http.post(`${apiUrl}/auth/signup/email`, handleEmailSignup),
+  http.post(`${apiUrl}/auth/forgot-password`, handleForgotPassword),
+  http.post(`${apiUrl}/auth/reset-password`, handleResetPassword),
   http.post(`${apiUrl}/auth/login/email`, handleEmailLogin),
   http.get(`${apiUrl}/auth/me`, handleCurrentUser),
   http.post(`${apiUrl}/auth/logout`, handleLogout),
@@ -154,6 +157,60 @@ async function handleEmailLogin({ request }: { request: Request }) {
   }
   scenario.loggedIn = true;
   return HttpResponse.json({ token: scenario.token });
+}
+
+async function handleForgotPassword({ request }: { request: Request }) {
+  const result = await emailScenario(request);
+  if (result instanceof Response) return result;
+  const { scenario, body } = result;
+  if (
+    !scenario.recovery ||
+    !z.object({ email: z.email() }).strict().safeParse(body).success
+  ) {
+    return violation(
+      request,
+      "invalid recovery request or missing configuration",
+      scenario,
+    );
+  }
+  return HttpResponse.json({
+    message:
+      "If this account is eligible for password recovery, you’ll receive an email.",
+    cooldownSeconds: scenario.recovery.cooldownSeconds,
+  });
+}
+
+async function handleResetPassword({ request }: { request: Request }) {
+  const body: unknown = await request.json();
+  const payload = z
+    .object({ token: z.string(), password: z.string() })
+    .strict()
+    .safeParse(body);
+  const scenario = payload.success
+    ? [...scenarios.values()].find(
+        (scenario) => scenario.recovery?.token === payload.data.token,
+      )
+    : undefined;
+  if (!scenario || !payload.success)
+    return violation(request, "unknown recovery token or invalid payload");
+  const error = validateScenarioRequest(request, scenario);
+  if (error) return error;
+  if (
+    request.headers.has("X-Ethoko-User-Authorization") ||
+    !request.headers.get("Content-Type")?.includes("application/json")
+  )
+    return violation(request, "invalid recovery headers", scenario);
+  if (scenario.recovery?.outcome === "invalid-token")
+    return HttpResponse.json(
+      {
+        code: "ETKARP01",
+        reason: "This password reset link is invalid or expired.",
+      },
+      { status: 422 },
+    );
+  scenario.password = payload.data.password;
+  scenario.loggedIn = false;
+  return HttpResponse.json(null);
 }
 
 async function handleEmailVerification({ request }: { request: Request }) {
@@ -317,7 +374,8 @@ const controlHandlers = [
   http.get("/__test/health", () => HttpResponse.json({ ready: true })),
   http.post("/__test/scenarios", async ({ request }) => {
     const input = ScenarioInput.parse(await request.json());
-    const { identity, login, signup, registration, verification } = input;
+    const { identity, login, signup, registration, verification, recovery } =
+      input;
     if (
       [...scenarios.values()].some(
         (scenario) =>
@@ -337,6 +395,7 @@ const controlHandlers = [
       signup,
       registration,
       verification,
+      recovery,
       active: true,
       loggedIn: false,
       requests: [],
