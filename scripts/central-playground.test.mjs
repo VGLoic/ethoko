@@ -48,14 +48,27 @@ test(
   { timeout: 60_000 },
   async () => {
     const unrelated = await chromium.launch({ headless: true });
-    const config = JSON.parse(
-      await readFile("scripts/central-playground-browser.json", "utf8"),
-    );
-    const playground = await chromium.launchPersistentContext(
-      config.browser.userDataDir,
-      config.browser.launchOptions,
-    );
+    let playground;
+    let wrapper;
     try {
+      const config = JSON.parse(
+        await readFile("scripts/central-playground-browser.json", "utf8"),
+      );
+      wrapper = spawn(
+        process.execPath,
+        [
+          "-e",
+          "setInterval(() => {}, 1000)",
+          "--",
+          `--user-data-dir=${join(process.cwd(), config.browser.userDataDir)}`,
+          "--remote-debugging-pipe",
+        ],
+        { stdio: "ignore" },
+      );
+      playground = await chromium.launchPersistentContext(
+        config.browser.userDataDir,
+        config.browser.launchOptions,
+      );
       const page = await unrelated.newPage();
       await page.goto("data:text/html,<h1>Unrelated browser</h1>");
       const before = await status();
@@ -72,9 +85,11 @@ test(
         assert.throws(() => process.kill(processInfo.pid, 0));
       assert.equal(unrelated.isConnected(), true);
       assert.equal(await page.textContent("h1"), "Unrelated browser");
+      assert.equal(process.kill(wrapper.pid, 0), true);
       await command("stop");
     } finally {
-      await playground.close();
+      wrapper?.kill();
+      await playground?.close();
       await unrelated.close();
       await command("stop");
     }
@@ -197,6 +212,10 @@ test(
         await copyFile(
           "scripts/central-playground.mjs",
           join(other, "scripts/central-playground.mjs"),
+        );
+        await copyFile(
+          "scripts/central-playground-browser.json",
+          join(other, "scripts/central-playground-browser.json"),
         );
         await assert.rejects(
           exec(process.execPath, [

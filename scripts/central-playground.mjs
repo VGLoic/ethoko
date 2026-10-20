@@ -11,7 +11,7 @@ import {
   open,
   stat,
 } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -20,7 +20,13 @@ const exec = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
 const checkout = resolve(dirname(script), "..");
 const base = join(checkout, ".central-playground");
-const browserProfile = join(base, "browser", "profile");
+const browserConfig = JSON.parse(
+  await readFile(
+    new URL("./central-playground-browser.json", import.meta.url),
+    "utf8",
+  ),
+);
+const browserProfile = resolve(checkout, browserConfig.browser.userDataDir);
 const active = join(base, "active");
 const recordPath = join(active, "resources.json");
 const project = "ethoko-central-playground";
@@ -101,20 +107,42 @@ async function processTable() {
       return { pid: Number(pid), pgid: Number(pgid), started, command };
     });
 }
-function inspectBrowser(table) {
+async function inspectBrowser(table) {
+  const candidates = table.filter(
+    (p) =>
+      ` ${p.command} `.includes(` --user-data-dir=${browserProfile} `) &&
+      p.command.includes(" --remote-debugging-pipe") &&
+      !p.command.includes(" --type="),
+  );
+  const processes = [];
+  for (const candidate of candidates) {
+    try {
+      // ps's executable identity is separate from the flattened arguments:
+      // wrappers can carry all of Chromium's flags without being a browser.
+      const { stdout } = await run("ps", [
+        "-p",
+        String(candidate.pid),
+        "-o",
+        "comm=",
+      ]);
+      if (
+        ["chrome", "Chromium", "Google Chrome for Testing"].includes(
+          basename(stdout.trim()),
+        )
+      )
+        processes.push(candidate);
+    } catch (error) {
+      if (error.code !== 1) throw error; // The process may have just exited.
+    }
+  }
   return {
     profileDirectory: browserProfile,
-    evidenceDirectory: join(base, "browser", "evidence"),
-    processes: table.filter(
-      (p) =>
-        ` ${p.command} `.includes(` --user-data-dir=${browserProfile} `) &&
-        p.command.includes(" --remote-debugging-pipe") &&
-        !p.command.includes(" --type="),
-    ),
+    evidenceDirectory: resolve(checkout, browserConfig.outputDir),
+    processes,
   };
 }
 async function closeBrowser() {
-  const browsers = inspectBrowser(await processTable()).processes;
+  const browsers = (await inspectBrowser(await processTable())).processes;
   for (const browser of browsers) {
     // Revalidate the live command and start time, never trust a saved PID or
     // signal the MCP/OpenCode process group. Chromium closes its own children.
@@ -131,7 +159,7 @@ async function closeBrowser() {
     }
   }
   const deadline = Date.now() + 10_000;
-  while (inspectBrowser(await processTable()).processes.length) {
+  while ((await inspectBrowser(await processTable())).processes.length) {
     if (Date.now() >= deadline)
       throw new Error(
         "Playground browser did not close; use the playground MCP browser_close tool and retry stop. Application resource record retained.",
@@ -204,7 +232,7 @@ async function reachable(url) {
 }
 async function inspect(record) {
   const table = await processTable();
-  const browser = inspectBrowser(table);
+  const browser = await inspectBrowser(table);
   if (!record) {
     const directory = await stat(active).catch((error) => {
       if (error.code === "ENOENT") return null;
