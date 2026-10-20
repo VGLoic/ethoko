@@ -20,6 +20,7 @@
     "playground:start": "node scripts/central-playground.mjs start",
     "playground:status": "node scripts/central-playground.mjs status",
     "playground:stop": "node scripts/central-playground.mjs stop",
+    "playground:reset": "node scripts/central-playground.mjs reset",
     "test:playground": "node --test scripts/central-playground.test.mjs",
     "build": "turbo run build",
     "dev": "turbo run dev",

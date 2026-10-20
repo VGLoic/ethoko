@@ -9,6 +9,7 @@ import {
   unlink,
   rmdir,
   open,
+  stat,
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,16 @@ const load = async () => {
   try {
     return JSON.parse(await readFile(recordPath, "utf8"));
   } catch (error) {
-    if (error.code === "ENOENT") return null;
+    if (error.code === "ENOENT") {
+      try {
+        return JSON.parse(await readFile(`${recordPath}.tmp`, "utf8"));
+      } catch (pendingError) {
+        if (pendingError.code === "ENOENT") return null;
+        throw new Error(
+          `Cannot read interrupted resource record ${recordPath}.tmp: ${pendingError.message}`,
+        );
+      }
+    }
     throw error;
   }
 };
@@ -50,13 +60,27 @@ async function reservation(record) {
       ? container.Id
       : null;
   } catch (error) {
-    if (error.stderr?.includes("No such object")) return null;
+    if (/no such object/i.test(error.stderr ?? "")) return null;
     throw error;
   }
 }
 async function releaseReservation(record) {
   const id = await reservation(record);
   if (id) await run("docker", ["rm", "-v", id]);
+}
+async function assertNoExistingReservation() {
+  let container;
+  try {
+    const { stdout } = await run("docker", ["inspect", reservationName]);
+    container = JSON.parse(stdout)[0];
+  } catch (error) {
+    if (/no such object/i.test(error.stderr ?? "")) return;
+    throw error;
+  }
+  const location = container.Config.Labels?.["ethoko.playground.checkout"];
+  throw new Error(
+    `An existing playground is reserved at ${location ?? "an unknown checkout"}. Run pnpm playground:status and pnpm playground:stop from that checkout; this instance will not be replaced.`,
+  );
 }
 async function save(record) {
   await writeFile(`${recordPath}.tmp`, JSON.stringify(record, null, 2), {
@@ -65,13 +89,15 @@ async function save(record) {
   await rename(`${recordPath}.tmp`, recordPath);
 }
 async function processTable() {
-  const { stdout } = await run("ps", ["-axo", "pid=,pgid=,command="]);
+  const { stdout } = await run("ps", ["-axo", "pid=,pgid=,lstart=,command="]);
   return stdout
     .trim()
     .split("\n")
     .map((line) => {
-      const [, pid, pgid, command] = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
-      return { pid: Number(pid), pgid: Number(pgid), command };
+      const [, pid, pgid, started, command] = line.match(
+        /^\s*(\d+)\s+(\d+)\s+(.{24})\s+(.*)$/,
+      );
+      return { pid: Number(pid), pgid: Number(pgid), started, command };
     });
 }
 function keeperIn(table, resource, token) {
@@ -81,6 +107,34 @@ function keeperIn(table, resource, token) {
       p.pgid === resource.pid &&
       p.command.includes(`_service ${token} ${resource.name} `),
   );
+}
+function launcherIn(table, record) {
+  return table.some(
+    (p) =>
+      p.pid === record.launcher &&
+      (record.launcherIdentity
+        ? p.started === record.launcherIdentity.started &&
+          p.command === record.launcherIdentity.command
+        : p.command.includes(script) && / (start|reset)$/.test(p.command)),
+  );
+}
+function servicesIn(record, table) {
+  const services = [...record.services];
+  // A hard crash can land between spawn and saving the keeper PID. The
+  // token-bearing command line identifies that keeper without trusting a PID.
+  for (const name of ["api", "ui"]) {
+    for (const p of table) {
+      if (
+        p.pid === p.pgid &&
+        p.command.includes(
+          `${script} _service ${record.token} ${name} ${record.configFile} `,
+        ) &&
+        !services.some((s) => s.pid === p.pid)
+      )
+        services.push({ name, pid: p.pid });
+    }
+  }
+  return services;
 }
 async function freePort(port = 0, host = "127.0.0.1") {
   const server = createServer();
@@ -110,9 +164,24 @@ async function reachable(url) {
   }
 }
 async function inspect(record) {
-  if (!record) return { state: "stopped" };
+  if (!record) {
+    const directory = await stat(active).catch((error) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    return directory
+      ? {
+          state: "degraded",
+          checkout,
+          resourceRecord: recordPath,
+          recovery:
+            "Resource record missing; run pnpm playground:stop to remove an empty startup directory. Inspect any remaining files manually.",
+        }
+      : { state: "stopped" };
+  }
   const table = await processTable();
-  const processes = record.services.flatMap((service) => {
+  const services = servicesIn(record, table);
+  const processes = services.flatMap((service) => {
     if (!keeperIn(table, service, record.token)) return [];
     return table
       .filter((p) => p.pgid === service.pid)
@@ -120,6 +189,7 @@ async function inspect(record) {
   });
   let containers = [];
   let databaseReady = false;
+  let reserved = false;
   let containerInspectionError;
   try {
     const { stdout } = await compose(record, ["ps", "-aq"]);
@@ -128,11 +198,13 @@ async function inspect(record) {
       const inspected = await run("docker", ["inspect", ...containers]);
       databaseReady = JSON.parse(inspected.stdout).every(
         (container) =>
+          container.Config.Labels?.["ethoko.playground.run"] === record.token &&
           container.State.Running &&
           container.State.Health?.Status === "healthy",
       );
     }
     const id = await reservation(record);
+    reserved = Boolean(id);
     if (id) containers.push(id);
   } catch {
     containerInspectionError =
@@ -149,14 +221,16 @@ async function inspect(record) {
   return {
     state:
       record.state === "running" &&
-      record.services.every((s) =>
+      ["api", "ui"].every((name) => services.some((s) => s.name === name)) &&
+      services.every((s) =>
         processes.some((p) => p.service === s.name && p.pid !== s.pid),
       ) &&
       containers.length &&
       databaseReady &&
+      reserved &&
       healthy
         ? "running"
-        : record.state === "starting"
+        : record.state === "starting" && launcherIn(table, record)
           ? "starting"
           : "degraded",
     checkout: record.checkout,
@@ -174,8 +248,29 @@ async function inspect(record) {
   };
 }
 async function cleanup(record) {
+  // A hard-killed launcher can leave its Docker CLI child running. In
+  // particular, Compose may still create containers after an initial snapshot.
+  // Let identified resource-creating commands settle before taking that snapshot;
+  // never release the reservation while one can still create resources.
+  const deadline = Date.now() + 180_000;
+  while (
+    (await processTable()).some(
+      (p) =>
+        (p.command.includes(record.composeFile) &&
+          p.command.includes(" up ")) ||
+        (p.command.includes(`create --name ${reservationName} `) &&
+          p.command.includes(`ethoko.playground.run=${record.token}`)),
+    )
+  ) {
+    if (Date.now() >= deadline)
+      throw new Error(
+        "A playground Docker operation is still running; resource record retained. Restore Docker and retry stop.",
+      );
+    await sleep(250);
+  }
   const table = await processTable();
-  for (const service of record.services) {
+  const services = servicesIn(record, table);
+  for (const service of services) {
     if (
       !keeperIn(table, service, record.token) &&
       table.some((p) => p.pgid === service.pid)
@@ -185,7 +280,7 @@ async function cleanup(record) {
       );
     }
   }
-  const owned = record.services.filter((s) => keeperIn(table, s, record.token));
+  const owned = services.filter((s) => keeperIn(table, s, record.token));
   for (const service of owned) process.kill(-service.pid, "SIGTERM");
   await sleep(2000);
   const remaining = await processTable();
@@ -195,22 +290,53 @@ async function cleanup(record) {
   }
   // Keepers intentionally remain alive through TERM so group identity can be
   // checked before escalation, even if pnpm or the application exits first.
-  await compose(record, ["down", "--timeout", "5"]);
+  // Select immutable IDs by this run's label, never by the shared project name.
+  const { stdout: ids } = await run("docker", [
+    "ps",
+    "-aq",
+    "--filter",
+    `label=ethoko.playground.run=${record.token}`,
+  ]);
+  const reserved = await reservation(record);
+  for (const id of ids.trim().split(/\s+/).filter(Boolean)) {
+    if (reserved?.startsWith(id)) continue;
+    await run("docker", ["rm", "-f", "-v", id]);
+  }
+  const { stdout: networks } = await run("docker", [
+    "network",
+    "ls",
+    "-q",
+    "--filter",
+    `label=ethoko.playground.run=${record.token}`,
+  ]);
+  for (const id of networks.trim().split(/\s+/).filter(Boolean)) {
+    await run("docker", ["network", "rm", id]);
+  }
   await releaseReservation(record);
   await writeFile(
     join(dirname(record.composeFile), "stopped.json"),
     JSON.stringify(record, null, 2),
     { mode: 0o600 },
   );
-  await unlink(recordPath);
+  await unlink(`${recordPath}.tmp`).catch((error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  await unlink(recordPath).catch((error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
   await rmdir(active);
 }
-async function start() {
+async function start(reset = false) {
   await mkdir(base, { recursive: true, mode: 0o700 });
   try {
     await mkdir(active, { mode: 0o700 });
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
+    const report = await inspect(await load());
+    if (report.state === "running") {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
     throw new Error(
       `A playground resource record already exists at ${active}. Use pnpm playground:status and pnpm playground:stop; it will not be overwritten.`,
     );
@@ -252,12 +378,16 @@ async function start() {
   };
   try {
     await mkdir(directory, { recursive: true, mode: 0o700 });
+    record.launcherIdentity = (await processTable()).find(
+      (p) => p.pid === process.pid,
+    );
     await save(record);
     await stage("prerequisites");
     if (process.platform === "win32")
       throw new Error("POSIX process groups require macOS or Linux");
     await run("docker", ["info"]);
     await run("docker", ["compose", "version"]);
+    await assertNoExistingReservation();
     const existing = await run("docker", [
       "ps",
       "-aq",
@@ -278,9 +408,14 @@ async function start() {
       reservationName,
       "--label",
       `ethoko.playground.run=${token}`,
+      "--label",
+      `ethoko.playground.checkout=${checkout}`,
       "postgres:18",
       "true",
     ]);
+    // Hold the machine-wide reservation before deleting data, so another
+    // checkout cannot start using the volume during reset.
+    if (reset) await resetData();
     await run("pnpm", ["--version"]);
     await run("cargo", ["--version"]);
     const apiPort =
@@ -301,6 +436,10 @@ async function start() {
           services: {
             db: {
               image: "postgres:18",
+              labels: {
+                "ethoko.playground.run": token,
+                "ethoko.playground.checkout": checkout,
+              },
               environment: {
                 POSTGRES_USER: "playground",
                 POSTGRES_PASSWORD: "playground-local-only",
@@ -317,6 +456,7 @@ async function start() {
             },
           },
           volumes: { data: { name: "ethoko-central-playground-data" } },
+          networks: { default: { labels: { "ethoko.playground.run": token } } },
         },
         null,
         2,
@@ -471,26 +611,32 @@ async function main() {
   if (command === "start") return start();
   if (command === "status")
     return console.log(JSON.stringify(await inspect(await load()), null, 2));
-  if (command === "stop") {
+  if (command === "stop" || command === "reset") {
     const record = await load();
     if (!record) {
+      // Before the first record is written, startup has created no resources.
+      // Only remove an empty directory; unknown contents require inspection.
+      await rmdir(active).catch((error) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+      if (command === "reset") {
+        return start(true);
+      }
       console.log("Playground is stopped.");
       return;
     }
     if (record.state === "starting") {
       // Avoid racing the launcher creating resources while stop removes them.
       const table = await processTable();
-      if (
-        table.some(
-          (p) =>
-            p.pid === record.launcher &&
-            p.command.includes(script) &&
-            p.command.endsWith(" start"),
-        )
-      ) {
+      if (launcherIn(table, record)) {
         process.kill(record.launcher, "SIGTERM");
         for (let i = 0; i < 250; i++) {
-          if (!(await load())) return;
+          if (!(await load())) {
+            if (command === "reset") {
+              return start(true);
+            }
+            return;
+          }
           await sleep(1000);
         }
         throw new Error(
@@ -499,13 +645,30 @@ async function main() {
       }
     }
     await cleanup(record);
+    if (command === "reset") {
+      return start(true);
+    }
     console.log("Playground stopped; PostgreSQL data and logs preserved.");
     return;
   }
   console.log(
-    "Usage: pnpm playground:start | playground:status | playground:stop\nSee docs/central-playground.md for prerequisites and limitations.",
+    "Usage: pnpm playground:start | playground:status | playground:stop | playground:reset\nSee docs/central-playground.md for prerequisites and limitations.",
   );
   if (command && command !== "--help") process.exitCode = 1;
+}
+async function resetData() {
+  const name = "ethoko-central-playground-data";
+  let volume;
+  try {
+    const { stdout } = await run("docker", ["volume", "inspect", name]);
+    volume = JSON.parse(stdout)[0];
+  } catch (error) {
+    if (/no such volume/i.test(error.stderr ?? "")) return;
+    throw error;
+  }
+  if (volume.Labels?.["com.docker.compose.project"] !== project)
+    throw new Error("Refusing to reset an unrecognized database volume");
+  await run("docker", ["volume", "rm", name]);
 }
 main().catch((error) => {
   console.error(error.message);
