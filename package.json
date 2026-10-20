@@ -17,6 +17,7 @@
     "infrastructure"
   ],
   "scripts": {
+    "playground:explore": "node scripts/central-playground.mjs explore",
     "playground:start": "node scripts/central-playground.mjs start",
     "playground:status": "node scripts/central-playground.mjs status",
     "playground:stop": "node scripts/central-playground.mjs stop",

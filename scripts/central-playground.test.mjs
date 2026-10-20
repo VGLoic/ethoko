@@ -97,6 +97,149 @@ test(
 );
 
 test(
+  "bounded exploration cleans up after success and handled interruption, but explicit handoff stays usable",
+  { timeout: 300_000 },
+  async () => {
+    const config = JSON.parse(
+      await readFile("scripts/central-playground-browser.json", "utf8"),
+    );
+    const unrelated = await chromium.launch({ headless: true });
+    const page = await unrelated.newPage();
+    await page.goto("data:text/html,<h1>Unrelated browser</h1>");
+    const assertStopped = async (before) => {
+      const after = await status();
+      assert.equal(after.state, "stopped");
+      assert.deepEqual(after.browser.processes, []);
+      for (const resource of [...before.processes, ...before.browser.processes])
+        assert.throws(() => process.kill(resource.pid, 0));
+      for (const id of before.containers)
+        await assert.rejects(exec("docker", ["inspect", id]));
+      assert.equal(await page.textContent("h1"), "Unrelated browser");
+    };
+    let browser;
+    let runner;
+    const begin = async (handoff = false) => {
+      runner = spawn(
+        process.execPath,
+        [
+          "scripts/central-playground.mjs",
+          "explore",
+          ...(handoff ? ["--handoff"] : []),
+          "--",
+          process.execPath,
+          "--input-type=module",
+          "-e",
+          `import { spawn } from 'node:child_process';
+         const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio: 'ignore'});
+         console.log('EXPLORING ' + process.pid + ' ' + child.pid);
+         process.on('SIGUSR1', () => process.exit(0));
+         setInterval(() => {}, 1000);`,
+        ],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+      const finished = once(runner, "exit");
+      let output = "";
+      runner.stdout.on("data", (data) => {
+        output += data;
+      });
+      runner.stderr.on("data", (data) => {
+        output += data;
+      });
+      const deadline = Date.now() + 180_000;
+      while (!/EXPLORING \d+ \d+/.test(output)) {
+        assert.ok(Date.now() < deadline && runner.exitCode === null, output);
+        await sleep(100);
+      }
+      const [, pid, child] = output.match(/EXPLORING (\d+) (\d+)/);
+      browser = await chromium.launchPersistentContext(
+        config.browser.userDataDir,
+        config.browser.launchOptions,
+      );
+      await browser.newPage();
+      return {
+        finished,
+        pid: Number(pid),
+        child: Number(child),
+        before: await status(),
+      };
+    };
+    try {
+      // A normal bounded command returns; cleanup must happen without a stop call.
+      const normal = await begin();
+      process.kill(normal.pid, "SIGUSR1");
+      assert.deepEqual(await normal.finished, [0, null]);
+      await assertStopped(normal.before);
+      assert.throws(() => process.kill(normal.child, 0));
+      await browser.close();
+
+      const interrupted = await begin(true);
+      runner.kill("SIGTERM");
+      await interrupted.finished;
+      await assertStopped(interrupted.before);
+      assert.throws(() => process.kill(interrupted.child, 0));
+      await browser.close();
+
+      const handoff = await begin(true);
+      process.kill(handoff.pid, "SIGUSR1");
+      assert.deepEqual(await handoff.finished, [0, null]);
+      const handedOff = await status();
+      assert.equal(handedOff.state, "running");
+      assert.deepEqual(handedOff.browser.processes, []);
+      assert.equal((await fetch(`${handedOff.urls.ui}/login`)).status, 200);
+      assert.throws(() => process.kill(handoff.child, 0));
+      await command("stop");
+      await assertStopped(handoff.before);
+
+      const crashed = await begin();
+      runner.kill("SIGKILL");
+      await crashed.finished;
+      const leftovers = await status();
+      assert.ok(leftovers.processes.some((p) => p.pid === crashed.child));
+      await command("stop");
+      await assertStopped(crashed.before);
+
+      await assert.rejects(
+        exec(
+          "pnpm",
+          [
+            "playground:explore",
+            "--handoff",
+            "--",
+            process.execPath,
+            "-e",
+            "process.exit(7)",
+          ],
+          { timeout: 180_000 },
+        ),
+      );
+      assert.equal((await status()).state, "stopped");
+      await assert.rejects(
+        exec(
+          "pnpm",
+          [
+            "playground:explore",
+            "--",
+            "ethoko-nonexistent-exploration-command",
+          ],
+          { timeout: 180_000 },
+        ),
+        /ENOENT/,
+      );
+      assert.equal((await status()).state, "stopped");
+    } finally {
+      if (runner && runner.exitCode === null && runner.signalCode === null) {
+        const finished = once(runner, "exit");
+        runner.kill("SIGTERM");
+        await finished;
+      }
+      await browser?.close();
+      await command("stop");
+      await unrelated.close();
+    }
+  },
+);
+
+test(
   "public commands deliver verification email through the worker, authenticate and stop their resources",
   { timeout: 300_000 },
   async () => {
