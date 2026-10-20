@@ -161,6 +161,7 @@ test(
         pid: Number(pid),
         child: Number(child),
         before: await status(),
+        output: () => output,
       };
     };
     try {
@@ -177,6 +178,24 @@ test(
       await interrupted.finished;
       await assertStopped(interrupted.before);
       assert.throws(() => process.kill(interrupted.child, 0));
+      await browser.close();
+
+      const finalizing = await begin(true);
+      const browserPid = finalizing.before.browser.processes[0].pid;
+      process.kill(browserPid, "SIGSTOP");
+      try {
+        process.kill(finalizing.pid, "SIGUSR1");
+        const deadline = Date.now() + 10_000;
+        while (!finalizing.output().includes("preparing human handoff")) {
+          assert.ok(Date.now() < deadline, finalizing.output());
+          await sleep(50);
+        }
+        runner.kill("SIGTERM");
+      } finally {
+        process.kill(browserPid, "SIGCONT");
+      }
+      assert.deepEqual(await finalizing.finished, [143, null]);
+      await assertStopped(finalizing.before);
       await browser.close();
 
       const handoff = await begin(true);
@@ -213,6 +232,38 @@ test(
         ),
       );
       assert.equal((await status()).state, "stopped");
+
+      await command("start");
+      const existing = await status();
+      const containers = JSON.parse(
+        (await exec("docker", ["inspect", ...existing.containers])).stdout,
+      );
+      const database = containers.find((container) => container.State.Running);
+      await exec("docker", ["stop", database.Id]);
+      assert.equal((await status()).state, "degraded");
+      await assert.rejects(
+        exec(
+          "pnpm",
+          [
+            "playground:explore",
+            "--",
+            process.execPath,
+            "-e",
+            "process.exit(0)",
+          ],
+          { timeout: 180_000 },
+        ),
+        /already exists/,
+      );
+      const refused = await status();
+      assert.equal(
+        refused.state,
+        "degraded",
+        "refused exploration preserves the pre-existing instance for inspection",
+      );
+      for (const resource of existing.processes)
+        assert.equal(process.kill(resource.pid, 0), true);
+      await command("stop");
       await assert.rejects(
         exec(
           "pnpm",

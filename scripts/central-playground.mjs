@@ -338,31 +338,10 @@ async function cleanup(record) {
       );
     await sleep(250);
   }
-  const table = await processTable();
-  const services = servicesIn(record, table);
-  for (const service of services) {
-    if (
-      !keeperIn(table, service, record.token) &&
-      table.some((p) => p.pgid === service.pid)
-    ) {
-      throw new Error(
-        `Cannot safely identify ${service.name} process group ${service.pid}; resource record retained for manual inspection`,
-      );
-    }
-  }
-  const owned = services.filter((s) => keeperIn(table, s, record.token));
-  for (const service of owned) process.kill(-service.pid, "SIGTERM");
-  await sleep(2000);
-  const remaining = await processTable();
-  for (const service of owned) {
-    if (keeperIn(remaining, service, record.token))
-      process.kill(-service.pid, "SIGKILL");
-  }
+  await stopServices(record);
   // Stop exploration execution before the browser: otherwise an in-flight tool
   // can relaunch Chromium while explicit stop is cleaning up after a hard crash.
   await closeBrowser();
-  // Keepers intentionally remain alive through TERM so group identity can be
-  // checked before escalation, even if pnpm or the application exits first.
   // Select immutable IDs by this run's label, never by the shared project name.
   const { stdout: ids } = await run("docker", [
     "ps",
@@ -398,6 +377,31 @@ async function cleanup(record) {
     if (error.code !== "ENOENT") throw error;
   });
   await rmdir(active);
+}
+
+async function stopServices(record, selected) {
+  const table = await processTable();
+  const services = selected ?? servicesIn(record, table);
+  for (const service of services) {
+    if (
+      !keeperIn(table, service, record.token) &&
+      table.some((p) => p.pgid === service.pid)
+    ) {
+      throw new Error(
+        `Cannot safely identify ${service.name} process group ${service.pid}; resource record retained for manual inspection`,
+      );
+    }
+  }
+  const owned = services.filter((s) => keeperIn(table, s, record.token));
+  for (const service of owned) process.kill(-service.pid, "SIGTERM");
+  await sleep(2000);
+  const remaining = await processTable();
+  for (const service of owned) {
+    if (keeperIn(remaining, service, record.token))
+      process.kill(-service.pid, "SIGKILL");
+  }
+  // Keepers intentionally remain alive through TERM so group identity can be
+  // checked before escalation, even if pnpm or the application exits first.
 }
 async function start(reset = false) {
   await mkdir(base, { recursive: true, mode: 0o700 });
@@ -665,16 +669,14 @@ async function service() {
   process.on("SIGINT", () => {});
   setInterval(() => {}, 60_000);
   const environment = JSON.parse(await readFile(configFile, "utf8"));
-  const child = spawn(
-    name === "exploration" ? args[0] : "pnpm",
-    name === "exploration" ? args.slice(1) : args,
-    {
-      cwd: checkout,
-      env:
-        name === "exploration" ? process.env : { ...cleanEnv, ...environment },
-      stdio: "inherit",
-    },
-  );
+  let launch = { command: "pnpm", args, env: { ...cleanEnv, ...environment } };
+  if (name === "exploration")
+    launch = { command: args[0], args: args.slice(1), env: process.env };
+  const child = spawn(launch.command, launch.args, {
+    cwd: checkout,
+    env: launch.env,
+    stdio: "inherit",
+  });
   child.on("error", (error) => {
     if (process.connected) process.send({ error: error.message });
     else console.error(`${name} launch failed: ${error.message}`);
@@ -697,6 +699,7 @@ async function explore() {
   let wake;
   let child;
   let record;
+  let started = false;
   const interruption = new Promise((resolve) => {
     wake = resolve;
   });
@@ -711,6 +714,7 @@ async function explore() {
   let successful = false;
   try {
     await start();
+    started = true;
     if (interrupted) throw new Error("Exploration interrupted during startup");
     record = await load();
     child = spawn(
@@ -749,22 +753,9 @@ async function explore() {
   } finally {
     try {
       if (child?.pid) {
-        const keeper = keeperIn(
-          await processTable(),
-          { pid: child.pid, name: "exploration" },
-          record.token,
-        );
-        if (keeper) {
-          process.kill(-child.pid, "SIGTERM");
-          await sleep(500);
-          process.kill(-child.pid, "SIGKILL");
-          await new Promise((resolve) => {
-            if (child.signalCode || child.exitCode !== null) resolve();
-            else child.once("exit", resolve);
-          });
-          record.services = record.services.filter((s) => s.pid !== child.pid);
-          await save(record);
-        }
+        await stopServices(record, [{ pid: child.pid, name: "exploration" }]);
+        record.services = record.services.filter((s) => s.pid !== child.pid);
+        await save(record);
       }
     } catch (error) {
       successful = false;
@@ -772,17 +763,24 @@ async function explore() {
     } finally {
       try {
         if (successful && handoff && !interrupted) {
+          console.log("Playground: preparing human handoff");
           await closeBrowser();
-          console.log("Explicit human handoff; application left running:");
-          console.log(JSON.stringify(await inspect(await load()), null, 2));
-          console.log("Stop later from this checkout: pnpm playground:stop");
-        } else {
+          const report = await inspect(await load());
+          if (!interrupted) {
+            console.log("Explicit human handoff; application left running:");
+            console.log(JSON.stringify(report, null, 2));
+            console.log("Stop later from this checkout: pnpm playground:stop");
+          }
+        }
+        if (started && (!successful || !handoff || interrupted)) {
           const { stdout } = await run(process.execPath, [script, "stop"], {
             timeout: 300_000,
           });
           process.stdout.write(stdout);
         }
       } finally {
+        if (interrupted)
+          process.exitCode = interrupted === "SIGINT" ? 130 : 143;
         process.off("SIGINT", onInt);
         process.off("SIGTERM", onTerm);
       }
