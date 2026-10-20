@@ -20,6 +20,7 @@ const exec = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
 const checkout = resolve(dirname(script), "..");
 const base = join(checkout, ".central-playground");
+const browserProfile = join(base, "browser", "profile");
 const active = join(base, "active");
 const recordPath = join(active, "resources.json");
 const project = "ethoko-central-playground";
@@ -100,6 +101,44 @@ async function processTable() {
       return { pid: Number(pid), pgid: Number(pgid), started, command };
     });
 }
+function inspectBrowser(table) {
+  return {
+    profileDirectory: browserProfile,
+    evidenceDirectory: join(base, "browser", "evidence"),
+    processes: table.filter(
+      (p) =>
+        ` ${p.command} `.includes(` --user-data-dir=${browserProfile} `) &&
+        p.command.includes(" --remote-debugging-pipe") &&
+        !p.command.includes(" --type="),
+    ),
+  };
+}
+async function closeBrowser() {
+  const browsers = inspectBrowser(await processTable()).processes;
+  for (const browser of browsers) {
+    // Revalidate the live command and start time, never trust a saved PID or
+    // signal the MCP/OpenCode process group. Chromium closes its own children.
+    const current = (await processTable()).find((p) => p.pid === browser.pid);
+    if (
+      current?.started === browser.started &&
+      current.command === browser.command
+    ) {
+      try {
+        process.kill(browser.pid, "SIGTERM");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+    }
+  }
+  const deadline = Date.now() + 10_000;
+  while (inspectBrowser(await processTable()).processes.length) {
+    if (Date.now() >= deadline)
+      throw new Error(
+        "Playground browser did not close; use the playground MCP browser_close tool and retry stop. Application resource record retained.",
+      );
+    await sleep(100);
+  }
+}
 function keeperIn(table, resource, token) {
   return table.some(
     (p) =>
@@ -164,6 +203,8 @@ async function reachable(url) {
   }
 }
 async function inspect(record) {
+  const table = await processTable();
+  const browser = inspectBrowser(table);
   if (!record) {
     const directory = await stat(active).catch((error) => {
       if (error.code === "ENOENT") return null;
@@ -174,12 +215,12 @@ async function inspect(record) {
           state: "degraded",
           checkout,
           resourceRecord: recordPath,
+          browser,
           recovery:
             "Resource record missing; run pnpm playground:stop to remove an empty startup directory. Inspect any remaining files manually.",
         }
-      : { state: "stopped" };
+      : { state: "stopped", browser };
   }
-  const table = await processTable();
   const services = servicesIn(record, table);
   const processes = services.flatMap((service) => {
     if (!keeperIn(table, service, record.token)) return [];
@@ -244,10 +285,12 @@ async function inspect(record) {
     launcher: record.state === "starting" ? record.launcher : null,
     resourceRecord: recordPath,
     configuration: record.configFile,
+    browser,
     dataVolume: "ethoko-central-playground-data",
   };
 }
 async function cleanup(record) {
+  await closeBrowser();
   // A hard-killed launcher can leave its Docker CLI child running. In
   // particular, Compose may still create containers after an initial snapshot.
   // Let identified resource-creating commands settle before taking that snapshot;
@@ -614,6 +657,7 @@ async function main() {
   if (command === "stop" || command === "reset") {
     const record = await load();
     if (!record) {
+      await closeBrowser();
       // Before the first record is written, startup has created no resources.
       // Only remove an empty directory; unknown contents require inspection.
       await rmdir(active).catch((error) => {

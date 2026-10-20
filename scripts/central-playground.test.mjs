@@ -16,6 +16,7 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { chromium } from "playwright";
 
 const exec = promisify(execFile);
 const command = (name, options = {}) =>
@@ -41,6 +42,44 @@ async function waitForCapturedEmail(directory, recipient) {
     "normal PostgreSQL queue/worker delivers the email within 30 seconds",
   );
 }
+
+test(
+  "stop closes only the dedicated playground browser, even without applications",
+  { timeout: 60_000 },
+  async () => {
+    const unrelated = await chromium.launch({ headless: true });
+    const config = JSON.parse(
+      await readFile("scripts/central-playground-browser.json", "utf8"),
+    );
+    const playground = await chromium.launchPersistentContext(
+      config.browser.userDataDir,
+      config.browser.launchOptions,
+    );
+    try {
+      const page = await unrelated.newPage();
+      await page.goto("data:text/html,<h1>Unrelated browser</h1>");
+      const before = await status();
+      assert.equal(before.state, "stopped");
+      assert.equal(before.browser.processes.length, 1);
+      assert.ok(
+        before.browser.profileDirectory.startsWith(
+          `${process.cwd()}/.central-playground/`,
+        ),
+      );
+      await command("stop");
+      assert.deepEqual((await status()).browser.processes, []);
+      for (const processInfo of before.browser.processes)
+        assert.throws(() => process.kill(processInfo.pid, 0));
+      assert.equal(unrelated.isConnected(), true);
+      assert.equal(await page.textContent("h1"), "Unrelated browser");
+      await command("stop");
+    } finally {
+      await playground.close();
+      await unrelated.close();
+      await command("stop");
+    }
+  },
+);
 
 test(
   "public commands deliver verification email through the worker, authenticate and stop their resources",

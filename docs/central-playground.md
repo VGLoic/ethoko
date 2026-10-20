@@ -12,7 +12,7 @@ Email signup and verification work locally. Runtime configuration explicitly sel
 - Rust/Cargo supporting edition 2024, plus the native build dependencies used by `apps/central`.
 - Running Docker with Compose v2+ (`docker info`, `docker compose version`). The first run needs network access to pull `postgres:18` and obtain uncached Rust dependencies.
 
-No SQLx CLI, locally installed PostgreSQL, browser automation setup, or `.env` editing is required. Run on a trusted development machine: the existing API dev server binds all interfaces; this is not a production deployment.
+No SQLx CLI, locally installed PostgreSQL, or `.env` editing is required. Browser installation is only needed for interactive exploration and browser-resource acceptance below. Run on a trusted development machine: the existing API dev server binds all interfaces; this is not a production deployment.
 
 ## Commands
 
@@ -57,6 +57,8 @@ Startup errors report the failing stage and clean up resources from that attempt
 
 ## Retrieve local verification links
 
+The interactive browser procedure below uses these same captures, without direct API calls.
+
 After signup, wait for the worker (normally a few seconds), then use the `emailCaptureDirectory` from `pnpm playground:status`:
 
 ```sh
@@ -70,12 +72,46 @@ For direct API exploration, the generated `configuration` file contains the loca
 
 Email verification does **not** register a handle: `/auth/me` still reports `state: "pending"` with `emailVerified: true`. Complete onboarding through `POST /auth/register-handle` with `{ "handle": "your-unique-handle" }` and both credentials; `/auth/me` then reports `state: "registered"`. Never modify User state or queue contents directly.
 
+## Interactive exploration in OpenCode V2
+
+Project-local `opencode.json` configures the `playground` stdio server under V2's `mcp.servers`, preserving other settings. It uses lockfile-pinned `@playwright/mcp`; root `playwright` is pinned to the same upstream version for browser installation and lifecycle tests. This is independent of `apps/central-ui`'s Playwright/MSW harness. See the [V2 MCP reference](https://opencode.ai/v2/docs/mcp-servers) and [Playwright MCP capabilities](https://github.com/microsoft/playwright-mcp).
+
+From the repository root, after `pnpm install`:
+
+```sh
+pnpm playground:browser:install
+opencode mcp list
+pnpm playground:start
+pnpm playground:status
+```
+
+On Linux, install Chromium's OS dependencies with `pnpm exec playwright install --with-deps chromium` (may require administrator access). Repeat browser installation after upgrading MCP/Playwright. In an already running OpenCode, use `/mcps` to connect/reconnect `playground` if needed. Start OpenCode at the repository root: config/profile/output paths resolve from that workspace. `scripts/central-playground-browser.json` selects bundled Chromium, **headless**, with a dedicated persistent profile at `.central-playground/browser/profile`. It never attaches to personal browsers. Only one MCP client can use this profile at a time; do not use it for unrelated browsing or override browser/profile/endpoint settings through `PLAYWRIGHT_MCP_*` environment variables.
+
+Ask the agent to perform the following interactively, choosing each next action from the current page, not by running a scripted test:
+
+1. Discover `urls.ui` from status and use `browser_navigate` on the `playground` server to open `<ui-url>/signup`. Inspect `browser_snapshot` (read its returned file if needed), then use its element references with `browser_type`, `browser_click`, and `browser_press_key` to sign up with a unique email and password.
+2. Read the real worker's JSON capture for that recipient in `emailCaptureDirectory`. Open its `verification_url` using `browser_navigate` and submit **Verify email** through the UI.
+3. Navigate to `<ui-url>/login`, sign in through the form, follow **Register handle** from Home, and submit an available permanent handle. Inspect Home for the handle and **Email verified: Yes**. Signup and verification success pages currently require explicit navigation to the next route.
+4. Inspect `browser_console_messages` and `browser_network_requests`; `browser_network_request` provides individual request details. Browser diagnostics show UI/BFF traffic, not server-to-server API calls. Read the existing status-reported `logs.ui` and `logs.api`/`logs.worker` files for server diagnostics. Never enable mocks or bypass authentication.
+5. Save a screenshot with `browser_take_screenshot`, plus useful snapshots/console/network listings. Status reports `browser.evidenceDirectory`; automatically named files go there. **Explicit relative filenames resolve from the workspace root**, not the output directory: use `.central-playground/browser/evidence/<name>` to keep them ignored. Report the journey, observed result, evidence locations, and substitution limits in the session/PR, not committed run reports. Only email delivery is locally substituted; real UI/BFF/API/PostgreSQL/worker run, while GitHub and live email-provider delivery are not proven.
+6. Finish browser tool calls, optionally call `browser_close` to close the current page, then run `pnpm playground:stop`. This is the authoritative cleanup for the browser **and** applications; closing a tab alone is insufficient. Verify status says `stopped` and `browser.processes` is empty. Do not invoke browser tools after stop: even a tool requiring a page can relaunch Chromium. The MCP transport and OpenCode server remain available.
+
+### Browser resources and manual cleanup
+
+Status includes `browser.profileDirectory`, `browser.evidenceDirectory`, and live browser PIDs/commands/start times, even when applications are stopped. Application `state` does not describe browser state; inspect `browser.processes` separately.
+
+Stop closes Chromium identified by this checkout's exact reserved profile and Playwright debugging-pipe flag, including without an application record. It rechecks the live command/start time before signalling the browser PID, never the MCP/OpenCode process group. Chromium shuts down its children. If shutdown does not finish within ten seconds, stop fails and retains any application record for inspection/retry. Do not issue browser calls concurrently with cleanup: another navigation can launch a browser again.
+
+Manual cleanup is the same `pnpm playground:status` / `pnpm playground:stop` sequence; no OpenCode shutdown or broad browser kill is needed. If browser shutdown fails, inspect the reported command and profile, close its page through the `playground` MCP tools, and retry stop. Keep browser cookies, captures, screenshots, snapshots, and network details private: they may contain email addresses, verification codes, passwords, or session credentials. Stop preserves evidence and the profile; reset clears application data, not historical evidence or cookies. Sign in again after restart/reset as needed. There is no automatic exploration timeout or human-handoff workflow here.
+
 ## Command and HTTP acceptance
 
-Run the small real-service command acceptance suite with **no existing playground**:
+Run the small real-service command acceptance suite with **no existing playground or active playground browser** (install Chromium first):
 
 ```sh
 pnpm test:playground
 ```
+
+Browser-resource acceptance launches dedicated and unrelated Chromium instances, verifies identification, stops the dedicated browser even without application resources, and checks the unrelated browser still works. The connected interactive UI journey above remains separate from these regression tests.
 
 It starts through the playground command, submits signup with the normal BFF Machine Credential, awaits the actual worker's capture file, verifies using the captured link's parameters, signs in, validates the resulting User Session Token through `/auth/me`, and registers a handle through the public API. It proves persistence through stop/start and normal sign-in, then resets and repeats signup/verification/sign-in for the same email. **The suite resets the playground database.** It also checks healthy reuse, cross-checkout refusal, process/container shutdown, repeated stop, occupied-port failure, unrelated services, handled and hard launcher interruptions, partial-resource status, and safe refusal after loss of a keeper. Browser navigation/cookie acceptance is separate; no real GitHub services are invoked.
