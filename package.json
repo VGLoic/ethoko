@@ -22,6 +22,7 @@
     "playground:status": "node scripts/central-playground.mjs status",
     "playground:stop": "node scripts/central-playground.mjs stop",
     "playground:reset": "node scripts/central-playground.mjs reset",
+    "playground:clean": "node scripts/central-playground.mjs clean",
     "playground:browser:install": "pnpm exec playwright install chromium",
     "test:playground": "node --test scripts/central-playground.test.mjs",
     "build": "turbo run build",
