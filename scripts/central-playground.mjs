@@ -189,7 +189,7 @@ function servicesIn(record, table) {
   const services = [...record.services];
   // A hard crash can land between spawn and saving the keeper PID. The
   // token-bearing command line identifies that keeper without trusting a PID.
-  for (const name of ["api", "ui"]) {
+  for (const name of ["api", "ui", "exploration"]) {
     for (const p of table) {
       if (
         p.pid === p.pgid &&
@@ -318,7 +318,6 @@ async function inspect(record) {
   };
 }
 async function cleanup(record) {
-  await closeBrowser();
   // A hard-killed launcher can leave its Docker CLI child running. In
   // particular, Compose may still create containers after an initial snapshot.
   // Let identified resource-creating commands settle before taking that snapshot;
@@ -339,28 +338,10 @@ async function cleanup(record) {
       );
     await sleep(250);
   }
-  const table = await processTable();
-  const services = servicesIn(record, table);
-  for (const service of services) {
-    if (
-      !keeperIn(table, service, record.token) &&
-      table.some((p) => p.pgid === service.pid)
-    ) {
-      throw new Error(
-        `Cannot safely identify ${service.name} process group ${service.pid}; resource record retained for manual inspection`,
-      );
-    }
-  }
-  const owned = services.filter((s) => keeperIn(table, s, record.token));
-  for (const service of owned) process.kill(-service.pid, "SIGTERM");
-  await sleep(2000);
-  const remaining = await processTable();
-  for (const service of owned) {
-    if (keeperIn(remaining, service, record.token))
-      process.kill(-service.pid, "SIGKILL");
-  }
-  // Keepers intentionally remain alive through TERM so group identity can be
-  // checked before escalation, even if pnpm or the application exits first.
+  await stopServices(record);
+  // Stop exploration execution before the browser: otherwise an in-flight tool
+  // can relaunch Chromium while explicit stop is cleaning up after a hard crash.
+  await closeBrowser();
   // Select immutable IDs by this run's label, never by the shared project name.
   const { stdout: ids } = await run("docker", [
     "ps",
@@ -396,6 +377,31 @@ async function cleanup(record) {
     if (error.code !== "ENOENT") throw error;
   });
   await rmdir(active);
+}
+
+async function stopServices(record, selected) {
+  const table = await processTable();
+  const services = selected ?? servicesIn(record, table);
+  for (const service of services) {
+    if (
+      !keeperIn(table, service, record.token) &&
+      table.some((p) => p.pgid === service.pid)
+    ) {
+      throw new Error(
+        `Cannot safely identify ${service.name} process group ${service.pid}; resource record retained for manual inspection`,
+      );
+    }
+  }
+  const owned = services.filter((s) => keeperIn(table, s, record.token));
+  for (const service of owned) process.kill(-service.pid, "SIGTERM");
+  await sleep(2000);
+  const remaining = await processTable();
+  for (const service of owned) {
+    if (keeperIn(remaining, service, record.token))
+      process.kill(-service.pid, "SIGKILL");
+  }
+  // Keepers intentionally remain alive through TERM so group identity can be
+  // checked before escalation, even if pnpm or the application exits first.
 }
 async function start(reset = false) {
   await mkdir(base, { recursive: true, mode: 0o700 });
@@ -663,21 +669,128 @@ async function service() {
   process.on("SIGINT", () => {});
   setInterval(() => {}, 60_000);
   const environment = JSON.parse(await readFile(configFile, "utf8"));
-  const child = spawn("pnpm", args, {
+  let launch = { command: "pnpm", args, env: { ...cleanEnv, ...environment } };
+  if (name === "exploration")
+    launch = { command: args[0], args: args.slice(1), env: process.env };
+  const child = spawn(launch.command, launch.args, {
     cwd: checkout,
-    env: { ...cleanEnv, ...environment },
+    env: launch.env,
     stdio: "inherit",
   });
-  child.on("error", (error) =>
-    console.error(`${name} launch failed: ${error.message}`),
-  );
-  child.on("exit", (code, signal) =>
-    console.error(`${name} dev command exited (${code ?? signal})`),
-  );
+  child.on("error", (error) => {
+    if (process.connected) process.send({ error: error.message });
+    else console.error(`${name} launch failed: ${error.message}`);
+  });
+  child.on("exit", (code, signal) => {
+    if (process.connected) process.send({ code, signal });
+    else console.error(`${name} dev command exited (${code ?? signal})`);
+  });
+}
+
+async function explore() {
+  const args = process.argv.slice(3);
+  const handoff = args[0] === "--handoff";
+  if (handoff) args.shift();
+  if (args.shift() !== "--" || !args.length)
+    throw new Error(
+      "Usage: pnpm playground:explore [--handoff] -- <command> [args...]",
+    );
+  let interrupted;
+  let wake;
+  let child;
+  let record;
+  let started = false;
+  const interruption = new Promise((resolve) => {
+    wake = resolve;
+  });
+  const interrupt = (signal) => {
+    interrupted = signal;
+    wake({ signal });
+  };
+  const onInt = () => interrupt("SIGINT");
+  const onTerm = () => interrupt("SIGTERM");
+  process.on("SIGINT", onInt);
+  process.on("SIGTERM", onTerm);
+  let successful = false;
+  try {
+    await start();
+    started = true;
+    if (interrupted) throw new Error("Exploration interrupted during startup");
+    record = await load();
+    child = spawn(
+      process.execPath,
+      [
+        script,
+        "_service",
+        record.token,
+        "exploration",
+        record.configFile,
+        ...args,
+      ],
+      {
+        cwd: checkout,
+        detached: true,
+        stdio: ["inherit", "inherit", "inherit", "ipc"],
+      },
+    );
+    const completed = new Promise((resolve, reject) => {
+      child.once("message", resolve);
+      child.once("error", reject);
+      child.once("exit", () =>
+        reject(new Error("Exploration command keeper exited unexpectedly")),
+      );
+    });
+    // Startup/IPC failure can arrive while the resource record is being saved.
+    // Observe rejection immediately; the await below still reports it normally.
+    completed.catch(() => {});
+    record.services.push({ name: "exploration", pid: child.pid });
+    await save(record);
+    const result = await Promise.race([completed, interruption]);
+    if (result.error) throw new Error(result.error);
+    successful = !interrupted && result.code === 0;
+    process.exitCode =
+      interrupted === "SIGINT" ? 130 : interrupted ? 143 : (result.code ?? 1);
+  } finally {
+    try {
+      if (child?.pid) {
+        await stopServices(record, [{ pid: child.pid, name: "exploration" }]);
+        record.services = record.services.filter((s) => s.pid !== child.pid);
+        await save(record);
+      }
+    } catch (error) {
+      successful = false;
+      throw error;
+    } finally {
+      try {
+        if (successful && handoff && !interrupted) {
+          console.log("Playground: preparing human handoff");
+          await closeBrowser();
+          const report = await inspect(await load());
+          if (!interrupted) {
+            console.log("Explicit human handoff; application left running:");
+            console.log(JSON.stringify(report, null, 2));
+            console.log("Stop later from this checkout: pnpm playground:stop");
+          }
+        }
+        if (started && (!successful || !handoff || interrupted)) {
+          const { stdout } = await run(process.execPath, [script, "stop"], {
+            timeout: 300_000,
+          });
+          process.stdout.write(stdout);
+        }
+      } finally {
+        if (interrupted)
+          process.exitCode = interrupted === "SIGINT" ? 130 : 143;
+        process.off("SIGINT", onInt);
+        process.off("SIGTERM", onTerm);
+      }
+    }
+  }
 }
 
 async function main() {
   const command = process.argv[2];
+  if (command === "explore") return explore();
   if (command === "_service") return service();
   if (command === "start") return start();
   if (command === "status")
@@ -724,7 +837,7 @@ async function main() {
     return;
   }
   console.log(
-    "Usage: pnpm playground:start | playground:status | playground:stop | playground:reset\nSee docs/central-playground.md for prerequisites and limitations.",
+    "Usage: pnpm playground:start | playground:status | playground:stop | playground:reset\npnpm playground:explore [--handoff] -- <command> [args...]\nSee docs/central-playground.md for prerequisites and limitations.",
   );
   if (command && command !== "--help") process.exitCode = 1;
 }
