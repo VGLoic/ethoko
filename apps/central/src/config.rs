@@ -27,6 +27,8 @@ pub struct Config {
     pub log_level: Level,
     /// OTP configuration
     pub otp_config: OtpConfig,
+    /// Cooldown between password recovery emails, in seconds.
+    pub password_reset_cooldown_seconds: u16,
     /// Global rate limit configuration
     pub global_rate_limit_config: RateLimitConfig,
     /// Auth rate limit configuration for specific public routes, e.g. re-send verification OTP
@@ -231,6 +233,14 @@ impl Config {
             }
         };
 
+        let password_reset_cooldown_seconds =
+            match parse_env_variable::<u16>(lookup, "PASSWORD_RESET_COOLDOWN_SECONDS") {
+                Ok(value) => value.unwrap_or(60),
+                Err(error) => {
+                    errors.push(error);
+                    60
+                }
+            };
         errors.extend(github_oauth_errors);
         if !errors.is_empty() {
             return Err(errors);
@@ -261,6 +271,7 @@ impl Config {
             database_url,
             log_level,
             otp_config,
+            password_reset_cooldown_seconds,
             global_rate_limit_config,
             auth_rate_limit_config,
             resend_api_key,

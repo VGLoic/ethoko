@@ -22,6 +22,7 @@ async fn test_verify_email_200_valid_otp() {
         .first()
         .map(|t| match t {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+            _ => panic!("Expected verification email"),
         })
         .expect("Expected an OTP email to be sent");
 
@@ -56,6 +57,7 @@ async fn test_verify_email_422_already_verified() {
         .first()
         .map(|t| match t {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+            _ => panic!("Expected verification email"),
         })
         .expect("Expected an OTP email to be sent");
 
@@ -132,6 +134,7 @@ async fn test_verify_email_422_invalid_email() {
         .first()
         .map(|t| match t {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+            _ => panic!("Expected verification email"),
         })
         .expect("Expected an OTP email to be sent");
 
@@ -168,6 +171,7 @@ async fn test_verify_email_422_expired_otp() {
         .first()
         .map(|t| match t {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+            _ => panic!("Expected verification email"),
         })
         .expect("Expected an OTP email to be sent");
 

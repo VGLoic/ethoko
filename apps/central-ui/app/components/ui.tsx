@@ -72,11 +72,13 @@ export function SubmitButton({
   pendingLabel = "Working…",
   secondary = false,
   intent,
+  disabled = false,
 }: {
   children: ReactNode;
   pendingLabel?: string;
   secondary?: boolean;
   intent?: string;
+  disabled?: boolean;
 }) {
   const navigation = useNavigation();
   const busy = navigation.state !== "idle";
@@ -86,7 +88,7 @@ export function SubmitButton({
     <button
       type="submit"
       className={secondary ? "button button-secondary" : "button"}
-      disabled={busy}
+      disabled={busy || disabled}
       aria-busy={submitting}
     >
       {submitting ? pendingLabel : children}

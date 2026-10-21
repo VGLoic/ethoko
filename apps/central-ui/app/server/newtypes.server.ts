@@ -1,8 +1,17 @@
 import z from "zod";
 
+// Rust str::trim uses Unicode White_Space, unlike JavaScript trim (notably U+0085/U+FEFF).
+export function trimPasswordInput(value: string): string {
+  return value.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "");
+}
+
 export const PasswordSchema = z
   .string()
-  .min(8, "Password must be at least 8 characters long.")
+  .transform(trimPasswordInput)
+  .refine(
+    (val) => new TextEncoder().encode(val).length >= 8,
+    "Password must be at least 8 UTF-8 bytes long.",
+  )
   // Minimum 1 upercase
   .refine(
     (val) => /[A-Z]/.test(val),
@@ -20,7 +29,7 @@ export const PasswordSchema = z
   )
   // Minimum 1 special character
   .refine(
-    (val) => /[!@#$%^&*(),.?":{}|<>]/.test(val),
+    (val) => /[^a-zA-Z0-9]/.test(val),
     "Password must contain at least one special character.",
   );
 
