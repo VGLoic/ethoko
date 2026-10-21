@@ -12,6 +12,7 @@ import {
   mkdtemp,
   mkdir,
   copyFile,
+  writeFile,
   rm,
 } from "node:fs/promises";
 import { join } from "node:path";
@@ -42,6 +43,79 @@ async function waitForCapturedEmail(directory, recipient) {
     "normal PostgreSQL queue/worker delivers the email within 30 seconds",
   );
 }
+
+test("clean discards stopped local output and tolerates absent targets", async () => {
+  assert.equal((await status()).state, "stopped");
+  const base = join(process.cwd(), ".central-playground");
+  const unrelated = await mkdtemp(
+    join(tmpdir(), "playground-clean-unrelated-"),
+  );
+  const volume = `playground-clean-unrelated-${randomUUID()}`;
+  try {
+    await exec("docker", ["volume", "create", volume]);
+    await writeFile(join(unrelated, "keep.txt"), "unrelated");
+    for (const file of [
+      "runs/historical/api.log",
+      "runs/historical/emails/message.json",
+      "runs/historical/environment.json",
+      "browser/profile/cookies",
+      "browser/evidence/screenshot.png",
+      "browser/evidence/snapshot.yml",
+    ]) {
+      await mkdir(join(base, file, ".."), { recursive: true });
+      await writeFile(join(base, file), "generated output");
+    }
+    const result = await command("clean");
+    assert.match(result.stdout, /cleaned.*stopped/i);
+    await assert.rejects(readdir(base), { code: "ENOENT" });
+    await command("clean");
+    assert.equal((await status()).state, "stopped");
+    await assert.rejects(readdir(base), { code: "ENOENT" });
+    assert.equal(
+      await readFile(join(unrelated, "keep.txt"), "utf8"),
+      "unrelated",
+    );
+    await exec("docker", ["volume", "inspect", volume]);
+    await readFile("scripts/central-playground-browser.json");
+  } finally {
+    await exec("docker", ["volume", "rm", volume]);
+    await rm(unrelated, { recursive: true });
+  }
+});
+
+test("clean retains unresolved lifecycle files and refuses an unrecognized volume", async () => {
+  const active = join(process.cwd(), ".central-playground/active");
+  await mkdir(active, { recursive: true });
+  try {
+    await assert.rejects(command("clean"), /must already be stopped/);
+    assert.deepEqual(await readdir(active), []);
+    await writeFile(join(active, "resources.json.tmp"), "interrupted JSON");
+    await assert.rejects(command("clean"), /JSON/);
+    assert.equal(
+      await readFile(join(active, "resources.json.tmp"), "utf8"),
+      "interrupted JSON",
+    );
+  } finally {
+    await rm(active, { recursive: true });
+  }
+  const volume = "ethoko-central-playground-data";
+  await assert.rejects(
+    exec("docker", ["volume", "inspect", volume]),
+    /no such volume/i,
+  );
+  await exec("docker", ["volume", "create", volume]);
+  try {
+    await assert.rejects(command("clean"), /unrecognized database volume/);
+    await exec("docker", ["volume", "inspect", volume]);
+    // A failed clean must release its own reservation, not block future use.
+    await assert.rejects(
+      exec("docker", ["inspect", "ethoko-central-playground-reservation"]),
+      /No such object/i,
+    );
+  } finally {
+    await exec("docker", ["volume", "rm", volume]);
+  }
+});
 
 test(
   "stop closes only the dedicated playground browser, even without applications",
@@ -79,6 +153,9 @@ test(
           `${process.cwd()}/.central-playground/`,
         ),
       );
+      await assert.rejects(command("clean"), /must already be stopped/);
+      assert.equal((await status()).browser.processes.length, 1);
+      await readdir(before.browser.profileDirectory);
       await command("stop");
       assert.deepEqual((await status()).browser.processes, []);
       for (const processInfo of before.browser.processes)
@@ -398,6 +475,8 @@ test(
       assert.deepEqual(reused.processes, running.processes);
       assert.deepEqual(reused.containers, running.containers);
       assert.deepEqual(reused.urls, running.urls);
+      await assert.rejects(command("clean"), /must already be stopped/);
+      assert.deepEqual((await status()).processes, running.processes);
       const other = await mkdtemp(
         join(tmpdir(), "central-playground-checkout-"),
       );
@@ -425,6 +504,14 @@ test(
             return true;
           },
         );
+        await assert.rejects(
+          exec(process.execPath, [
+            join(other, "scripts/central-playground.mjs"),
+            "clean",
+          ]),
+          /existing playground is reserved/,
+        );
+        await exec("docker", ["volume", "inspect", running.dataVolume]);
         assert.deepEqual((await status()).processes, running.processes);
       } finally {
         await rm(other, { recursive: true });
@@ -493,6 +580,21 @@ test(
       for (const id of running.containers) {
         await assert.rejects(exec("docker", ["inspect", id]));
       }
+      await command("stop");
+      await command("clean");
+      await assert.rejects(
+        exec("docker", ["volume", "inspect", running.dataVolume]),
+        /no such volume/i,
+      );
+      await assert.rejects(readdir(".central-playground"), { code: "ENOENT" });
+      assert.equal((await status()).state, "stopped");
+      await command("start");
+      running = await status();
+      assert.equal(running.state, "running");
+      configuration = JSON.parse(await readFile(running.configuration, "utf8"));
+      await request("/auth/login/email", { email, password }, undefined, 422);
+      await request("/auth/signup/email", { email, password }, undefined, 201);
+      await waitForCapturedEmail(running.emailCaptureDirectory, email);
       await command("stop");
     } finally {
       await command("stop");

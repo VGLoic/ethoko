@@ -10,6 +10,9 @@ import {
   rmdir,
   open,
   stat,
+  rm,
+  readdir,
+  lstat,
 } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,6 +77,19 @@ async function reservation(record) {
 async function releaseReservation(record) {
   const id = await reservation(record);
   if (id) await run("docker", ["rm", "-v", id]);
+}
+async function reserve(record) {
+  await run("docker", [
+    "create",
+    "--name",
+    reservationName,
+    "--label",
+    `ethoko.playground.run=${record.token}`,
+    "--label",
+    `ethoko.playground.checkout=${checkout}`,
+    "postgres:18",
+    "true",
+  ]);
 }
 async function assertNoExistingReservation() {
   let container;
@@ -479,20 +495,10 @@ async function start(reset = false) {
     // Docker atomically reserves this name across checkouts, while every file
     // remains checkout-local. Never remove a reservation with another run token.
     reservationAttempted = true;
-    await run("docker", [
-      "create",
-      "--name",
-      reservationName,
-      "--label",
-      `ethoko.playground.run=${token}`,
-      "--label",
-      `ethoko.playground.checkout=${checkout}`,
-      "postgres:18",
-      "true",
-    ]);
+    await reserve(record);
     // Hold the machine-wide reservation before deleting data, so another
     // checkout cannot start using the volume during reset.
-    if (reset) await resetData();
+    if (reset) await removeDatabaseVolume();
     await run("pnpm", ["--version"]);
     await run("cargo", ["--version"]);
     const apiPort =
@@ -793,6 +799,7 @@ async function main() {
   if (command === "explore") return explore();
   if (command === "_service") return service();
   if (command === "start") return start();
+  if (command === "clean") return clean();
   if (command === "status")
     return console.log(JSON.stringify(await inspect(await load()), null, 2));
   if (command === "stop" || command === "reset") {
@@ -837,11 +844,76 @@ async function main() {
     return;
   }
   console.log(
-    "Usage: pnpm playground:start | playground:status | playground:stop | playground:reset\npnpm playground:explore [--handoff] -- <command> [args...]\nSee docs/central-playground.md for prerequisites and limitations.",
+    "Usage: pnpm playground:start | playground:status | playground:stop | playground:reset | playground:clean\npnpm playground:explore [--handoff] -- <command> [args...]\nSee docs/central-playground.md for prerequisites and limitations.",
   );
   if (command && command !== "--help") process.exitCode = 1;
 }
-async function resetData() {
+async function clean() {
+  const directory = await lstat(base).catch((error) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (directory?.isSymbolicLink())
+    throw new Error(
+      "Refusing to clean a symbolic-link playground runtime directory",
+    );
+  const assertStopped = async () => {
+    const report = await inspect(await load());
+    if (report.state !== "stopped" || report.browser.processes.length)
+      throw new Error(
+        "Playground must already be stopped, including its browser. Run pnpm playground:status and pnpm playground:stop before pnpm playground:clean; runtime files retained.",
+      );
+  };
+  await assertStopped();
+  await assertNoExistingReservation();
+  const record = { token: randomUUID() };
+  let locked = false;
+  // Finish releasing the reservation on handled interruption, as startup does.
+  const onInt = () => {
+    process.exitCode = 130;
+  };
+  const onTerm = () => {
+    process.exitCode = 143;
+  };
+  process.on("SIGINT", onInt);
+  process.on("SIGTERM", onTerm);
+  try {
+    // Use the same atomic machine-wide reservation as start/reset, without
+    // creating a local run or starting services. Never remove another run's lock.
+    await reserve(record);
+    await assertStopped();
+    await mkdir(base, { recursive: true, mode: 0o700 });
+    // The same exclusive directory used by startup prevents a local launcher
+    // from writing new tracking files while historical output is being removed.
+    await mkdir(active, { mode: 0o700 });
+    locked = true;
+    await removeDatabaseVolume();
+    for (const name of await readdir(base)) {
+      if (name !== "active")
+        await rm(join(base, name), { recursive: true, force: true });
+    }
+    await rmdir(active);
+    locked = false;
+    // Never recursively remove the root after releasing the local lock: a new
+    // startup may already have created active/ and must retain its tracking.
+    await rmdir(base);
+  } finally {
+    try {
+      if (locked) await rmdir(active);
+    } finally {
+      try {
+        await releaseReservation(record);
+      } finally {
+        process.off("SIGINT", onInt);
+        process.off("SIGTERM", onTerm);
+      }
+    }
+  }
+  console.log(
+    "Playground cleaned; database volume and local runtime files removed. Playground remains stopped.",
+  );
+}
+async function removeDatabaseVolume() {
   const name = "ethoko-central-playground-data";
   let volume;
   try {
@@ -852,7 +924,7 @@ async function resetData() {
     throw error;
   }
   if (volume.Labels?.["com.docker.compose.project"] !== project)
-    throw new Error("Refusing to reset an unrecognized database volume");
+    throw new Error("Refusing to remove an unrecognized database volume");
   await run("docker", ["volume", "rm", name]);
 }
 main().catch((error) => {
