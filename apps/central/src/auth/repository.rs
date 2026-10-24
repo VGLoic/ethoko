@@ -18,6 +18,7 @@ use crate::{
         requests::{
             login_github_callback::LoginGithubCallbackError,
             login_github_start::LoginGithubStartError, logout::LogoutError,
+            password_recovery::ResetPasswordError,
         },
     },
     config::OtpConfig,
@@ -46,7 +47,7 @@ pub trait AuthRepository: Send + Sync + 'static {
         &self,
         hash: [u8; 32],
         password: crate::newtypes::password_hash::PasswordHash,
-    ) -> Result<(), super::requests::password_recovery::ResetPasswordError>;
+    ) -> Result<(), ResetPasswordError>;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
@@ -287,8 +288,7 @@ impl AuthRepository for PsqlAuthRepository {
         &self,
         hash: [u8; 32],
         password: crate::newtypes::password_hash::PasswordHash,
-    ) -> Result<(), super::requests::password_recovery::ResetPasswordError> {
-        use super::requests::password_recovery::ResetPasswordError;
+    ) -> Result<(), ResetPasswordError> {
         // Keep the transaction boundary here: no credential/session mutation can escape a failed reset.
         let mut transaction = self.pool.begin().await.map_err(anyhow::Error::from)?;
         let user_id = sqlx::query_scalar::<_, uuid::Uuid>(
