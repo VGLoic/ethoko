@@ -22,7 +22,9 @@
     { "action": "shell", "resource": "cargo check *", "effect": "allow" },
     { "action": "shell", "resource": "cargo clippy *", "effect": "allow" },
     { "action": "shell", "resource": "cargo build *", "effect": "allow" },
-    { "action": "shell", "resource": "cargo fmt *", "effect": "allow" }
+    { "action": "shell", "resource": "cargo fmt *", "effect": "allow" },
+    { "action": "shell", "resource": "gh api --paginate repos/VGLoic/ethoko/pulls/*/comments", "effect": "allow" },
+    { "action": "shell", "resource": "gh api --paginate repos/VGLoic/ethoko/issues/*/comments", "effect": "allow" }
   ],
   "providers": {
     "lmstudio": {
