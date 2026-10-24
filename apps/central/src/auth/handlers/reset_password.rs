@@ -1,6 +1,6 @@
 use crate::{
     auth::{
-        models::requests::{password_recovery::*, signup_email::SignupEmailRequestError},
+        models::requests::{reset_password::*, signup_email::SignupEmailRequestError},
         password_hasher,
         principal::CentralUiBff,
         state::AuthState,

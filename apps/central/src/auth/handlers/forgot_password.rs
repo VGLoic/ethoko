@@ -1,5 +1,5 @@
 use crate::{
-    auth::{models::requests::password_recovery::*, principal::CentralUiBff, state::AuthState},
+    auth::{models::requests::forgot_password::*, principal::CentralUiBff, state::AuthState},
     newtypes::email::{Email, EmailError},
     router::{ApiError, UnprocessableEntityError},
 };

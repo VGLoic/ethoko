@@ -1,17 +1,5 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use thiserror::Error;
-
-#[derive(Deserialize)]
-pub struct HttpForgotPasswordBody {
-    pub email: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HttpForgotPasswordResponse {
-    pub message: &'static str,
-    pub cooldown_seconds: u16,
-}
 
 #[derive(Deserialize)]
 pub struct HttpResetPasswordBody {

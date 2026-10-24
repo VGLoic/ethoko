@@ -18,7 +18,7 @@ use crate::{
         requests::{
             login_github_callback::LoginGithubCallbackError,
             login_github_start::LoginGithubStartError, logout::LogoutError,
-            password_recovery::ResetPasswordError,
+            reset_password::ResetPasswordError,
         },
     },
     config::OtpConfig,

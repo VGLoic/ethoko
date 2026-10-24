@@ -48,7 +48,7 @@ pub trait AuthService: Send + Sync + 'static {
         &self,
         token: &str,
         hash: crate::newtypes::password_hash::PasswordHash,
-    ) -> Result<(), super::requests::password_recovery::ResetPasswordError>;
+    ) -> Result<(), super::requests::reset_password::ResetPasswordError>;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
@@ -227,7 +227,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         &self,
         token: &str,
         hash: crate::newtypes::password_hash::PasswordHash,
-    ) -> Result<(), super::requests::password_recovery::ResetPasswordError> {
+    ) -> Result<(), super::requests::reset_password::ResetPasswordError> {
         self.repository
             .complete_password_reset(sha2::Sha256::digest(token.as_bytes()).into(), hash)
             .await
