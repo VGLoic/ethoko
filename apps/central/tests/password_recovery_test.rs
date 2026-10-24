@@ -498,6 +498,27 @@ async fn unknown_and_github_only_users_receive_no_reset_email_or_password() {
 }
 
 #[tokio::test]
+async fn recovery_requests_reject_empty_and_malformed_email() {
+    let instance = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+    for (email, reason) in [
+        ("", "empty value not allowed"),
+        ("not-an-email", "invalid format"),
+    ] {
+        let response = post(&instance, "forgot-password", json!({"email": email})).await;
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            response.json::<serde_json::Value>().await.unwrap(),
+            json!({
+                "code": "ETKAG01",
+                "reason": format!("invalid submitted field \"email\": {reason}")
+            })
+        );
+    }
+}
+
+#[tokio::test]
 async fn recovery_requests_are_generic_and_require_only_machine_authentication() {
     let instance = setup_instance(&TestConfigBuilder::build_default())
         .await
