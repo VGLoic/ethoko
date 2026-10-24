@@ -37,11 +37,11 @@ where
     let router = Router::new()
         .route(
             "/forgot-password",
-            post(super::handlers::password_recovery::handle_forgot_password),
+            post(super::handlers::forgot_password::handle_forgot_password),
         )
         .route(
             "/reset-password",
-            post(super::handlers::password_recovery::handle_reset_password),
+            post(super::handlers::reset_password::handle_reset_password),
         )
         .route("/signup/email", post(handle_signup_email))
         .route("/verify-email", post(handle_verify_email))
