@@ -69,9 +69,7 @@ type ApiResult<TData, TUnprocessableEntityReason> =
 class EthokoCentralClient {
   async forgotPassword(params: {
     email: string;
-  }): Promise<
-    ApiResult<{ message: string; cooldownSeconds: number }, "unknown">
-  > {
+  }): Promise<ApiResult<{ cooldownSeconds: number }, "unknown">> {
     const response = await fetch(`${this.baseUrl}/auth/forgot-password`, {
       method: "POST",
       headers: this.createBffHeaders(),
@@ -80,7 +78,6 @@ class EthokoCentralClient {
     return this.handleResponse(
       response,
       z.object({
-        message: z.string(),
         cooldownSeconds: z.number().int().nonnegative(),
       }),
       {},

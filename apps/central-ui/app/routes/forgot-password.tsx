@@ -23,7 +23,12 @@ export async function action({ request }: Route.ActionArgs): Promise<{
       email: email.data,
     });
     if (result.variant === "success")
-      return { ...result.data, confirmedAt: Date.now() };
+      return {
+        ...result.data,
+        message:
+          "If this account is eligible for password recovery, you’ll receive an email.",
+        confirmedAt: Date.now(),
+      };
   } catch {
     // Do not log submitted email addresses or credentials.
   }

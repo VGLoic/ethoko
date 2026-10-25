@@ -24,8 +24,5 @@ pub async fn handle_forgot_password(
         .forgot_password(email)
         .await
         .map_err(ApiError::InternalServerError)?;
-    Ok(Json(HttpForgotPasswordResponse {
-        message: "If this account is eligible for password recovery, you’ll receive an email.",
-        cooldown_seconds,
-    }))
+    Ok(Json(HttpForgotPasswordResponse { cooldown_seconds }))
 }

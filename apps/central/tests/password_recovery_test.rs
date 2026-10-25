@@ -537,7 +537,6 @@ async fn recovery_requests_are_generic_and_require_only_machine_authentication()
         assert_eq!(
             response.json::<serde_json::Value>().await.unwrap(),
             json!({
-                "message": "If this account is eligible for password recovery, you’ll receive an email.",
                 "cooldownSeconds": 60
             })
         );

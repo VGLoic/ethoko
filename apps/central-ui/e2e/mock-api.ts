@@ -174,8 +174,6 @@ async function handleForgotPassword({ request }: { request: Request }) {
     );
   }
   return HttpResponse.json({
-    message:
-      "If this account is eligible for password recovery, you’ll receive an email.",
     cooldownSeconds: scenario.recovery.cooldownSeconds,
   });
 }
