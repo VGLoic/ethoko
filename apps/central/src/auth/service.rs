@@ -11,6 +11,7 @@ use crate::{
                 resend_verification_otp::{
                     ResendVerificationOtpError, ResendVerificationOtpRequest,
                 },
+                reset_password::ResetPasswordRequest,
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
             },
@@ -46,8 +47,7 @@ pub trait AuthService: Send + Sync + 'static {
     /// Returns InvalidToken for unusable tokens, or Unknown on storage failure.
     async fn reset_password(
         &self,
-        token: &str,
-        hash: crate::newtypes::password_hash::PasswordHash,
+        request: ResetPasswordRequest,
     ) -> Result<(), super::requests::reset_password::ResetPasswordError>;
     /// Registers a new pending user with the provided email and password hash.
     /// - A new pending user is created with the provided email, no handle, and an unverified email.
@@ -225,11 +225,13 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
     async fn reset_password(
         &self,
-        token: &str,
-        hash: crate::newtypes::password_hash::PasswordHash,
+        request: ResetPasswordRequest,
     ) -> Result<(), super::requests::reset_password::ResetPasswordError> {
         self.repository
-            .complete_password_reset(sha2::Sha256::digest(token.as_bytes()).into(), hash)
+            .complete_password_reset(
+                sha2::Sha256::digest(request.token.as_bytes()).into(),
+                request.password_hash,
+            )
             .await
     }
     async fn signup_with_email(
