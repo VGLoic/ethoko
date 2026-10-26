@@ -2,43 +2,30 @@ import { spawnSync } from "node:child_process";
 
 const suites = {
   central: [
-    ["test:integration:db:status"],
-    ...["build", "check-types", "lint", "check-format"].flatMap((operation) =>
-      ["central", "central-ui"].map((name) => ["--filter", name, operation]),
-    ),
-    ["--filter", "central", "test:unit"],
-    ["--filter", "central", "test:integration"],
-    ["--filter", "central-ui", "test:e2e"],
-    ["--filter", "central-ui", "test:e2e:verify-harness"],
+    "pnpm test:integration:db:status",
+    "pnpm --filter central build",
+    "pnpm --filter central-ui build",
+    "pnpm --filter central check-types",
+    "pnpm --filter central-ui check-types",
+    "pnpm --filter central lint",
+    "pnpm --filter central-ui lint",
+    "pnpm --filter central check-format",
+    "pnpm --filter central-ui check-format",
+    "pnpm --filter central test:unit",
+    "pnpm --filter central test:integration",
+    "pnpm --filter central-ui test:e2e",
+    "pnpm --filter central-ui test:e2e:verify-harness",
   ],
   cli: [
-    [
-      "exec",
-      "turbo",
-      "run",
-      "build",
-      "--filter=!central",
-      "--filter=!central-ui",
-    ],
+    "pnpm exec turbo run build --filter=!central --filter=!central-ui",
     // Refresh workspace binary links after the CLI has been built.
-    ["install", "--frozen-lockfile"],
-    ...["check-types", "lint", "check-format", "test:unit"].map((operation) => [
-      "exec",
-      "turbo",
-      "run",
-      operation,
-      "--filter=!central",
-      "--filter=!central-ui",
-    ]),
-    ["--filter", "@ethoko/cli-beacon", "test:e2e"],
-    [
-      "exec",
-      "turbo",
-      "run",
-      "test:e2e:apps",
-      "--filter=!central",
-      "--filter=!central-ui",
-    ],
+    "pnpm install --frozen-lockfile",
+    "pnpm exec turbo run check-types --filter=!central --filter=!central-ui",
+    "pnpm exec turbo run lint --filter=!central --filter=!central-ui",
+    "pnpm exec turbo run check-format --filter=!central --filter=!central-ui",
+    "pnpm exec turbo run test:unit --filter=!central --filter=!central-ui",
+    "pnpm --filter @ethoko/cli-beacon test:e2e",
+    "pnpm exec turbo run test:e2e:apps --filter=!central --filter=!central-ui",
   ],
 };
 
@@ -48,11 +35,11 @@ if (!Object.hasOwn(suites, suite)) {
   process.exit(1);
 }
 
-for (const args of suites[suite]) {
-  console.log(`\n[validate:${suite}] pnpm ${args.join(" ")}`);
-  const result = spawnSync("pnpm", args, { stdio: "inherit" });
+for (const command of suites[suite]) {
+  console.log(`\n[validate:${suite}] ${command}`);
+  const result = spawnSync(command, { shell: true, stdio: "inherit" });
   if (result.error || result.status !== 0) {
-    console.error(`[validate:${suite}] FAILED: pnpm ${args.join(" ")}`);
+    console.error(`[validate:${suite}] FAILED: ${command}`);
     if (result.error) console.error(result.error.message);
     process.exit(result.status || 1);
   }
