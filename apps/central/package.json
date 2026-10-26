@@ -7,9 +7,11 @@
     "dev": "cargo run --quiet --bin=central-server",
     "build": "cargo build --quiet",
     "check-types": "cargo check --quiet",
+    "check-types:ci": "pnpm check-types",
     "check-format": "cargo fmt --check",
     "format": "cargo fmt",
     "lint": "cargo clippy --quiet -- -Dwarnings",
+    "lint:ci": "pnpm lint",
     "test:unit": "cargo test --quiet --lib",
     "test:integration": "./scripts/integration-test.sh"
   }
