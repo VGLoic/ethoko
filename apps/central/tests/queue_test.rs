@@ -18,12 +18,37 @@ struct TestJobPayload {
 
 const RETRY_DELAY_SECONDS: u16 = 1;
 
-#[sqlx::test]
-async fn test_psql_dequeue_non_ready_job(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_dequeue_non_ready_job(queue).await;
+// SQLx 0.8 hashes only the test path for its temporary database name. Include
+// a runtime nonce so simultaneous invocations cannot drop each other's database.
+// Keep SQLx's migration, pool, and success-only cleanup behavior unchanged.
+macro_rules! psql_test {
+    ($name:ident, $behavior:ident) => {
+        #[test]
+        fn $name() {
+            async fn run(pool: Pool<Postgres>) {
+                setup();
+                let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
+                $behavior(queue).await;
+            }
+
+            // SQLx requires a static path; these ten small strings live until
+            // this short-lived test process exits.
+            let path = format!(
+                "{}::{}::{}",
+                module_path!(),
+                stringify!($name),
+                uuid::Uuid::new_v4()
+            )
+            .leak();
+            let mut args = sqlx::testing::TestArgs::new(path);
+            args.migrator(&sqlx::migrate!("./migrations"));
+            let test: fn(Pool<Postgres>) -> _ = run;
+            sqlx::testing::TestFn::run_test(test, args)
+        }
+    };
 }
+
+psql_test!(test_psql_dequeue_non_ready_job, test_dequeue_non_ready_job);
 
 #[tokio::test]
 async fn test_memory_dequeue_non_ready_job() {
@@ -32,12 +57,7 @@ async fn test_memory_dequeue_non_ready_job() {
     test_dequeue_non_ready_job(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_dequeue_ready_job(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_dequeue_ready_job(queue).await;
-}
+psql_test!(test_psql_dequeue_ready_job, test_dequeue_ready_job);
 
 #[tokio::test]
 async fn test_memory_dequeue_ready_job() {
@@ -46,12 +66,10 @@ async fn test_memory_dequeue_ready_job() {
     test_dequeue_ready_job(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_successive_dequeue_ready_job(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_successive_dequeue_ready_job(queue).await;
-}
+psql_test!(
+    test_psql_successive_dequeue_ready_job,
+    test_successive_dequeue_ready_job
+);
 
 #[tokio::test]
 async fn test_memory_successive_dequeue_ready_job() {
@@ -60,12 +78,7 @@ async fn test_memory_successive_dequeue_ready_job() {
     test_successive_dequeue_ready_job(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_process_timeout(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_process_timeout(queue).await;
-}
+psql_test!(test_psql_process_timeout, test_process_timeout);
 
 #[tokio::test]
 async fn test_memory_process_timeout() {
@@ -74,12 +87,10 @@ async fn test_memory_process_timeout() {
     test_process_timeout(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_process_timeout_into_dead(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_process_timeout_into_dead(queue).await;
-}
+psql_test!(
+    test_psql_process_timeout_into_dead,
+    test_process_timeout_into_dead
+);
 
 #[tokio::test]
 async fn test_memory_process_timeout_into_dead() {
@@ -88,12 +99,7 @@ async fn test_memory_process_timeout_into_dead() {
     test_process_timeout_into_dead(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_process_success(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_process_success(queue).await;
-}
+psql_test!(test_psql_process_success, test_process_success);
 
 #[tokio::test]
 async fn test_memory_process_success() {
@@ -102,12 +108,10 @@ async fn test_memory_process_success() {
     test_process_success(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_process_fail_into_success(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_process_fail_into_success(queue).await;
-}
+psql_test!(
+    test_psql_process_fail_into_success,
+    test_process_fail_into_success
+);
 
 #[tokio::test]
 async fn test_memory_process_fail_into_success() {
@@ -116,12 +120,10 @@ async fn test_memory_process_fail_into_success() {
     test_process_fail_into_success(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_process_fail_into_dead(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_process_fail_into_dead(queue).await;
-}
+psql_test!(
+    test_psql_process_fail_into_dead,
+    test_process_fail_into_dead
+);
 
 #[tokio::test]
 async fn test_memory_process_fail_into_dead() {
@@ -130,12 +132,7 @@ async fn test_memory_process_fail_into_dead() {
     test_process_fail_into_dead(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_retry_dead_job(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_retry_dead_job(queue).await;
-}
+psql_test!(test_psql_retry_dead_job, test_retry_dead_job);
 
 #[tokio::test]
 async fn test_memory_retry_dead_job() {
@@ -144,12 +141,10 @@ async fn test_memory_retry_dead_job() {
     test_retry_dead_job(queue).await;
 }
 
-#[sqlx::test]
-async fn test_psql_dequeued_jobs_in_scheduled_at_order(pool: Pool<Postgres>) {
-    setup();
-    let queue = PsqlQueue::new(RETRY_DELAY_SECONDS, pool);
-    test_dequeued_jobs_in_scheduled_at_order(queue).await;
-}
+psql_test!(
+    test_psql_dequeued_jobs_in_scheduled_at_order,
+    test_dequeued_jobs_in_scheduled_at_order
+);
 
 #[tokio::test]
 async fn test_memory_dequeued_jobs_in_scheduled_at_order() {

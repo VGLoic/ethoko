@@ -1,0 +1,20 @@
+services:
+  integration-db:
+    image: postgres:16.6
+    user: postgres
+    volumes:
+      - integration-db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: central
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "admin", "-d", "central"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+
+volumes:
+  integration-db-data:

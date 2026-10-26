@@ -59,13 +59,14 @@ Production deployment configuration must explicitly retain `CENTRAL_ENVIRONMENT=
 
 ### Integration tests
 
-Run integration tests through the Central package script. It starts the integration database, waits for it to become healthy, runs the tests, and tears the database down afterward:
+Start the root-owned shared integration database once, then run integration tests through the Central package script. Tests require the service to be running and never manage its lifecycle:
 
 ```bash
+pnpm test:integration:db:start
 pnpm --filter central test:integration
 ```
 
-To run one integration-test crate while retaining that database lifecycle:
+To run one integration-test crate against the already-running database:
 
 ```bash
 pnpm --filter central test:integration --test queue_test
@@ -84,6 +85,8 @@ CENTRAL_TEST_LOG=debug pnpm --filter central test:integration --test queue_test 
 ```
 
 Arguments are forwarded to Cargo, so standard test selection and filtering remain available. The `--` before `--nocapture` is Cargo's required test-harness separator.
+
+The root `pnpm test:integration` command retains the full integration selection. For comprehensive API and UI validation use `pnpm validate:central`. See [validation and shared-database coordination](../../docs/validation.md) before stopping or cleaning shared data, or testing across branches with different migrations.
 
 ### Database interaction and migration
 

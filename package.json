@@ -17,6 +17,14 @@
     "infrastructure"
   ],
   "scripts": {
+    "validate:central": "node scripts/validate.mjs central",
+    "validate:cli": "node scripts/validate.mjs cli",
+    "test:validation": "node --test scripts/validation.test.mjs",
+    "test:integration:db:start": "node scripts/integration-db.mjs start",
+    "test:integration:db:status": "node scripts/integration-db.mjs status",
+    "test:integration:db:stop": "node scripts/integration-db.mjs stop",
+    "test:integration:db:clean": "node scripts/integration-db.mjs clean",
+    "test:integration:db:test": "node --test scripts/integration-db.test.mjs",
     "playground:explore": "node scripts/central-playground.mjs explore",
     "playground:start": "node scripts/central-playground.mjs start",
     "playground:status": "node scripts/central-playground.mjs status",

@@ -178,4 +178,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - run: pnpm test:integration:db:start
       - run: pnpm test:integration
+      - run: pnpm test:integration:db:clean
+        if: always()

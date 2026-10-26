@@ -13,6 +13,8 @@
 
 Developing Central? See the [connected Central playground workflow](docs/central-playground.md) for start, status, stop, and machine prerequisites.
 
+Developing this monorepo? See [validation suites and the shared integration database](docs/validation.md) for `pnpm validate:central` and `pnpm validate:cli`.
+
 Ethoko enables teams to **store** and **share** versioned smart-contract compilation artifacts.  
 As such, it decouples the compilation process from the operation processes.
 
