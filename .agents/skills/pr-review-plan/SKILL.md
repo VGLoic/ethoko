@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # PR Review Plan
 
-Analyze a review and publish a small, evidence-backed plan on the PR. This skill owns planning and tracking links; implementation, completion updates, and substantive review replies belong to later work.
+Analyze a review and publish an evidence-backed plan of bounded changes on the PR. This skill owns planning and tracking links; implementation, completion updates, and substantive review replies belong to later work.
 
 ## 1. Read the review and current plan
 
@@ -14,22 +14,30 @@ Use `gh` to identify the requested PR, or the current branch's PR when none is s
 
 Find conversation comments containing the exact marker `<!-- pr-review-plan -->`. The latest by creation time is the sole canonical plan; update it even if older plans exist. If none exists, create one in step 4. Preserve its item IDs, checkboxes, and implementation references. Read marked tracking replies as bookkeeping, rather than new review requests.
 
-Finish when every review point and the existing canonical plan are available, with source URLs and the reviewed head SHA recorded.
+Find the originating PRD/task through the supplied reference, PR/commit issue links, or relevant repository specs. Read its requirements and explicit exclusions. If none exists, use the PR description when it establishes the intended outcome; otherwise ask for the scope reference. Record the source used.
+
+Finish when every review point and the existing canonical plan are available, with source URLs, the scope reference, and the reviewed head SHA recorded.
 
 ## 2. Identify bounded changes
 
-For each review point, inspect the relevant code at the recorded PR head, including affected consumers and tests as needed. Establish that the inspected code matches that revision; identify any evidence gap explicitly.
+For each review point, inspect the relevant code at the recorded PR head. Resolve accessible factual questions by tracing affected callers, consumers, tests, dependencies, and execution context. Establish that the inspected code matches that revision. Check whether a suspected failure is reachable in the supported execution model before treating it as a blocker.
 
-Classify each outstanding point:
+Choose a bounded implementation using the review direction, documented standards, and existing conventions. The reviewer need not prescribe types, methods, or internal boundaries. Explain material implementation choices briefly; multiple possible implementations alone are not a reason to escalate.
 
-- **Ready:** the review identifies both the problem and an acceptable solution, and targeted inspection confirms a bounded change with a concrete verification method. Record the inspected paths or symbols supporting that boundary.
-- **Needs human intervention:** a decision, acceptable solution, necessary evidence, or independence from an unresolved point is missing. State the specific question or missing information in one sentence. Questions requiring a substantive response belong here for this first version.
+Classify each outstanding point against three gates:
 
-Small changes still need evidence: documentation can depend on unsettled error types, and removing a response field can affect consumers. A dependency on an unresolved decision makes the dependent change need human intervention too.
+1. **Clear direction:** the intended outcome of the review comment is understood.
+2. **In scope:** both the outcome and proposed implementation fit the scope reference, preserving its requirements and exclusions. Supporting refactors or convention fixes qualify when directly needed for the correction, even if not individually named in the task. Keep unrelated improvements and speculative capabilities outside the item.
+3. **Two-way door:** the item's additional effects are cheap to reverse in the actual deployment context, without significant lasting consequences. Assess the item rather than inheriting the whole PR's classification. Reverting code alone is insufficient when data changes, external effects, or consumer commitments persist.
 
-Keep investigation targeted. When qualifying a point would require substantial design or planning, record the blocker and move on. An empty ready list is a valid result. For already addressed points or irrelevant notices, record a short disposition and source link so review coverage is explicit.
+- **Ready:** inspection supports all three gates and a concrete verification method. Record the inspected paths or symbols, scope rationale, and reversibility evidence.
+- **Needs human intervention:** after targeted investigation, a specific obstacle to a gate remains: unclear intent, a scope conflict, a one-way door, unavailable necessary evidence, or a material trade-off the available guidance cannot settle. State the obstacle and the question or decision needed in one sentence. Points requiring only a substantive discussion reply remain here for this version.
 
-Finish when every review point is accounted for and every ready change has an inspected boundary, verification method, and scope stop condition. Keep the code unchanged.
+Separate independent portions before propagating a blocker. A prerequisite that meets the gates is sequencing: its dependents can remain ready with an explicit dependency. Only a concrete dependency on an unresolved obstacle requires human intervention too; identify that obstacle. For example, error documentation can follow a planned error-type change, while documentation for unaffected errors stays independent.
+
+An empty ready list is valid. For already addressed points or irrelevant notices, record a short disposition and source link so review coverage is explicit.
+
+Finish when every review point is accounted for, each escalation names a remaining obstacle after investigation, and every ready change has evidence for the gates, a verification method, and a scope stop condition. Keep the code unchanged.
 
 ## 3. Assemble the checklist
 
@@ -46,21 +54,23 @@ Use this comment structure:
 ## PR review action plan
 
 Reviewed head: <commit SHA>
+Scope reference: <PRD/task link or path; PR description if used as fallback>
 
 ### Ready
 
 - [ ] **R1 — <title>**
   - Sources: <review comment links>
   - Change: <intended outcome and bounded scope; inspected paths/symbols>
+  - Basis: <why in scope and cheap to reverse in the actual context>
   - Depends on: <IDs, if any>
   - Verify: <specific check and expected result>
-  - Scope stop condition: <discovery that would require a new decision or wider change>
+  - Scope stop condition: <discovery that would invalidate direction, scope, or reversibility>
 
 ### Needs human intervention
 
 - [ ] **R2 — <title>**
   - Sources: <review comment links>
-  - Open point: <specific question or missing information>
+  - Open point: <remaining obstacle and the question or decision needed>
 
 ### Completed / otherwise accounted for
 
@@ -70,7 +80,7 @@ source links for already addressed points or irrelevant notices.>
 
 Use “None” for empty sections. The plan describes scope and dependencies; execution batch size and execution-session policy belong to the execution skill.
 
-Finish when the checklist covers the whole review, preserves existing progress, and has no ready item conditional on an unresolved decision.
+Finish when the checklist covers the whole review, preserves existing progress, orders prerequisites before dependents, and has no ready item conditional on an unresolved human-intervention obstacle.
 
 ## 4. Publish and link
 
