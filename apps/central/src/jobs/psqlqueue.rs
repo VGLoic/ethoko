@@ -306,15 +306,14 @@ impl Queue for PsqlQueue {
             r#"
             UPDATE "ethoko_job"
             SET
-                scheduled_at = $1,
+                scheduled_at = now(),
                 retry_count = 0,
                 dequeued_at = NULL,
                 processing_timeout_at = NULL,
                 status = 'pending'
-            WHERE id = $2 AND status = 'dead'
+            WHERE id = $1 AND status = 'dead'
             "#,
         )
-        .bind(Utc::now().trunc_subsecs(TRUNCATE_SUBSECS))
         .bind(job.id)
         .execute(&mut *transaction)
         .await
