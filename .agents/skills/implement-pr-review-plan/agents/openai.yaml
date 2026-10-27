@@ -1,0 +1,5 @@
+interface:
+  display_name: "Implement PR Review Plan"
+  short_description: "Implement a PR review plan serially with a final review."
+policy:
+  allow_implicit_invocation: false
