@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model: [gpt-6.1-astra, gpt-6.1-sol]
+        model: [gpt-6-astra, gpt-6.1-sol]
     env:
       SMOKE_MODEL: openai/${{ matrix.model }}#medium
     steps:
