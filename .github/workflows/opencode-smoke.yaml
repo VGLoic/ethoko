@@ -1,4 +1,4 @@
-name: OpenCode Copilot smoke test
+name: OpenCode OpenAI smoke test
 
 on:
   workflow_dispatch:
@@ -20,9 +20,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model: [gpt-6-astra, gpt-6-sol]
+        model: [gpt-6.1-astra, gpt-6.1-sol]
     env:
-      SMOKE_MODEL: github-copilot/${{ matrix.model }}#medium
+      SMOKE_MODEL: openai/${{ matrix.model }}#medium
     steps:
       - uses: actions/checkout@v5
         with:
@@ -43,15 +43,15 @@ jobs:
         run: |
           npm install --global @opencode/cli
           opencode --version
-      - name: Import Copilot credential
+      - name: Import OpenAI credential
         env:
-          COPILOT_AUTH: ${{ secrets.OPENCODE_COPILOT_AUTH }}
+          OPENAI_AUTH: ${{ secrets.OPENCODE_OPENAI_AUTH }}
         run: |
-          test -n "$COPILOT_AUTH" || { echo 'Missing OPENCODE_COPILOT_AUTH secret'; exit 1; }
+          test -n "$OPENAI_AUTH" || { echo 'Missing OPENCODE_OPENAI_AUTH secret'; exit 1; }
           umask 077
-          credential_file="$RUNNER_TEMP/copilot-auth.json"
+          credential_file="$RUNNER_TEMP/openai-auth.json"
           trap 'rm -f "$credential_file"' EXIT
-          printf '%s' "$COPILOT_AUTH" > "$credential_file"
+          printf '%s' "$OPENAI_AUTH" > "$credential_file"
           opencode auth import --standalone "$credential_file"
       - name: Delegate and publish smoke comment
         working-directory: .github/opencode-smoke
@@ -63,4 +63,4 @@ jobs:
         run: |
           opencode run --standalone --auto --format json \
             --agent smoke-coordinator --model "$SMOKE_MODEL" \
-            "@copilot-smoke Run only this smoke skill. Repository: $GH_REPO. PR: $PR_NUMBER. Exact coordinator and child model: $SMOKE_MODEL. Run: $RUN_URL."
+            "@openai-smoke Run only this smoke skill. Repository: $GH_REPO. PR: $PR_NUMBER. Exact coordinator and child model: $SMOKE_MODEL. Run: $RUN_URL."

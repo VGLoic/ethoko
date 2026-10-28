@@ -13,19 +13,19 @@
     { "action": "provider.use", "resource": "*", "effect": "deny" },
     {
       "action": "provider.use",
-      "resource": "github-copilot",
+      "resource": "openai",
       "effect": "allow"
     }
   ],
   "agents": {
     "smoke-coordinator": {
-      "description": "Delegate the Copilot smoke message and publish its test comment",
+      "description": "Delegate the OpenAI smoke message and publish its test comment",
       "mode": "primary",
       "model": "{env:SMOKE_MODEL}",
       "steps": 12,
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
-        { "action": "skill", "resource": "copilot-smoke", "effect": "allow" },
+        { "action": "skill", "resource": "openai-smoke", "effect": "allow" },
         {
           "action": "subagent",
           "resource": "smoke-message",
