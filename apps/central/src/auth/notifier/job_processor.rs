@@ -1,7 +1,7 @@
 use crate::{
     auth::{
         models::requests::send_email_verification_otp::SendEmailVerificationOtpError,
-        notifier::jobs::{AuthJob, SendEmailVerificationOtpPayload},
+        notifier::jobs::{AuthEmailDeliveryPayload, AuthJob},
         repository::AuthRepository,
     },
     config::OtpConfig,
@@ -17,13 +17,20 @@ pub struct AuthJobProcessor<R: AuthRepository, E: EmailService> {
     auth_repository: R,
     email_service: E,
     otp_config: OtpConfig,
+    password_reset_cooldown_seconds: u16,
 }
 impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
-    pub fn new(auth_repository: R, email_service: E, otp_config: OtpConfig) -> Self {
+    pub fn new(
+        auth_repository: R,
+        email_service: E,
+        otp_config: OtpConfig,
+        password_reset_cooldown_seconds: u16,
+    ) -> Self {
         Self {
             auth_repository,
             email_service,
             otp_config,
+            password_reset_cooldown_seconds,
         }
     }
 }
@@ -42,6 +49,33 @@ impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E>
             .map_err(|e| anyhow::Error::new(e).context("failed to deserialized job payload"))?;
 
         match payload {
+            AuthJob::SendPasswordReset(payload) => {
+                use sha2::Digest;
+                let bytes: [u8; 32] = fake::rand::random();
+                let expires_at = chrono::Utc::now() + chrono::Duration::hours(1);
+                let token = bytes
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>();
+                let hash = sha2::Sha256::digest(token.as_bytes()).into();
+                self.email_service
+                    .send_email(
+                        payload.user_email,
+                        crate::externalcom::email::EmailTemplate::PasswordReset(
+                            crate::externalcom::email::PasswordResetPayload { token },
+                        ),
+                    )
+                    .await?;
+                self.auth_repository
+                    .register_password_reset(
+                        payload.user_id,
+                        hash,
+                        expires_at,
+                        self.password_reset_cooldown_seconds,
+                    )
+                    .await?;
+                Ok(())
+            }
             AuthJob::SendEmailVerificationOtp(p) => {
                 self.process_send_email_verification_otp(p)
                     .await
@@ -57,7 +91,7 @@ impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E>
 impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
     async fn process_send_email_verification_otp(
         &self,
-        payload: SendEmailVerificationOtpPayload,
+        payload: AuthEmailDeliveryPayload,
     ) -> Result<(), anyhow::Error> {
         let otp = Otp::generate()?;
 

@@ -67,6 +67,37 @@ type ApiResult<TData, TUnprocessableEntityReason> =
     };
 
 class EthokoCentralClient {
+  async forgotPassword(params: {
+    email: string;
+  }): Promise<
+    ApiResult<{ message: string; cooldownSeconds: number }, "unknown">
+  > {
+    const response = await fetch(`${this.baseUrl}/auth/forgot-password`, {
+      method: "POST",
+      headers: this.createBffHeaders(),
+      body: JSON.stringify(params),
+    });
+    return this.handleResponse(
+      response,
+      z.object({
+        message: z.string(),
+        cooldownSeconds: z.number().int().nonnegative(),
+      }),
+      {},
+    );
+  }
+
+  async resetPassword(params: {
+    token: string;
+    password: string;
+  }): Promise<ApiResult<null, "invalid-token">> {
+    const response = await fetch(`${this.baseUrl}/auth/reset-password`, {
+      method: "POST",
+      headers: this.createBffHeaders(),
+      body: JSON.stringify(params),
+    });
+    return this.handleResponse(response, null, { ETKARP01: "invalid-token" });
+  }
   constructor(private baseUrl: string) {}
 
   private createBffHeaders(params?: {

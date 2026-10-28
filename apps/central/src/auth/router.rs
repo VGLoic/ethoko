@@ -35,6 +35,14 @@ where
     let limiter = auth_router_governor_conf.limiter().clone();
 
     let router = Router::new()
+        .route(
+            "/forgot-password",
+            post(super::handlers::password_recovery::handle_forgot_password),
+        )
+        .route(
+            "/reset-password",
+            post(super::handlers::password_recovery::handle_reset_password),
+        )
         .route("/signup/email", post(handle_signup_email))
         .route("/verify-email", post(handle_verify_email))
         .route(
