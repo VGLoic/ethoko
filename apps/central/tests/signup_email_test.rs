@@ -31,7 +31,12 @@ async fn test_signup_email() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::CREATED);
-    let response_body: HttpSignupEmailResponse = response.json().await.unwrap();
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(
+        body.get("handle_registration"),
+        Some(&serde_json::Value::Null)
+    );
+    let response_body: HttpSignupEmailResponse = serde_json::from_value(body).unwrap();
     assert_eq!(response_body.email, email);
     assert!(!response_body.email_verified);
 }

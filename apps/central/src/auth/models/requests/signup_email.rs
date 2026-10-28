@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    auth::{models::user::User, password_hasher},
+    auth::{http_responses::HandleRegistrationResponse, models::user::User, password_hasher},
     newtypes::{
         email::{Email, EmailError},
         password::{Password, PasswordError},
@@ -65,6 +65,8 @@ pub enum SignupEmailError {
 #[serde(rename_all = "camelCase")]
 pub struct HttpSignupEmailResponse {
     pub email: Email,
+    #[serde(rename = "handle_registration")]
+    pub handle_registration: Option<HandleRegistrationResponse>,
     pub email_verified: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -75,8 +77,13 @@ impl From<User> for HttpSignupEmailResponse {
         HttpSignupEmailResponse {
             email: user.email().to_owned(),
             email_verified: user.email_verified(),
-            created_at: user.created_at(),
-            updated_at: user.updated_at(),
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+            handle_registration: user.handle_registration.map(|registration| {
+                HandleRegistrationResponse {
+                    handle: registration.handle,
+                }
+            }),
         }
     }
 }

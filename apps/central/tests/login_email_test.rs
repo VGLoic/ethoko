@@ -72,7 +72,12 @@ async fn test_login_email_token_valid() {
         .unwrap();
 
     assert_eq!(me_response.status(), StatusCode::OK);
-    let user: UserResponse = me_response.json().await.unwrap();
+    let body: serde_json::Value = me_response.json().await.unwrap();
+    assert_eq!(
+        body.get("handle_registration"),
+        Some(&serde_json::Value::Null)
+    );
+    let user: UserResponse = serde_json::from_value(body).unwrap();
     match user {
         UserResponse::Pending {
             email,

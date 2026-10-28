@@ -204,7 +204,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         debug!(
             event = "auth.signup.succeeded",
             user_id = %user.id(),
-            lifecycle = ?user.lifecycle(),
+            has_handle_registration = user.handle_registration.is_some(),
             "Completed signup with email"
         );
 

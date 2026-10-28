@@ -31,17 +31,22 @@ impl AuthActions for InstanceState {
             email: email.to_string(),
             password: password.as_str().to_owned(),
         };
-        let user = self
+        let response = self
             .reqwest_client
             .post(format!("{}/auth/signup/email", &self.server_url))
             .bearer_auth(CENTRAL_UI_BFF_SHARED_SECRET)
             .json(&signup_body)
             .send()
             .await
-            .unwrap()
-            .json::<HttpSignupEmailResponse>()
-            .await
             .unwrap();
+        let status = response.status();
+        let body = response.text().await.unwrap();
+        assert_eq!(
+            status,
+            reqwest::StatusCode::CREATED,
+            "signup failed: {body}"
+        );
+        let user = serde_json::from_str::<HttpSignupEmailResponse>(&body).unwrap();
 
         self.job_worker.consume_jobs().await.unwrap();
 
