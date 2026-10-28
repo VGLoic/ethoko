@@ -1,0 +1,66 @@
+name: OpenCode OpenAI smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Same-repository PR number to receive two test comments
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  smoke:
+    name: Smoke / ${{ matrix.model }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [gpt-6-astra, gpt-6.1-sol]
+    env:
+      SMOKE_MODEL: openai/${{ matrix.model }}#medium
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Validate PR target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'Expected a positive PR number'; exit 1; }
+          gh pr view "$PR_NUMBER" --json headRepository,isCrossRepository \
+            --jq '.isCrossRepository == false' | grep -qx true
+      - name: Install OpenCode V2
+        run: |
+          npm install --global @opencode/cli
+          opencode --version
+      - name: Import OpenAI credential
+        env:
+          OPENAI_AUTH: ${{ secrets.OPENCODE_OPENAI_AUTH }}
+        run: |
+          test -n "$OPENAI_AUTH" || { echo 'Missing OPENCODE_OPENAI_AUTH secret'; exit 1; }
+          umask 077
+          credential_file="$RUNNER_TEMP/openai-auth.json"
+          trap 'rm -f "$credential_file"' EXIT
+          printf '%s' "$OPENAI_AUTH" > "$credential_file"
+          opencode auth import --standalone "$credential_file"
+      - name: Delegate and publish smoke comment
+        working-directory: .github/opencode-smoke
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+        run: |
+          opencode run --standalone --auto --format json \
+            --agent smoke-coordinator --model "$SMOKE_MODEL" \
+            "@openai-smoke Run only this smoke skill. Repository: $GH_REPO. PR: $PR_NUMBER. Exact coordinator and child model: $SMOKE_MODEL. Run: $RUN_URL."
