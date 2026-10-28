@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": [".github/opencode-smoke/instructions.md"],
   "mcp": {
     "servers": {
       "playground": {
@@ -22,7 +23,8 @@
       "description": "Delegate the OpenAI smoke message and publish its test comment",
       "mode": "primary",
       "model": "{env:SMOKE_MODEL}",
-      "steps": 12,
+      "system": "Coordinate only the explicitly invoked smoke skill. Report configuration marker DEFAULT-CONFIG-207.",
+      "steps": 16,
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "skill", "resource": "openai-smoke", "effect": "allow" },
@@ -32,6 +34,16 @@
           "effect": "allow"
         },
         { "action": "shell", "resource": "gh pr view *", "effect": "allow" },
+        {
+          "action": "shell",
+          "resource": "git -C * rev-parse HEAD",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git -C * show HEAD:.github/opencode-smoke/inspection.txt",
+          "effect": "allow"
+        },
         { "action": "shell", "resource": "gh pr comment *", "effect": "allow" },
         {
           "action": "shell",
@@ -44,9 +56,21 @@
       "description": "Prepare one short smoke-test message; return text only",
       "mode": "subagent",
       "model": "{env:SMOKE_MODEL}",
-      "system": "Return a short test message identifying the exact model and reasoning variant supplied by the coordinator. This is a delegation smoke test, not a code review. Return text only.",
-      "steps": 1,
-      "permissions": [{ "action": "*", "resource": "*", "effect": "deny" }]
+      "system": "Perform the smoke inspection requested by the coordinator. Return a short test message identifying the exact model and reasoning variant, configuration marker DEFAULT-CHILD-CONFIG-207, ambient instruction markers, inspected PR SHA and fixture text. This is a delegation smoke test, not a code review.",
+      "steps": 4,
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        {
+          "action": "shell",
+          "resource": "git -C * rev-parse HEAD",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git -C * show HEAD:.github/opencode-smoke/inspection.txt",
+          "effect": "allow"
+        }
+      ]
     }
   }
 }
