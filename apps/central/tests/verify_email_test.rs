@@ -178,8 +178,7 @@ async fn test_verify_email_422_expired_otp() {
         })
         .expect("Expected an OTP email to be sent");
 
-    // Simulate OTP expiration by advancing the time in the email service
-    tokio::time::sleep(Duration::from_secs(3)).await; // Wait for OTP to expire (3 seconds)
+    tokio::time::sleep(Duration::from_secs(3)).await;
 
     let verify_email_body = HttpVerifyEmailBody {
         email: user.email.to_string(),
@@ -198,6 +197,28 @@ async fn test_verify_email_422_expired_otp() {
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let error = response.json::<UnprocessableEntityError>().await.unwrap();
     assert_eq!(error.code, "ETKAVE03");
+
+    // Expiry does not remove the request or bypass its longer resend cooldown.
+    let resend_response = instance_state
+        .reqwest_client
+        .post(format!(
+            "{}/auth/resend-verification-otp",
+            instance_state.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .json(&serde_json::json!({ "email": user.email.to_string() }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resend_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        resend_response
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKARV02"
+    );
 }
 
 #[tokio::test]

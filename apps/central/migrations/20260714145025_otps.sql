@@ -1,4 +1,3 @@
--- Add migration script here
 CREATE TYPE otp_purpose AS ENUM ('email_verification', 'password_reset');
 
 CREATE TABLE "otp_request" (
@@ -7,5 +6,6 @@ CREATE TABLE "otp_request" (
     otp_hash                   BYTEA        NOT NULL,
     purpose                    otp_purpose  NOT NULL,
     expires_at                 TIMESTAMPTZ  NOT NULL,
-    created_at                 TIMESTAMPTZ  NOT NULL DEFAULT now()
+    created_at                 TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE (user_id, purpose)
 );

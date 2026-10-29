@@ -12,6 +12,7 @@ pub struct OtpRequest {
     #[allow(dead_code)] // Retained as part of the database row.
     pub user_id: uuid::Uuid,
     pub otp_hash: [u8; 32],
+    #[allow(dead_code)] // Retained as part of the purpose-scoped database row.
     pub purpose: OtpPurpose,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub expires_at: chrono::DateTime<chrono::Utc>,
