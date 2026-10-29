@@ -73,7 +73,7 @@ Each completed delivery is a separate JSON file with `recipient`, `kind`, `deliv
 
 For direct API exploration, the generated `configuration` file contains the local `CENTRAL_UI_BFF_SHARED_SECRET` Machine Credential. Send it as `Authorization: Bearer <secret>` for `POST /auth/signup/email`, `POST /auth/verify-email`, and `POST /auth/login/email`. Signup accepts `{ "email": "...", "password": "..." }` and returns 201. Verification accepts `{ "email": "...", "otp": "..." }`. Login accepts email/password and returns a `token`; send that User Session Token separately as `X-Ethoko-User-Authorization: Bearer <token>` with the Machine Credential to `GET /auth/me`. Pace requests at least two seconds apart to respect the real API's rate limits.
 
-Email verification does **not** register a handle: `/auth/me` still reports `state: "pending"` with `emailVerified: true`. Complete onboarding through `POST /auth/register-handle` with `{ "handle": "your-unique-handle" }` and both credentials; `/auth/me` then reports `state: "registered"`. Never modify User state or queue contents directly.
+Email verification does **not** register a handle: `/auth/me` still reports `handle_registration: null` with `emailVerified: true`. Complete onboarding through `POST /auth/register-handle` with `{ "handle": "your-unique-handle" }` and both credentials; `/auth/me` then reports `handle_registration: { "handle": "your-unique-handle" }` and `suggestedHandle: null`. Never modify User records or queue contents directly.
 
 ## Interactive exploration in OpenCode V2
 

@@ -78,19 +78,9 @@ async fn test_login_email_token_valid() {
         Some(&serde_json::Value::Null)
     );
     let user: UserResponse = serde_json::from_value(body).unwrap();
-    match user {
-        UserResponse::Pending {
-            email,
-            suggested_handle,
-            email_verified,
-            ..
-        } => {
-            assert_eq!(email, signup_user.email);
-            assert_eq!(suggested_handle, None);
-            assert!(!email_verified);
-        }
-        UserResponse::Registered { .. } => panic!("expected pending user response"),
-    }
+    assert_eq!(user.email, signup_user.email);
+    assert_eq!(user.suggested_handle, None);
+    assert!(!user.email_verified);
 }
 
 #[tokio::test]

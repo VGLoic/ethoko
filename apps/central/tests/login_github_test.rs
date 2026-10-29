@@ -335,19 +335,10 @@ async fn test_login_github_callback_200_with_newly_created_user() {
         Some(&serde_json::Value::Null)
     );
     let me_body: UserResponse = serde_json::from_value(body).unwrap();
-    match me_body {
-        UserResponse::Pending {
-            email: response_email,
-            suggested_handle,
-            email_verified,
-            ..
-        } => {
-            assert_eq!(response_email, email);
-            assert_eq!(suggested_handle, Some(expected_suggested_handle));
-            assert!(email_verified);
-        }
-        UserResponse::Registered { .. } => panic!("expected pending github user response"),
-    }
+    assert_eq!(me_body.email, email);
+    assert_eq!(me_body.suggested_handle, Some(expected_suggested_handle));
+    assert!(me_body.handle_registration.is_none());
+    assert!(me_body.email_verified);
 }
 
 #[tokio::test]
@@ -517,30 +508,19 @@ async fn test_login_github_callback_200_with_existing_user() {
 
     assert_eq!(me_response.status(), StatusCode::OK);
     let me_body: UserResponse = me_response.json().await.unwrap();
-    match me_body {
-        UserResponse::Pending {
-            email: response_email,
-            suggested_handle,
-            email_verified,
-            ..
-        } => {
-            assert_eq!(response_email, email);
-            assert_eq!(suggested_handle, Some(expected_suggested_handle));
-            assert!(email_verified);
-        }
-        UserResponse::Registered { .. } => {
-            panic!("expected existing github user to remain pending")
-        }
-    }
+    assert_eq!(me_body.email, email);
+    assert_eq!(me_body.suggested_handle, Some(expected_suggested_handle));
+    assert!(me_body.handle_registration.is_none());
+    assert!(me_body.email_verified);
 }
 
 #[tokio::test]
-async fn test_login_github_callback_422_with_existing_pending_user_email_collision() {
+async fn test_login_github_callback_422_with_existing_user_email_collision() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
 
-    let (existing_pending_user, _password) = instance_state.signup_user().await;
+    let (existing_user, _password) = instance_state.signup_user().await;
 
     let start_response = instance_state
         .reqwest_client
@@ -561,7 +541,7 @@ async fn test_login_github_callback_422_with_existing_pending_user_email_collisi
         login: Faker.fake::<Handle>().to_string(),
     };
     let github_user_emails = vec![GithubApiUserEmailsResponseItem {
-        email: existing_pending_user.email.to_string(),
+        email: existing_user.email.to_string(),
         verified: false,
         primary: true,
     }];
@@ -656,17 +636,8 @@ async fn test_login_github_token_valid() {
 
     assert_eq!(me_response.status(), StatusCode::OK);
     let me_body: UserResponse = me_response.json().await.unwrap();
-    match me_body {
-        UserResponse::Pending {
-            email: response_email,
-            suggested_handle,
-            email_verified,
-            ..
-        } => {
-            assert_eq!(response_email, email);
-            assert_eq!(suggested_handle, Some(expected_suggested_handle));
-            assert!(email_verified);
-        }
-        UserResponse::Registered { .. } => panic!("expected pending github user response"),
-    }
+    assert_eq!(me_body.email, email);
+    assert_eq!(me_body.suggested_handle, Some(expected_suggested_handle));
+    assert!(me_body.handle_registration.is_none());
+    assert!(me_body.email_verified);
 }

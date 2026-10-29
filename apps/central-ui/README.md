@@ -92,11 +92,11 @@ Login defaults to success when omitted. Signup returns the API's email,
 emailVerified, createdAt, and updatedAt fields (no User state or session token);
 confirmation mismatch stays within the real UI/BFF and must produce no API traffic.
 
-For handle registration, use `fakeIdentity({ state: "pending" })` and declare
+For handle registration, use `fakeIdentity({ handle_registration: null })` and declare
 `registration: "success"` or `registration: "taken"` beside the test. The identity's
-generated handle is the expected submission, not a handle owned by a Pending User.
-Success updates only the token-selected scenario to Registered User; taken-handle
-feedback leaves it pending. Profile reads are stable, and neither outcome changes
+generated handle is the expected submission, not a handle owned by a User without a registration.
+Success adds a Handle Registration only to the token-selected scenario; taken-handle
+feedback leaves it without a registration. Profile reads are stable, and neither outcome changes
 email verification. There is no shared handle-ownership simulation.
 
 Verification tests configure the submitted six-digit code and

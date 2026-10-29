@@ -56,7 +56,13 @@ async fn test_register_handle_200_adds_registration_to_user() {
         .unwrap();
     assert_eq!(before.status(), StatusCode::OK);
     let before: serde_json::Value = before.json().await.unwrap();
-    assert_eq!(before["state"], "pending");
+    assert_eq!(before.as_object().unwrap().len(), 6);
+    assert_eq!(
+        before.get("suggestedHandle"),
+        Some(&serde_json::Value::Null)
+    );
+    assert!(before.get("state").is_none());
+    assert!(before.get("handle").is_none());
     assert_eq!(
         before.get("handle_registration"),
         Some(&serde_json::Value::Null)
@@ -78,6 +84,10 @@ async fn test_register_handle_200_adds_registration_to_user() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body.as_object().unwrap().len(), 6);
+    assert_eq!(body.get("suggestedHandle"), Some(&serde_json::Value::Null));
+    assert!(body.get("state").is_none());
+    assert!(body.get("handle").is_none());
     assert_eq!(
         body["handle_registration"],
         serde_json::json!({ "handle": handle.to_string() })
@@ -89,23 +99,14 @@ async fn test_register_handle_200_adds_registration_to_user() {
         .await;
     assert_eq!(get_me(&instance_state, &fresh_token).await, body);
     let user: UserResponse = serde_json::from_value(body).unwrap();
-    match user {
-        UserResponse::Registered {
-            email,
-            handle: registered_handle,
-            email_verified,
-            ..
-        } => {
-            assert_eq!(email, signup_user.email);
-            assert_eq!(registered_handle, handle);
-            assert!(!email_verified);
-        }
-        UserResponse::Pending { .. } => panic!("expected registered user response"),
-    }
+    assert_eq!(user.email, signup_user.email);
+    assert_eq!(user.handle_registration.unwrap().handle, handle);
+    assert_eq!(user.suggested_handle, None);
+    assert!(!user.email_verified);
 }
 
 #[tokio::test]
-async fn test_register_handle_422_duplicate_handle_keeps_other_user_pending_retryable() {
+async fn test_register_handle_422_duplicate_handle_leaves_other_user_without_registration() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -170,14 +171,12 @@ async fn test_register_handle_422_duplicate_handle_keeps_other_user_pending_retr
 
     assert_eq!(me_response.status(), StatusCode::OK);
     let user: UserResponse = me_response.json().await.unwrap();
-    match user {
-        UserResponse::Pending { email, .. } => assert_eq!(email, second_signup_user.email),
-        UserResponse::Registered { .. } => panic!("expected duplicate claimant to remain pending"),
-    }
+    assert_eq!(user.email, second_signup_user.email);
+    assert!(user.handle_registration.is_none());
 }
 
 #[tokio::test]
-async fn test_register_handle_422_already_registered_user_cannot_change_handle() {
+async fn test_register_handle_422_existing_registration_cannot_change_handle() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -230,7 +229,7 @@ async fn test_register_handle_422_already_registered_user_cannot_change_handle()
         user["handle_registration"]["handle"],
         first_handle.to_string()
     );
-    assert_eq!(user["handle"], first_handle.to_string());
+    assert!(user.get("handle").is_none());
     let repeat = register_handle(&instance_state, &token, &first_handle.to_string()).await;
     assert_eq!(repeat.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
@@ -353,10 +352,8 @@ async fn test_register_handle_user_can_register_before_email_verification() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let user: UserResponse = response.json().await.unwrap();
-    match user {
-        UserResponse::Registered { email_verified, .. } => assert!(!email_verified),
-        UserResponse::Pending { .. } => panic!("expected registered user response"),
-    }
+    assert!(user.handle_registration.is_some());
+    assert!(!user.email_verified);
 
     let emails = instance_state
         .email_service
@@ -489,7 +486,7 @@ async fn test_register_handle_github_suggestion_is_non_reserving_and_cleared_on_
     assert_eq!(user["email"], email.to_string());
     assert_eq!(user["handle_registration"]["handle"], handle.to_string());
     assert_eq!(user["emailVerified"], false);
-    assert!(user.get("suggestedHandle").is_none());
+    assert_eq!(user.get("suggestedHandle"), Some(&serde_json::Value::Null));
     assert_eq!(get_me(&instance_state, &token).await, user);
 }
 
@@ -528,7 +525,7 @@ async fn test_competing_users_claim_one_handle_without_partial_registration() {
         handle
     );
     let loser = get_me(&instance, loser_token).await;
-    assert_eq!(loser["state"], "pending");
+    assert!(loser.get("state").is_none());
     assert_eq!(
         loser.get("handle_registration"),
         Some(&serde_json::Value::Null)

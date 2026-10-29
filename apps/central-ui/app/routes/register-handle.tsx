@@ -98,7 +98,7 @@ export default function RegisterHandle({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  if (loaderData.user.state === "registered") {
+  if (loaderData.user.handle_registration) {
     return (
       <Page>
         <h1>Register handle</h1>
