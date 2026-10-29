@@ -40,6 +40,13 @@ async fn test_verify_email_200_valid_otp() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
+    let user: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(user["state"], "pending");
+    assert_eq!(
+        user.get("handle_registration"),
+        Some(&serde_json::Value::Null)
+    );
+    assert_eq!(user["emailVerified"], true);
 }
 
 #[tokio::test]

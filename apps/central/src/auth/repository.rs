@@ -13,7 +13,7 @@ use crate::{
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
             },
-            user::{User, UserLifecycle, UserLifecycleRow, UserRow},
+            user::{User, UserRow},
         },
         requests::{
             login_github_callback::LoginGithubCallbackError,
@@ -30,8 +30,8 @@ use thiserror::Error;
 /// Repository trait for auth-related operations
 #[async_trait::async_trait]
 pub trait AuthRepository: Send + Sync + 'static {
-    /// Registers a new pending user with the provided email and password hash.
-    /// - A new pending user is created with the provided email, no handle, and an unverified email.
+    /// Creates a User with the provided email and password hash.
+    /// - The User has no Handle Registration and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
@@ -118,7 +118,7 @@ pub trait AuthRepository: Send + Sync + 'static {
         session_token_payload: OpaqueTokenCreatePayload,
     ) -> Result<OpaqueToken, RecordSessionTokenError>;
 
-    /// Registers a handle for the specified user, transitioning them from a pending user to a registered user.
+    /// Creates the User's permanent Handle Registration and atomically clears their suggestion.
     /// # Errors
     /// * `RegisterHandleError::HandleAlreadyExists` if the requested handle is already taken.
     /// * `RegisterHandleError::AlreadyRegistered` if the user has already registered a handle.
@@ -225,17 +225,14 @@ impl AuthRepository for PsqlAuthRepository {
             r#"
             INSERT INTO "ethoko_user" (
                 email,
-                handle,
                 suggested_handle,
-                lifecycle,
                 email_verified
-            ) VALUES ($1, $2, $3, $4, $5)
+            ) VALUES ($1, $2, $3)
             RETURNING
                 id,
                 email,
-                handle,
+                NULL::TEXT AS handle,
                 suggested_handle,
-                lifecycle,
                 email_verified,
                 created_at,
                 updated_at
@@ -243,8 +240,6 @@ impl AuthRepository for PsqlAuthRepository {
         )
         .bind(&request.email)
         .bind(Option::<String>::None)
-        .bind(Option::<String>::None)
-        .bind(UserLifecycleRow::Pending)
         .bind(false)
         .fetch_one(&mut *transaction)
         .await
@@ -257,9 +252,7 @@ impl AuthRepository for PsqlAuthRepository {
             }
             anyhow::anyhow!(e).context("failed to create user").into()
         })?;
-        let user: User = user_row.try_into().map_err(|e| {
-            SignupEmailError::Unknown(anyhow::Error::new(e).context("created invalid user row"))
-        })?;
+        let user = User::from(user_row);
 
         let auth_credential = sqlx::query_as::<_, AuthCredential>(
             r#"
@@ -338,27 +331,22 @@ impl AuthRepository for PsqlAuthRepository {
             r#"
             INSERT INTO "ethoko_user" (
                 email,
-                handle,
                 suggested_handle,
-                lifecycle,
                 email_verified
             )
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, $2, $3)
             RETURNING
                 id,
                 email,
-                handle,
+                NULL::TEXT AS handle,
                 suggested_handle,
-                lifecycle,
                 email_verified,
                 created_at,
                 updated_at
             "#,
         )
         .bind(&github_user.primary_email)
-        .bind(Option::<String>::None)
         .bind(Some(github_user.username.clone()))
-        .bind(UserLifecycleRow::Pending)
         .bind(github_user.email_verified)
         .fetch_one(&mut *transaction)
         .await
@@ -371,11 +359,7 @@ impl AuthRepository for PsqlAuthRepository {
             }
             anyhow::anyhow!(e).context("failed to create user").into()
         })?;
-        let user: User = user_row.try_into().map_err(|e| {
-            LoginGithubCallbackError::Unknown(
-                anyhow::Error::new(e).context("created invalid user row"),
-            )
-        })?;
+        let user = User::from(user_row);
 
         let auth_credential = sqlx::query_as::<_, AuthCredential>(
             r#"
@@ -650,27 +634,39 @@ impl AuthRepository for PsqlAuthRepository {
         user_id: uuid::Uuid,
         request: RegisterHandleRequest,
     ) -> Result<User, RegisterHandleError> {
-        let user = sqlx::query_as::<_, UserRow>(
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
+
+        // Serialize claims by the same User so repeat registration always wins
+        // over handle availability checks, including simultaneous requests.
+        sqlx::query("SELECT id FROM ethoko_user WHERE id = $1 FOR UPDATE")
+            .bind(user_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(e).context("failed to lock user for handle registration")
+            })?;
+
+        let user = get_user_by_id(user_id, &mut *transaction)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user"))?
+            .ok_or_else(|| anyhow::anyhow!("user not found for handle registration"))?;
+        if user.handle_registration.is_some() {
+            return Err(RegisterHandleError::AlreadyRegistered);
+        }
+
+        sqlx::query(
             r#"
-            UPDATE "ethoko_user"
-            SET handle = $2,
-                suggested_handle = NULL,
-                lifecycle = 'registered'
-            WHERE id = $1 AND lifecycle = 'pending'
-            RETURNING
-                id,
-                email,
-                handle,
-                suggested_handle,
-                lifecycle,
-                email_verified,
-                created_at,
-                updated_at
+            INSERT INTO handle_registration (user_id, handle)
+            VALUES ($1, $2)
             "#,
         )
         .bind(user_id)
         .bind(&request.handle)
-        .fetch_optional(&self.pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(db_err) = &e
@@ -682,39 +678,22 @@ impl AuthRepository for PsqlAuthRepository {
                 return RegisterHandleError::HandleAlreadyExists(request.handle.to_string());
             }
             RegisterHandleError::Unknown(anyhow::anyhow!(e).context("failed to register handle"))
-        })?
-        .map(TryInto::try_into)
-        .transpose()
-        .map_err(|e| {
-            RegisterHandleError::Unknown(
-                anyhow::Error::new(e).context("updated invalid user row during register handle"),
-            )
         })?;
 
-        match user {
-            Some(user) => Ok(user),
-            None => {
-                let existing_user = get_user_by_id(user_id, &self.pool)
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!(e)
-                            .context("failed to fetch user after register handle attempt")
-                    })?
-                    .ok_or_else(|| {
-                        RegisterHandleError::Unknown(anyhow::anyhow!(
-                            "user not found for register handle"
-                        ))
-                    })?;
-
-                if existing_user.lifecycle() == UserLifecycle::Registered {
-                    Err(RegisterHandleError::AlreadyRegistered)
-                } else {
-                    Err(RegisterHandleError::Unknown(anyhow::anyhow!(
-                        "register handle update did not affect any row"
-                    )))
-                }
-            }
-        }
+        sqlx::query("UPDATE ethoko_user SET suggested_handle = NULL WHERE id = $1")
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to clear suggested handle"))?;
+        let user = get_user_by_id(user_id, &mut *transaction)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user after registration"))?
+            .ok_or_else(|| anyhow::anyhow!("user not found after registration"))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit handle registration"))?;
+        Ok(user)
     }
 
     async fn get_user_by_session_token(
@@ -918,24 +897,22 @@ async fn get_user_by_email<'a, E: Executor<'a, Database = Postgres>>(
     let user = sqlx::query_as::<_, UserRow>(
         r#"
             SELECT
-                id,
-                email,
-                handle,
-                suggested_handle,
-                lifecycle,
-                email_verified,
-                created_at,
-                updated_at
-        FROM "ethoko_user"
-        WHERE email = $1
+                u.id,
+                u.email,
+                r.handle,
+                u.suggested_handle,
+                u.email_verified,
+                u.created_at,
+                u.updated_at
+        FROM ethoko_user u
+        LEFT JOIN handle_registration r ON r.user_id = u.id
+        WHERE u.email = $1
         "#,
     )
     .bind(email)
     .fetch_optional(executor)
     .await?
-    .map(TryInto::try_into)
-    .transpose()
-    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+    .map(User::from);
 
     Ok(user)
 }
@@ -947,24 +924,22 @@ async fn get_user_by_id<'a, E: Executor<'a, Database = Postgres>>(
     let user = sqlx::query_as::<_, UserRow>(
         r#"
             SELECT
-                id,
-                email,
-                handle,
-                suggested_handle,
-                lifecycle,
-                email_verified,
-                created_at,
-                updated_at
-        FROM "ethoko_user"
-        WHERE id = $1
+                u.id,
+                u.email,
+                r.handle,
+                u.suggested_handle,
+                u.email_verified,
+                u.created_at,
+                u.updated_at
+        FROM ethoko_user u
+        LEFT JOIN handle_registration r ON r.user_id = u.id
+        WHERE u.id = $1
         "#,
     )
     .bind(user_id)
     .fetch_optional(executor)
     .await?
-    .map(TryInto::try_into)
-    .transpose()
-    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+    .map(User::from);
 
     Ok(user)
 }

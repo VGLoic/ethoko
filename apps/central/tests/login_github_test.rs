@@ -329,7 +329,12 @@ async fn test_login_github_callback_200_with_newly_created_user() {
         .unwrap();
 
     assert_eq!(me_response.status(), StatusCode::OK);
-    let me_body: UserResponse = me_response.json().await.unwrap();
+    let body: serde_json::Value = me_response.json().await.unwrap();
+    assert_eq!(
+        body.get("handle_registration"),
+        Some(&serde_json::Value::Null)
+    );
+    let me_body: UserResponse = serde_json::from_value(body).unwrap();
     match me_body {
         UserResponse::Pending {
             email: response_email,

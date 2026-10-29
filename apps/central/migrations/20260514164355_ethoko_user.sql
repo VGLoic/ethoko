@@ -2,21 +2,13 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "moddatetime";
 
-CREATE TYPE user_lifecycle AS ENUM ('pending', 'registered');
-
 CREATE TABLE "ethoko_user" (
     id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
     email          TEXT         NOT NULL,
-    handle         TEXT,
     suggested_handle TEXT,
-    lifecycle      user_lifecycle NOT NULL,
     email_verified BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CHECK (
-        (lifecycle = 'pending' AND handle IS NULL)
-        OR (lifecycle = 'registered' AND handle IS NOT NULL)
-    )
+    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 CREATE TRIGGER update_ethoko_user_updated_at
@@ -25,7 +17,12 @@ FOR EACH ROW
 EXECUTE FUNCTION moddatetime('updated_at');
 
 CREATE UNIQUE INDEX unique_email ON "ethoko_user" (email);
-CREATE UNIQUE INDEX unique_registered_handle ON "ethoko_user" (handle) WHERE handle IS NOT NULL;
+
+CREATE TABLE handle_registration (
+    user_id UUID PRIMARY KEY REFERENCES "ethoko_user" (id) ON DELETE CASCADE,
+    handle TEXT NOT NULL,
+    CONSTRAINT unique_registered_handle UNIQUE (handle)
+);
 
 CREATE TABLE "auth_credential" (
     id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),

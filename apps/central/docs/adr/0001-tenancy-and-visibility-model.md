@@ -1,6 +1,6 @@
 # Personal-namespace tenancy with per-Project Visibility
 
-Each **User** on Ethoko Central owns a **Namespace** equal to their immutable handle; **Projects** live within a Namespace and are addressed as `namespace/project:tag`. Each Project carries a **Visibility** (`public` or `private`); public Projects accept anonymous reads. This mirrors Docker Hub, npm, crates.io, and GHCR — the dominant convention for developer-tool registries.
+A **User** on Ethoko Central obtains a **Namespace** through their optional **Handle Registration**, equal to its unique, immutable handle. Users without a registration have no Namespace. **Projects** live within a Namespace and are addressed as `namespace/project:tag`. Each Project carries a **Visibility** (`public` or `private`); public Projects accept anonymous reads. This mirrors Docker Hub, npm, crates.io, and GHCR — the dominant convention for developer-tool registries.
 
 ## Considered alternatives
 

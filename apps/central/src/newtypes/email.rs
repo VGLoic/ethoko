@@ -1,4 +1,4 @@
-use fake::{Dummy, Fake, faker, rand};
+use fake::{Dummy, Fake, Faker, rand};
 use serde::{Deserialize, Serialize, de::Visitor};
 use sqlx::{Database, Decode, Encode};
 use thiserror::Error;
@@ -148,7 +148,11 @@ where
 
 impl<T> Dummy<T> for Email {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_: &T, rng: &mut R) -> Self {
-        let email: String = faker::internet::en::SafeEmail().fake_with_rng(rng);
+        // SafeEmail draws from a finite name pool, which collides across runs
+        // against the persistent integration database. Honor the supplied RNG
+        // while giving each address a 128-bit random local part.
+        let local_part: u128 = Faker.fake_with_rng(rng);
+        let email = format!("{local_part:032x}@example.com");
         Email::new(&email).unwrap()
     }
 }
