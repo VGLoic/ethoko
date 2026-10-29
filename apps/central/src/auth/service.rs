@@ -4,6 +4,7 @@ use crate::{
         models::{
             auth_credential::{AuthCredential, AuthCredentialPayload},
             opaque_token::{OpaqueTokenCreatePayload, OpaqueTokenValue},
+            otp_request::OtpPurpose,
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
                 logout::LogoutError,
@@ -19,7 +20,7 @@ use crate::{
         notifier::AuthNotifier,
         password_hasher::verify_password,
         repository::{
-            AuthRepository, GetAuthCredentialError, GetLastOtpRequestError, RecordSessionTokenError,
+            AuthRepository, GetAuthCredentialError, GetOtpRequestError, RecordSessionTokenError,
         },
         requests::{
             login_email::{LoginEmailError, LoginEmailRequest},
@@ -265,18 +266,18 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         if user.email_verified() {
             return Err(ResendVerificationOtpError::UserAlreadyVerified);
         }
-        let last_otp = self
+        let current_otp = self
             .repository
-            .get_last_otp_request_by_user_id(user.id())
+            .get_otp_request_by_user_and_purpose(user.id(), OtpPurpose::EmailVerification)
             .await
             .map_err(|e| match e {
-                GetLastOtpRequestError::Unknown(err) => {
-                    err.context("Error fetching last OTP request by user ID")
+                GetOtpRequestError::Unknown(err) => {
+                    err.context("Error fetching current email-verification OTP request")
                 }
             })?;
-        if let Some(last_otp) = last_otp {
+        if let Some(current_otp) = current_otp {
             let now = chrono::Utc::now();
-            let elapsed = now.signed_duration_since(last_otp.created_at);
+            let elapsed = now.signed_duration_since(current_otp.created_at);
             if elapsed < chrono::Duration::seconds(self.otp_config.cooldown_seconds.into()) {
                 return Err(ResendVerificationOtpError::CooldownNotElapsed);
             }

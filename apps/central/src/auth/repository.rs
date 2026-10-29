@@ -55,7 +55,9 @@ pub trait AuthRepository: Send + Sync + 'static {
     ) -> Result<(User, AuthCredential, bool), LoginGithubCallbackError>;
 
     /// Registers a new email verification OTP for the user.
-    /// - A new OTP is created for the user with the provided OTP hash.
+    /// - Replaces the current email-verification request with a fresh identity and lifetime.
+    /// - Serializes issuance on the User, including when no request exists yet.
+    /// - Other purposes are neither checked for cooldown nor replaced.
     /// # Errors
     /// * `SendEmailVerificationOtpError::NotFound` if the user is not found.
     /// * `SendEmailVerificationOtpError::EmailAlreadyVerified` if the user's email is already verified.
@@ -70,7 +72,7 @@ pub trait AuthRepository: Send + Sync + 'static {
 
     /// Verifies the email of the user with the provided OTP hash.
     /// - The user is fetched from the database using the provided user ID.
-    /// - The latest OTP request for the user is fetched from the database.
+    /// - The current email-verification OTP request for the user is fetched from the database.
     /// - If the OTP request is found and the provided OTP hash matches the stored OTP hash, the user's email is marked as verified.
     /// - If the OTP request is not found, the provided OTP hash does not match the stored OTP hash, or the OTP request has expired, an appropriate error is returned.
     /// - If the user's email is already verified, an error is returned
@@ -91,13 +93,14 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// * `GetUserByEmailError::Unknown` for any other errors that may occur during the process.
     async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError>;
 
-    /// Gets the last OTP request for a user by their user ID.
+    /// Gets the current OTP request for a User and purpose, including expired requests.
     /// # Errors
-    /// * `GetLastOtpRequestError::Unknown` for any other errors that may occur during the process.
-    async fn get_last_otp_request_by_user_id(
+    /// * `GetOtpRequestError::Unknown` for any other errors that may occur during the process.
+    async fn get_otp_request_by_user_and_purpose(
         &self,
         user_id: uuid::Uuid,
-    ) -> Result<Option<OtpRequest>, GetLastOtpRequestError>;
+        purpose: OtpPurpose,
+    ) -> Result<Option<OtpRequest>, GetOtpRequestError>;
 
     /// Gets the user and auth credentials for a user by their email address.
     /// # Errors
@@ -188,7 +191,7 @@ pub enum GetAuthCredentialError {
 }
 
 #[derive(Error, Debug)]
-pub enum GetLastOtpRequestError {
+pub enum GetOtpRequestError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -402,43 +405,65 @@ impl AuthRepository for PsqlAuthRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
 
-        let user = get_user_by_id(user_id, &mut *transaction)
-            .await
-            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user"))?;
+        // A request-row lock cannot serialize first issuance: there may be no
+        // request yet. Lock the persistent User before reading purpose cooldown.
+        let email_verified = sqlx::query_scalar::<_, bool>(
+            "SELECT email_verified FROM ethoko_user WHERE id = $1 FOR UPDATE",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to lock user for otp issuance"))?;
 
-        let user = match user {
-            Some(user) => user,
+        let email_verified = match email_verified {
+            Some(email_verified) => email_verified,
             None => return Err(SendEmailVerificationOtpError::NotFound),
         };
-        if user.email_verified() {
+        if email_verified {
             return Err(SendEmailVerificationOtpError::EmailAlreadyVerified);
         }
 
-        let last_otp_request = get_last_otp_request_by_user_id(user_id, &mut *transaction)
-            .await
-            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
+        let current_otp_request = get_otp_request_by_user_and_purpose(
+            user_id,
+            OtpPurpose::EmailVerification,
+            &mut *transaction,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch current otp request"))?;
 
-        if let Some(otp_request) = last_otp_request {
+        // Measure the new lifetime after acquiring the lock, not from PostgreSQL's
+        // transaction-start time, which may precede a competing issuance.
+        let created_at = Utc::now();
+        if let Some(otp_request) = current_otp_request {
             let cooldown_limit = otp_request
                 .created_at
                 .checked_add_signed(TimeDelta::seconds(otp_config.cooldown_seconds.into()))
                 .ok_or(anyhow::anyhow!("failed to compute cooldown limit"))?;
-            if Utc::now() < cooldown_limit {
+            if created_at < cooldown_limit {
                 return Err(SendEmailVerificationOtpError::CooldownNotElapsed);
             }
         }
 
-        let expires_at = Utc::now()
+        let expires_at = created_at
             .checked_add_signed(TimeDelta::seconds(otp_config.ttl_seconds.into()))
             .ok_or(anyhow::anyhow!("failed to compute expires_at"))?;
+
+        sqlx::query("DELETE FROM otp_request WHERE user_id = $1 AND purpose = $2")
+            .bind(user_id)
+            .bind(OtpPurpose::EmailVerification)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to remove previous otp request"))?;
+
         let otp_request = sqlx::query_as::<_, OtpRequest>(
             r#"
             INSERT INTO otp_request (
                 user_id,
                 otp_hash,
                 purpose,
-                expires_at
-            ) VALUES ($1, $2, $3, $4)
+                expires_at,
+                created_at
+            ) VALUES ($1, $2, $3, $4, $5)
             RETURNING
                 id,
                 user_id,
@@ -452,6 +477,7 @@ impl AuthRepository for PsqlAuthRepository {
         .bind(otp_hash)
         .bind(OtpPurpose::EmailVerification)
         .bind(expires_at)
+        .bind(created_at)
         .fetch_one(&mut *transaction)
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to create otp request"))?;
@@ -486,9 +512,13 @@ impl AuthRepository for PsqlAuthRepository {
             return Err(VerifyEmailError::EmailAlreadyVerified);
         }
 
-        let otp_request = get_last_otp_request_by_user_id(user.id(), &mut *transaction)
-            .await
-            .map_err(|e| anyhow::anyhow!(e).context("failed to fetch last otp request"))?;
+        let otp_request = get_otp_request_by_user_and_purpose(
+            user.id(),
+            OtpPurpose::EmailVerification,
+            &mut *transaction,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fetch current otp request"))?;
 
         let otp_request = match otp_request {
             Some(otp_request) => otp_request,
@@ -497,11 +527,6 @@ impl AuthRepository for PsqlAuthRepository {
 
         if Utc::now() > otp_request.expires_at {
             return Err(VerifyEmailError::OtpExpired);
-        }
-
-        if let OtpPurpose::EmailVerification = otp_request.purpose {
-        } else {
-            return Err(VerifyEmailError::InvalidOtp);
         }
 
         if otp_request.otp_hash != verify_email_request.otp_hash {
@@ -544,15 +569,16 @@ impl AuthRepository for PsqlAuthRepository {
         }
     }
 
-    async fn get_last_otp_request_by_user_id(
+    async fn get_otp_request_by_user_and_purpose(
         &self,
         user_id: uuid::Uuid,
-    ) -> Result<Option<OtpRequest>, GetLastOtpRequestError> {
-        get_last_otp_request_by_user_id(user_id, &self.pool)
+        purpose: OtpPurpose,
+    ) -> Result<Option<OtpRequest>, GetOtpRequestError> {
+        get_otp_request_by_user_and_purpose(user_id, purpose, &self.pool)
             .await
             .map_err(|e| {
                 anyhow::anyhow!(e)
-                    .context("failed to fetch last otp request")
+                    .context("failed to fetch current otp request")
                     .into()
             })
     }
@@ -864,8 +890,9 @@ impl AuthRepository for PsqlAuthRepository {
     }
 }
 
-async fn get_last_otp_request_by_user_id<'a, E: Executor<'a, Database = Postgres>>(
+async fn get_otp_request_by_user_and_purpose<'a, E: Executor<'a, Database = Postgres>>(
     user_id: uuid::Uuid,
+    purpose: OtpPurpose,
     executor: E,
 ) -> Result<Option<OtpRequest>, sqlx::Error> {
     let otp_request = sqlx::query_as::<_, OtpRequest>(
@@ -878,12 +905,11 @@ async fn get_last_otp_request_by_user_id<'a, E: Executor<'a, Database = Postgres
             created_at,
             expires_at
         FROM otp_request
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 1
+        WHERE user_id = $1 AND purpose = $2
         "#,
     )
     .bind(user_id)
+    .bind(purpose)
     .fetch_optional(executor)
     .await?;
 
