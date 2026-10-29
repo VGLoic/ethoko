@@ -12,7 +12,7 @@ _Avoid_: "temporary handle", "reserved handle", "provider handle".
 ### Authentication
 
 **OTP Request**:
-A User's current request for a one-time code for a specific purpose: email verification or password reset. A User has at most one request for each purpose; requests for different purposes are independent. Issuing a replacement invalidates the previous code and starts a fresh lifetime and resend cooldown. An expired request remains current until replaced, but its code cannot be used.
+A User's latest retained request for a one-time code for a specific purpose: email verification or password reset. A User has at most one request for each purpose; requests for different purposes are independent. Issuing a replacement invalidates the previous code and starts a fresh lifetime and resend cooldown. Successful email verification consumes its request. Expired and consumed requests remain current until replaced, but their codes cannot be used; retaining the current request does not retain a history of previous requests.
 _Avoid_: "OTP history", "latest OTP" (there is only one current request per purpose).
 
 **Principal**:
