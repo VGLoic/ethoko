@@ -248,6 +248,8 @@ async function handleEmailSignup({ request }: { request: Request }) {
   return HttpResponse.json(
     {
       email: scenario.email,
+      handle_registration: null,
+      suggestedHandle: null,
       emailVerified: false,
       createdAt: scenario.createdAt,
       updatedAt: scenario.updatedAt,
@@ -258,9 +260,9 @@ async function handleEmailSignup({ request }: { request: Request }) {
 
 function profile(scenario: Scenario) {
   return {
-    state: scenario.state,
     email: scenario.email,
-    ...(scenario.state === "registered" ? { handle: scenario.handle } : {}),
+    handle_registration: scenario.handle_registration,
+    suggestedHandle: scenario.suggestedHandle,
     emailVerified: scenario.emailVerified,
     createdAt: scenario.createdAt,
     updatedAt: scenario.updatedAt,
@@ -286,7 +288,7 @@ async function handleRegisterHandle({ request }: { request: Request }) {
   if (
     !payload.success ||
     payload.data.handle !== scenario.handle ||
-    scenario.state !== "pending" ||
+    scenario.handle_registration !== null ||
     !request.headers.get("Content-Type")?.includes("application/json")
   ) {
     return violation(
@@ -301,8 +303,8 @@ async function handleRegisterHandle({ request }: { request: Request }) {
       { status: 422 },
     );
   }
-  scenario.state = "registered";
-  scenario.handle = payload.data.handle;
+  scenario.handle_registration = { handle: payload.data.handle };
+  scenario.suggestedHandle = null;
   return HttpResponse.json(profile(scenario));
 }
 

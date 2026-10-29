@@ -1,37 +1,16 @@
 import z from "zod";
 import { config } from "~/server/config.server";
 
-const PendingUserResponseSchema = z.object({
-  state: z.literal("pending"),
+const UserResponseSchema = z.object({
   email: z.email(),
-  suggestedHandle: z.string().nullable().optional(),
+  handle_registration: z.object({ handle: z.string() }).nullable(),
+  suggestedHandle: z.string().nullable(),
   emailVerified: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
 
-const RegisteredUserResponseSchema = z.object({
-  state: z.literal("registered"),
-  email: z.email(),
-  handle: z.string(),
-  emailVerified: z.boolean(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
-
-const UserResponseSchema = z.discriminatedUnion("state", [
-  PendingUserResponseSchema,
-  RegisteredUserResponseSchema,
-]);
 type UserResponse = z.infer<typeof UserResponseSchema>;
-
-const SignupResponseSchema = z.object({
-  email: z.email(),
-  emailVerified: z.boolean(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
-type SignupResponse = z.infer<typeof SignupResponseSchema>;
 
 const LoginResponseSchema = z.object({
   token: z.string(),
@@ -133,13 +112,13 @@ class EthokoCentralClient {
   async signup(signupRequest: {
     email: string;
     password: string;
-  }): Promise<ApiResult<SignupResponse, "email-already-registered">> {
+  }): Promise<ApiResult<UserResponse, "email-already-registered">> {
     const response = await fetch(`${this.baseUrl}/auth/signup/email`, {
       method: "POST",
       headers: this.createBffHeaders(),
       body: JSON.stringify(signupRequest),
     });
-    return await this.handleResponse(response, SignupResponseSchema, {
+    return await this.handleResponse(response, UserResponseSchema, {
       ETKAS01: "email-already-registered",
     });
   }

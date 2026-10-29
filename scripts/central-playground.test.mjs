@@ -451,12 +451,12 @@ test(
       );
       const { token } = await request("/auth/login/email", { email, password });
       assert.ok(token.startsWith("etks_"), "API issues a User Session Token");
-      const pending = await request("/auth/me", undefined, token);
-      assert.equal(pending.email, email);
-      assert.equal(pending.emailVerified, true);
+      const beforeRegistration = await request("/auth/me", undefined, token);
+      assert.equal(beforeRegistration.email, email);
+      assert.equal(beforeRegistration.emailVerified, true);
       assert.equal(
-        pending.state,
-        "pending",
+        beforeRegistration.handle_registration,
+        null,
         "email verification does not register a handle",
       );
       const handle = `pg${randomUUID().replaceAll("-", "").slice(0, 16)}`;
@@ -465,10 +465,9 @@ test(
         { handle },
         token,
       );
-      assert.equal(registered.state, "registered");
-      assert.equal(registered.handle, handle);
+      assert.deepEqual(registered.handle_registration, { handle });
       const me = await request("/auth/me", undefined, token);
-      assert.equal(me.state, "registered");
+      assert.deepEqual(me.handle_registration, { handle });
       assert.equal(me.emailVerified, true);
       await command("start");
       const reused = await status();
@@ -522,7 +521,7 @@ test(
       configuration = JSON.parse(await readFile(running.configuration, "utf8"));
       const resumed = await request("/auth/login/email", { email, password });
       const persisted = await request("/auth/me", undefined, resumed.token);
-      assert.equal(persisted.handle, handle);
+      assert.deepEqual(persisted.handle_registration, { handle });
       assert.equal(persisted.emailVerified, true);
       const oldCapture = message;
       const preservedEmails = running.emailCaptureDirectory;
@@ -566,8 +565,9 @@ test(
         password,
       });
       assert.equal(
-        (await request("/auth/me", undefined, freshLogin.token)).state,
-        "pending",
+        (await request("/auth/me", undefined, freshLogin.token))
+          .handle_registration,
+        null,
       );
       await command("stop");
       assert.equal((await status()).state, "stopped");

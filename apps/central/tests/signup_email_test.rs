@@ -32,6 +32,9 @@ async fn test_signup_email() {
 
     assert_eq!(response.status(), StatusCode::CREATED);
     let body: serde_json::Value = response.json().await.unwrap();
+    assert!(body.get("state").is_none());
+    assert!(body.get("handle").is_none());
+    assert_eq!(body.get("suggestedHandle"), Some(&serde_json::Value::Null));
     assert_eq!(
         body.get("handle_registration"),
         Some(&serde_json::Value::Null)

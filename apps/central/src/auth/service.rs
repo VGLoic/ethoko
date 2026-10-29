@@ -35,8 +35,8 @@ use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
-    /// Registers a new pending user with the provided email and password hash.
-    /// - A new pending user is created with the provided email, no handle, and an unverified email.
+    /// Creates a User with the provided email and password hash.
+    /// - The User has no Handle Registration and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
@@ -78,7 +78,7 @@ pub trait AuthService: Send + Sync + 'static {
         request: LoginEmailRequest,
     ) -> Result<OpaqueTokenValue, LoginEmailError>;
 
-    /// Registers a handle for the specified user, transitionning it from a pending user to a registered user.
+    /// Creates the specified User's permanent Handle Registration.
     /// # Errors
     /// * `RegisterHandleError::HandleAlreadyExists` if the requested handle is already taken.
     /// * `RegisterHandleError::AlreadyRegistered` if the user has already registered a handle.

@@ -3,11 +3,14 @@ import { fakeIdentity } from "./fake-identity";
 
 test.describe.configure({ mode: "parallel" });
 
-test("Pending User registers a handle and keeps the updated profile on reload", async ({
+test("User registers a handle and keeps the updated profile on reload", async ({
   page,
   scenario,
 }) => {
-  const user = fakeIdentity({ state: "pending", emailVerified: false });
+  const user = fakeIdentity({
+    handle_registration: null,
+    emailVerified: false,
+  });
   await scenario({ identity: user, login: "success", registration: "success" });
   await page.goto("/login");
   await page.getByLabel("Email", { exact: true }).fill(user.email);
@@ -43,11 +46,11 @@ test("Pending User registers a handle and keeps the updated profile on reload", 
   ).toBeVisible();
 });
 
-test("taken handle feedback leaves this User pending across profile reads", async ({
+test("taken handle feedback leaves this User without a registration across profile reads", async ({
   page,
   scenario,
 }) => {
-  const user = fakeIdentity({ state: "pending", emailVerified: true });
+  const user = fakeIdentity({ handle_registration: null, emailVerified: true });
   await scenario({ identity: user, login: "success", registration: "taken" });
   await page.goto("/login");
   await page.getByLabel("Email", { exact: true }).fill(user.email);

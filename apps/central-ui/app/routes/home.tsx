@@ -29,10 +29,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <div className="font-bold">Email:</div>
           <div className="identifier">{loaderData.user.email}</div>
         </div>
-        {user.state === "registered" ? (
+        {user.handle_registration ? (
           <div className="profile-row">
             <div className="font-bold">Handle:</div>
-            <div className="identifier">{user.handle}</div>
+            <div className="identifier">{user.handle_registration.handle}</div>
           </div>
         ) : (
           <div className="profile-row">
