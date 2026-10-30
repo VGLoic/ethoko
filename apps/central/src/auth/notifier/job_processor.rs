@@ -63,13 +63,6 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
 
         let otp_hash = otp.hash();
 
-        let email_template_payload =
-            EmailVerificationCodePayload::new(payload.user_email.clone(), otp);
-        self.email_service
-            .send_email(payload.user_email, email_template_payload.into())
-            .await
-            .map_err(|e| e.context("failed to send email verification OTP"))?;
-
         if let Err(e) = self
             .auth_repository
             .register_email_verification_otp(payload.user_id, otp_hash, &self.otp_config)
@@ -81,7 +74,7 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
                         event = "auth.email_verification_otp.recording_rejected",
                         user_id = %payload.user_id,
                         reason = "cooldown_not_elapsed",
-                        "Email verification OTP was sent but not recorded"
+                        "Email verification OTP was not recorded; skipping delivery"
                     );
                 }
                 SendEmailVerificationOtpError::EmailAlreadyVerified => {
@@ -89,7 +82,7 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
                         event = "auth.email_verification_otp.recording_rejected",
                         user_id = %payload.user_id,
                         reason = "email_already_verified",
-                        "Email verification OTP was sent but not recorded"
+                        "Email verification OTP was not recorded; skipping delivery"
                     );
                 }
                 SendEmailVerificationOtpError::NotFound => {
@@ -97,7 +90,7 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
                         event = "auth.email_verification_otp.recording_rejected",
                         user_id = %payload.user_id,
                         reason = "user_not_found",
-                        "Email verification OTP was sent but not recorded"
+                        "Email verification OTP was not recorded; skipping delivery"
                     );
                 }
                 SendEmailVerificationOtpError::Unknown(err) => {
@@ -106,14 +99,22 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
                         user_id = %payload.user_id,
                         error_class = error_classification(&err),
                         error_chain = %error_chain(&err),
-                        "Failed to record email verification OTP after delivery"
+                        "Failed to record email verification OTP before delivery"
                     );
                     return Err(
                         err.context("failed to register email verification in database in job")
                     );
                 }
             }
+            return Ok(());
         };
+
+        let email_template_payload =
+            EmailVerificationCodePayload::new(payload.user_email.clone(), otp);
+        self.email_service
+            .send_email(payload.user_email, email_template_payload.into())
+            .await
+            .map_err(|e| e.context("failed to send email verification OTP"))?;
 
         debug!(
             event = "auth.email_verification_otp.sent",

@@ -211,6 +211,7 @@ async fn queued_replacement_cannot_restart_successful_verification() {
         StatusCode::OK
     );
     instance.job_worker.consume_jobs().await.unwrap();
+    assert_eq!(verification_codes(&instance, &user.email).len(), 1);
     for code in verification_codes(&instance, &user.email) {
         let response = verify(&instance, &user.email, &code).await;
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -305,27 +306,16 @@ async fn concurrent_issuance(replacement: bool) {
         );
     }
 
-    // Delivery ordering is unchanged in this slice: a rejected issuance can
-    // still send an email. Do not assume the last delivered code is current.
+    // Only the accepted issuance delivers an email; duplicate queued issuance
+    // rejected by the worker's cooldown must not send an unrecorded code.
     let codes = verification_codes(&instance, &email);
-    let mut verified = false;
-    for code in codes.iter().skip(usize::from(replacement)) {
-        let response = verify(&instance, &email, code).await;
-        if response.status() == StatusCode::OK {
-            verified = true;
-            break;
-        }
-        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(
-            response
-                .json::<UnprocessableEntityError>()
-                .await
-                .unwrap()
-                .code,
-            "ETKAVE02"
-        );
-    }
-    assert!(verified, "One of the delivered codes must verify the User");
+    assert_eq!(codes.len(), if replacement { 2 } else { 1 });
+    let response = verify(&instance, &email, codes.last().unwrap()).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.json::<serde_json::Value>().await.unwrap()["emailVerified"],
+        true
+    );
 }
 
 fn verification_codes(instance: &InstanceState, email: &Email) -> Vec<String> {
