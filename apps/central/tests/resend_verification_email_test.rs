@@ -123,6 +123,119 @@ async fn replacement_invalidates_old_code_and_refreshes_expiry_and_cooldown() {
 }
 
 #[tokio::test]
+async fn verification_and_replacement_have_consistent_outcomes() {
+    let instance = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(0).build())
+        .await
+        .unwrap();
+
+    for _ in 0..8 {
+        let (user, _) = instance.signup_user().await;
+        let original = verification_codes(&instance, &user.email)[0].clone();
+        assert_eq!(
+            resend(&instance, &user.email).await.status(),
+            StatusCode::OK
+        );
+
+        let (verification, worker) = tokio::join!(
+            verify(&instance, &user.email, &original),
+            instance.job_worker.consume_jobs()
+        );
+        worker.unwrap();
+
+        if verification.status() == StatusCode::OK {
+            // Verification won: queued replacement cannot restart verification.
+            assert_eq!(
+                verification.json::<serde_json::Value>().await.unwrap()["emailVerified"],
+                true
+            );
+        } else {
+            // Replacement won: the superseded code cannot verify, but the
+            // freshly delivered current code remains usable.
+            assert_eq!(verification.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(
+                verification
+                    .json::<UnprocessableEntityError>()
+                    .await
+                    .unwrap()
+                    .code,
+                "ETKAVE02"
+            );
+            let codes = verification_codes(&instance, &user.email);
+            assert_eq!(codes.len(), 2);
+            let response = verify(&instance, &user.email, &codes[1]).await;
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.json::<serde_json::Value>().await.unwrap()["emailVerified"],
+                true
+            );
+        }
+
+        for code in verification_codes(&instance, &user.email) {
+            let response = verify(&instance, &user.email, &code).await;
+            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(
+                response
+                    .json::<UnprocessableEntityError>()
+                    .await
+                    .unwrap()
+                    .code,
+                "ETKAVE01"
+            );
+        }
+        let response = resend(&instance, &user.email).await;
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            response
+                .json::<UnprocessableEntityError>()
+                .await
+                .unwrap()
+                .code,
+            "ETKARV01"
+        );
+    }
+}
+
+#[tokio::test]
+async fn queued_replacement_cannot_restart_successful_verification() {
+    let instance = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(0).build())
+        .await
+        .unwrap();
+    let (user, _) = instance.signup_user().await;
+    let code = verification_codes(&instance, &user.email)[0].clone();
+    assert_eq!(
+        resend(&instance, &user.email).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        verify(&instance, &user.email, &code).await.status(),
+        StatusCode::OK
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    for code in verification_codes(&instance, &user.email) {
+        let response = verify(&instance, &user.email, &code).await;
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            response
+                .json::<UnprocessableEntityError>()
+                .await
+                .unwrap()
+                .code,
+            "ETKAVE01"
+        );
+    }
+    let response = resend(&instance, &user.email).await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKARV01"
+    );
+}
+
+#[tokio::test]
 async fn concurrent_resend_processing_preserves_current_verification_and_cooldown() {
     concurrent_issuance(true).await;
 }

@@ -470,7 +470,8 @@ impl AuthRepository for PsqlAuthRepository {
                 otp_hash,
                 purpose,
                 created_at,
-                expires_at
+                expires_at,
+                consumed_at
             "#,
         )
         .bind(user_id)
@@ -500,7 +501,18 @@ impl AuthRepository for PsqlAuthRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
 
-        let user = get_user_by_email(&verify_email_request.email, &mut *transaction)
+        // Share issuance's lock before reading the User or current request, so
+        // verification and replacement observe one another's committed outcome.
+        let user_id = sqlx::query_scalar::<_, uuid::Uuid>(
+            "SELECT id FROM ethoko_user WHERE email = $1 FOR UPDATE",
+        )
+        .bind(&verify_email_request.email)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to lock user for otp verification"))?
+        .ok_or(VerifyEmailError::NotFound)?;
+
+        let user = get_user_by_id(user_id, &mut *transaction)
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to fetch user"))?;
 
@@ -525,13 +537,27 @@ impl AuthRepository for PsqlAuthRepository {
             None => return Err(VerifyEmailError::InvalidOtp),
         };
 
-        if Utc::now() > otp_request.expires_at {
+        if otp_request.consumed_at.is_some() {
+            return Err(VerifyEmailError::InvalidOtp);
+        }
+
+        let consumed_at = Utc::now();
+        if consumed_at >= otp_request.expires_at {
             return Err(VerifyEmailError::OtpExpired);
         }
 
         if otp_request.otp_hash != verify_email_request.otp_hash {
             return Err(VerifyEmailError::InvalidOtp);
         }
+
+        sqlx::query("UPDATE otp_request SET consumed_at = $1 WHERE id = $2 AND user_id = $3 AND purpose = $4")
+            .bind(consumed_at)
+            .bind(otp_request.id)
+            .bind(user.id())
+            .bind(OtpPurpose::EmailVerification)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to consume otp request"))?;
 
         sqlx::query(
             r#"
@@ -903,7 +929,8 @@ async fn get_otp_request_by_user_and_purpose<'a, E: Executor<'a, Database = Post
             otp_hash,
             purpose,
             created_at,
-            expires_at
+            expires_at,
+            consumed_at
         FROM otp_request
         WHERE user_id = $1 AND purpose = $2
         "#,

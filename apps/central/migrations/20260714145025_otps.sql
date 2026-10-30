@@ -6,6 +6,7 @@ CREATE TABLE "otp_request" (
     otp_hash                   BYTEA        NOT NULL,
     purpose                    otp_purpose  NOT NULL,
     expires_at                 TIMESTAMPTZ  NOT NULL,
+    consumed_at                TIMESTAMPTZ,
     created_at                 TIMESTAMPTZ  NOT NULL DEFAULT now(),
     UNIQUE (user_id, purpose)
 );

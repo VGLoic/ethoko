@@ -50,6 +50,63 @@ async fn test_verify_email_200_valid_otp() {
 }
 
 #[tokio::test]
+async fn concurrent_verification_consumes_current_request_only_once() {
+    let instance = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+    let (user, _) = instance.signup_user().await;
+    let otp = instance
+        .email_service
+        .get_emails_sent_to(&user.email)
+        .first()
+        .map(|template| match template {
+            EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_string(),
+        })
+        .unwrap();
+    let mut attempts = tokio::task::JoinSet::new();
+    for _ in 0..16 {
+        let client = instance.reqwest_client.clone();
+        let url = format!("{}/auth/verify-email", instance.server_url);
+        let body = HttpVerifyEmailBody {
+            email: user.email.to_string(),
+            otp: otp.clone(),
+        };
+        attempts.spawn(async move {
+            client
+                .post(url)
+                .headers(central_ui_bff_principal_headers())
+                .json(&body)
+                .send()
+                .await
+                .unwrap()
+        });
+    }
+    let mut successes = 0;
+    while let Some(response) = attempts.join_next().await {
+        let response = response.unwrap();
+        if response.status() == StatusCode::OK {
+            successes += 1;
+            let user: serde_json::Value = response.json().await.unwrap();
+            assert_eq!(user["emailVerified"], true);
+        } else {
+            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            assert_eq!(
+                response
+                    .json::<UnprocessableEntityError>()
+                    .await
+                    .unwrap()
+                    .code,
+                "ETKAVE01"
+            );
+        }
+    }
+    assert_eq!(
+        successes, 1,
+        "The current request may be consumed only once"
+    );
+}
+
+#[tokio::test]
 async fn test_verify_email_422_already_verified() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
