@@ -98,7 +98,7 @@ impl<R: AuthRepository, S: AuthService, E: EmailService> AuthJobProcessor<R, S, 
 
         if let Err(e) = self
             .auth_repository
-            .register_email_verification_otp(payload.user_id, otp_hash, &self.otp_config)
+            .register_email_verification_otp(payload.user_id, Some(otp_hash), &self.otp_config)
             .await
         {
             match e {

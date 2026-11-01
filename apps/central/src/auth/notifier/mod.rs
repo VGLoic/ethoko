@@ -49,6 +49,7 @@ pub trait AuthNotifier: Send + Sync + 'static {
     async fn user_requested_resend_verification_otp(
         &self,
         user: &User,
+        otp_request_id: uuid::Uuid,
     ) -> Result<(), ResendVerificationOtpError>;
 
     /// Triggers a notification when user logged in with email
@@ -135,6 +136,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
     async fn user_requested_resend_verification_otp(
         &self,
         user: &User,
+        otp_request_id: uuid::Uuid,
     ) -> Result<(), ResendVerificationOtpError> {
         debug!(
             event = "auth.notification.enqueue_started",
@@ -145,7 +147,11 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
 
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+            AuthJob::FillEmailVerificationOtp(jobs::FillEmailVerificationOtpPayload {
+                user_id: user.id(),
+                user_email: user.email().to_owned(),
+                otp_request_id,
+            }),
         )?
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());

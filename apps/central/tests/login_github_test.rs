@@ -16,6 +16,92 @@ use fake::{Fake, Faker};
 use crate::common::central_ui_bff_with_user_principal_headers;
 
 #[tokio::test]
+async fn concurrent_first_resend_serializes_before_github_notification_processing() {
+    use ethoko_central::jobs::queue::Queue;
+    let instance = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+    let email = Faker.fake::<Email>();
+    instance.github_client.set_next_user(GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    });
+    instance
+        .github_client
+        .set_next_user_emails(vec![GithubApiUserEmailsResponseItem {
+            email: email.to_string(),
+            verified: false,
+            primary: true,
+        }]);
+    let start = instance
+        .reqwest_client
+        .post(format!("{}/auth/login/github/start", instance.server_url))
+        .headers(central_ui_bff_principal_headers())
+        .send()
+        .await
+        .unwrap()
+        .json::<HttpLoginGithubStartResponse>()
+        .await
+        .unwrap();
+    let response = instance
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/callback",
+            instance.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .json(&HttpLoginGithubCallbackBody {
+            code: instance.github_oauth_client.code().unwrap(),
+            state: start.state,
+        })
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    // GitHub's transitional notification has not created any request yet.
+    // Hold it so only linked resend work is processed in this scenario.
+    let _held = instance.job_queue.dequeue().await.unwrap().unwrap();
+    let (first, second) = tokio::join!(
+        instance.resend_verification_otp(&email),
+        instance.resend_verification_otp(&email)
+    );
+    let mut statuses = [first.status().as_u16(), second.status().as_u16()];
+    statuses.sort();
+    assert_eq!(statuses, [200, 422]);
+    let rejected = if first.status() == StatusCode::OK {
+        second
+    } else {
+        first
+    };
+    assert_eq!(
+        rejected
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKARV02"
+    );
+    assert!(instance.verification_codes(&email).is_empty());
+    assert_eq!(
+        instance
+            .verify_email(&email, "123456")
+            .await
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKAVE02"
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    let codes = instance.verification_codes(&email);
+    assert_eq!(codes.len(), 1);
+    assert_eq!(
+        instance.verify_email(&email, &codes[0]).await.status(),
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
 async fn test_login_github_start_201() {
     let instance_state = setup_instance(&TestConfigBuilder::build_default())
         .await
