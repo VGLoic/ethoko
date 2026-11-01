@@ -4,7 +4,6 @@ use crate::{
         models::{
             auth_credential::{AuthCredential, AuthCredentialPayload},
             opaque_token::{OpaqueTokenCreatePayload, OpaqueTokenValue},
-            otp_request::OtpPurpose,
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
                 fill_email_verification_otp::FillEmailVerificationOtpError,
@@ -13,6 +12,7 @@ use crate::{
                 resend_verification_otp::{
                     ResendVerificationOtpError, ResendVerificationOtpRequest,
                 },
+                send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
             },
@@ -20,9 +20,7 @@ use crate::{
         },
         notifier::AuthNotifier,
         password_hasher::verify_password,
-        repository::{
-            AuthRepository, GetAuthCredentialError, GetOtpRequestError, RecordSessionTokenError,
-        },
+        repository::{AuthRepository, GetAuthCredentialError, RecordSessionTokenError},
         requests::{
             login_email::{LoginEmailError, LoginEmailRequest},
             login_github_callback::{LoginGithubCallbackError, LoginGithubCallbackRequest},
@@ -71,7 +69,8 @@ pub trait AuthService: Send + Sync + 'static {
 
     /// Resends the verification OTP to the user's email.
     /// - If the user's email is already verified, an error is returned.
-    /// - The service only checks the condition for resend, the actual sending of the OTP is handled by the notifier.
+    /// - Commits a fresh Unfilled request under the User lock before best-effort
+    ///   enqueueing linked filling work; the previous code is invalid immediately.
     /// # Errors
     /// * `ResendVerificationOtpError::UserNotFound` if the user with the provided email is not found.
     /// * `ResendVerificationOtpError::UserAlreadyVerified` if the user's email is already verified.
@@ -289,29 +288,28 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
                     err.context("Error fetching user by email").into()
                 }
             })?;
-        if user.email_verified() {
-            return Err(ResendVerificationOtpError::UserAlreadyVerified);
-        }
-        let current_otp = self
+        // The preliminary User lookup identifies the lock target only. Verified
+        // email and cooldown checks are authoritative inside request creation.
+        let otp_request = self
             .repository
-            .get_otp_request_by_user_and_purpose(user.id(), OtpPurpose::EmailVerification)
+            .register_email_verification_otp(user.id(), None, &self.otp_config)
             .await
             .map_err(|e| match e {
-                GetOtpRequestError::Unknown(err) => {
-                    err.context("Error fetching current email-verification OTP request")
+                SendEmailVerificationOtpError::NotFound => ResendVerificationOtpError::UserNotFound,
+                SendEmailVerificationOtpError::EmailAlreadyVerified => {
+                    ResendVerificationOtpError::UserAlreadyVerified
                 }
+                SendEmailVerificationOtpError::CooldownNotElapsed => {
+                    ResendVerificationOtpError::CooldownNotElapsed
+                }
+                SendEmailVerificationOtpError::Unknown(err) => err
+                    .context("Error creating replacement email-verification OTP request")
+                    .into(),
             })?;
-        if let Some(current_otp) = current_otp {
-            let now = chrono::Utc::now();
-            let elapsed = now.signed_duration_since(current_otp.created_at);
-            if elapsed < chrono::Duration::seconds(self.otp_config.cooldown_seconds.into()) {
-                return Err(ResendVerificationOtpError::CooldownNotElapsed);
-            }
-        }
 
         if let Err(e) = self
             .notifier
-            .user_requested_resend_verification_otp(&user)
+            .user_requested_resend_verification_otp(&user, otp_request.id)
             .await
         {
             match &e {

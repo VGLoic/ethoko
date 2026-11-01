@@ -69,7 +69,9 @@ pub trait AuthRepository: Send + Sync + 'static {
         github_user: GithubUser,
     ) -> Result<(User, AuthCredential, bool), LoginGithubCallbackError>;
 
-    /// Registers a new email verification OTP for the user.
+    /// Creates an email-verification OTP Request for the User.
+    /// - Resend passes no hash to create an Unfilled request. A hash is supported
+    ///   only for transitional legacy GitHub notification work.
     /// - Replaces the current email-verification request with a fresh identity and lifetime.
     /// - Serializes issuance on the User, including when no request exists yet.
     /// - Other purposes are neither checked for cooldown nor replaced.
@@ -81,7 +83,7 @@ pub trait AuthRepository: Send + Sync + 'static {
     async fn register_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
-        otp_hash: [u8; 32],
+        otp_hash: Option<[u8; 32]>,
         otp_config: &OtpConfig,
     ) -> Result<OtpRequest, SendEmailVerificationOtpError>;
 
@@ -107,15 +109,6 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// * `GetUserByEmailError::NotFound` if the user is not found
     /// * `GetUserByEmailError::Unknown` for any other errors that may occur during the process.
     async fn get_user_by_email(&self, email: &Email) -> Result<User, GetUserByEmailError>;
-
-    /// Gets the current OTP request for a User and purpose, including expired requests.
-    /// # Errors
-    /// * `GetOtpRequestError::Unknown` for any other errors that may occur during the process.
-    async fn get_otp_request_by_user_and_purpose(
-        &self,
-        user_id: uuid::Uuid,
-        purpose: OtpPurpose,
-    ) -> Result<Option<OtpRequest>, GetOtpRequestError>;
 
     /// Gets the user and auth credentials for a user by their email address.
     /// # Errors
@@ -201,12 +194,6 @@ pub enum RecordSessionTokenError {
 pub enum GetAuthCredentialError {
     #[error("Auth credential not found")]
     NotFound,
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Error, Debug)]
-pub enum GetOtpRequestError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -474,7 +461,7 @@ impl AuthRepository for PsqlAuthRepository {
     async fn register_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
-        otp_hash: [u8; 32],
+        otp_hash: Option<[u8; 32]>,
         otp_config: &OtpConfig,
     ) -> Result<OtpRequest, SendEmailVerificationOtpError> {
         let mut transaction = self
@@ -674,20 +661,6 @@ impl AuthRepository for PsqlAuthRepository {
             Some(user) => Ok(user),
             None => Err(GetUserByEmailError::NotFound),
         }
-    }
-
-    async fn get_otp_request_by_user_and_purpose(
-        &self,
-        user_id: uuid::Uuid,
-        purpose: OtpPurpose,
-    ) -> Result<Option<OtpRequest>, GetOtpRequestError> {
-        get_otp_request_by_user_and_purpose(user_id, purpose, &self.pool)
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(e)
-                    .context("failed to fetch current otp request")
-                    .into()
-            })
     }
 
     async fn get_auth_credentials_by_email(

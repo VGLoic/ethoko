@@ -190,13 +190,20 @@ async fn retry_replaces_assigned_code_without_renewing_cooldown() {
             instance.resend_verification_otp(&email).await.status(),
             StatusCode::OK
         );
-        // Legacy resend is queued but has not replaced the linked request yet.
+        // Resend replaces immediately, before its filling work runs.
         assert_eq!(
             instance.verify_email(&email, &latest).await.status(),
-            StatusCode::OK
+            StatusCode::UNPROCESSABLE_ENTITY
         );
         instance.job_worker.consume_jobs().await.unwrap();
-        assert_eq!(instance.verification_codes(&email).len(), 1);
+        assert_eq!(instance.verification_codes(&email).len(), 2);
+        assert_eq!(
+            instance
+                .verify_email(&email, &instance.verification_codes(&email)[1])
+                .await
+                .status(),
+            StatusCode::OK
+        );
         break;
     }
 }
@@ -234,7 +241,7 @@ async fn obsolete_signup_job_cannot_fill_replacement_request() {
         .await
         .unwrap();
     let email = signup(&instance).await;
-    // Hold the signup job while the transitional resend creates a replacement.
+    // Hold the signup job while resend commits and fills a replacement.
     use ethoko_central::jobs::queue::Queue;
     let held = instance.job_queue.dequeue().await.unwrap().unwrap();
     assert_eq!(
