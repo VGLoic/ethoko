@@ -19,7 +19,6 @@ mod fake_email_service;
 mod fake_github_client;
 mod fake_oauth_client;
 mod manual_worker;
-mod persistence_fault;
 #[path = "../test_tracing.rs"]
 mod test_tracing;
 
@@ -37,7 +36,6 @@ pub struct InstanceState {
     pub github_oauth_client: FakeOauthClient,
     pub job_worker: ManualWorker<controlled_queue::ControlledQueue, RootProcessor>,
     pub job_queue: controlled_queue::ControlledQueue,
-    pub pool: sqlx::PgPool,
 }
 
 pub struct TestConfigBuilder {
@@ -167,7 +165,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
 
     let auth_oauth_github_client_adapter = FakeOauthClient::default();
     let auth = auth::Auth::compose(
-        pool.clone(),
+        pool,
         job_queue.clone(),
         email_service.clone(),
         github_client.clone(),
@@ -213,7 +211,6 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         server_url,
         job_worker,
         job_queue,
-        pool,
         email_service,
         github_client,
         github_oauth_client: auth_oauth_github_client_adapter,
