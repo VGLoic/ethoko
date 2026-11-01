@@ -7,6 +7,7 @@ use crate::{
             otp_request::OtpPurpose,
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                fill_email_verification_otp::FillEmailVerificationOtpError,
                 logout::LogoutError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
                 resend_verification_otp::{
@@ -38,13 +39,13 @@ use tracing::{debug, error};
 pub trait AuthService: Send + Sync + 'static {
     /// Atomically fills the linked request; false means successful ineligible skip.
     /// # Errors
-    /// Returns an error for unexpected persistence failures, which should be retried.
+    /// * `FillEmailVerificationOtpError::Unknown` for unexpected persistence failures, which should be retried.
     async fn fill_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
         request_id: uuid::Uuid,
         otp_hash: [u8; 32],
-    ) -> Result<bool, anyhow::Error>;
+    ) -> Result<bool, FillEmailVerificationOtpError>;
 
     /// Creates a User with the provided email and password hash.
     /// - The User has no Handle Registration and an unverified email.
@@ -231,7 +232,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         user_id: uuid::Uuid,
         request_id: uuid::Uuid,
         otp_hash: [u8; 32],
-    ) -> Result<bool, anyhow::Error> {
+    ) -> Result<bool, FillEmailVerificationOtpError> {
         self.repository
             .fill_email_verification_otp(user_id, request_id, otp_hash)
             .await

@@ -8,6 +8,7 @@ use crate::{
             otp_request::{OtpAssignment, OtpPurpose, OtpRequest, OtpRequestRow},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                fill_email_verification_otp::FillEmailVerificationOtpError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
                 send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
@@ -47,13 +48,13 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// Assigns a hash to the exact current, unexpired, unconsumed request of an
     /// unverified User under the shared User lock. Ineligible work returns false.
     /// # Errors
-    /// * `anyhow::Error` for unexpected database failures, including commit failure.
+    /// * `FillEmailVerificationOtpError::Unknown` for unexpected database failures, including commit failure.
     async fn fill_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
         request_id: uuid::Uuid,
         otp_hash: [u8; 32],
-    ) -> Result<bool, anyhow::Error>;
+    ) -> Result<bool, FillEmailVerificationOtpError>;
 
     /// Find in a user with their Github account, or creates a new user if one does not exist.
     /// Look first for an existing user with the given Github ID, and if not found, create a new user.
@@ -324,8 +325,12 @@ impl AuthRepository for PsqlAuthRepository {
         user_id: uuid::Uuid,
         request_id: uuid::Uuid,
         otp_hash: [u8; 32],
-    ) -> Result<bool, anyhow::Error> {
-        let mut transaction = self.pool.begin().await?;
+    ) -> Result<bool, FillEmailVerificationOtpError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
         let email_verified = sqlx::query_scalar::<_, bool>(
             "SELECT email_verified FROM ethoko_user WHERE id = $1 FOR UPDATE",
         )
@@ -353,7 +358,10 @@ impl AuthRepository for PsqlAuthRepository {
         .map_err(|e| anyhow::anyhow!(e).context("failed to fill email verification otp"))?
         .rows_affected()
             == 1;
-        transaction.commit().await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
         Ok(assigned)
     }
 
