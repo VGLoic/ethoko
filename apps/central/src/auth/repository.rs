@@ -5,7 +5,7 @@ use crate::{
             github_acl::GithubUser,
             oauth_transaction::OauthTransaction,
             opaque_token::{OpaqueToken, OpaqueTokenCreatePayload},
-            otp_request::{OtpPurpose, OtpRequest},
+            otp_request::{OtpAssignment, OtpPurpose, OtpRequest, OtpRequestRow},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
@@ -455,7 +455,7 @@ impl AuthRepository for PsqlAuthRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to remove previous otp request"))?;
 
-        let otp_request = sqlx::query_as::<_, OtpRequest>(
+        let otp_request = sqlx::query_as::<_, OtpRequestRow>(
             r#"
             INSERT INTO otp_request (
                 user_id,
@@ -488,7 +488,7 @@ impl AuthRepository for PsqlAuthRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
 
-        Ok(otp_request)
+        Ok(otp_request.into())
     }
 
     async fn verify_email_by_otp(
@@ -546,7 +546,10 @@ impl AuthRepository for PsqlAuthRepository {
             return Err(VerifyEmailError::OtpExpired);
         }
 
-        if otp_request.otp_hash != verify_email_request.otp_hash {
+        let OtpAssignment::Filled { otp_hash } = otp_request.assignment else {
+            return Err(VerifyEmailError::InvalidOtp);
+        };
+        if otp_hash != verify_email_request.otp_hash {
             return Err(VerifyEmailError::InvalidOtp);
         }
 
@@ -921,7 +924,7 @@ async fn get_otp_request_by_user_and_purpose<'a, E: Executor<'a, Database = Post
     purpose: OtpPurpose,
     executor: E,
 ) -> Result<Option<OtpRequest>, sqlx::Error> {
-    let otp_request = sqlx::query_as::<_, OtpRequest>(
+    let otp_request = sqlx::query_as::<_, OtpRequestRow>(
         r#"
         SELECT
             id,
@@ -940,7 +943,7 @@ async fn get_otp_request_by_user_and_purpose<'a, E: Executor<'a, Database = Post
     .fetch_optional(executor)
     .await?;
 
-    Ok(otp_request)
+    Ok(otp_request.map(OtpRequest::from))
 }
 
 async fn get_user_by_email<'a, E: Executor<'a, Database = Postgres>>(
