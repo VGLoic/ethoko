@@ -47,7 +47,7 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// Assigns a hash to the exact current, unexpired, unconsumed request of an
     /// unverified User under the shared User lock. Ineligible work returns false.
     /// # Errors
-    /// Returns an error for unexpected database failures, including commit failure.
+    /// * `anyhow::Error` for unexpected database failures, including commit failure.
     async fn fill_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
