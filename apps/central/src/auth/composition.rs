@@ -41,19 +41,20 @@ impl Auth {
         let repository = PsqlAuthRepository::new(pool);
         let notifier = AuthNotifierImpl::new(job_queue);
         let github_adapter = AuthGithubAdapter::new(github_client);
-        let service = AuthServiceImpl::new(
+        let service = Arc::new(AuthServiceImpl::new(
             repository.clone(),
             notifier,
             otp_config.clone(),
             oauth_client,
             oauth_transaction_ttl_seconds,
             github_adapter,
-        );
-        let job_processor = AuthJobProcessor::new(repository, email_service, otp_config);
+        ));
+        let job_processor =
+            AuthJobProcessor::new(repository, service.clone(), email_service, otp_config);
 
         Self {
             state: AuthState {
-                auth_service: Arc::new(service),
+                auth_service: service,
                 central_ui_bff_shared_secret: Arc::new(central_ui_bff_shared_secret),
             },
             job_processor: Arc::new(job_processor),

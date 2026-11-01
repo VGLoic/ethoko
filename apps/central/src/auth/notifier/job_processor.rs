@@ -3,6 +3,7 @@ use crate::{
         models::requests::send_email_verification_otp::SendEmailVerificationOtpError,
         notifier::jobs::{AuthJob, SendEmailVerificationOtpPayload},
         repository::AuthRepository,
+        service::AuthService,
     },
     config::OtpConfig,
     externalcom::email::{EmailService, EmailVerificationCodePayload},
@@ -12,16 +13,23 @@ use crate::{
 };
 use tracing::{debug, error, warn};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthJobProcessor<R: AuthRepository, E: EmailService> {
     auth_repository: R,
+    auth_service: std::sync::Arc<dyn AuthService>,
     email_service: E,
     otp_config: OtpConfig,
 }
 impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
-    pub fn new(auth_repository: R, email_service: E, otp_config: OtpConfig) -> Self {
+    pub fn new(
+        auth_repository: R,
+        auth_service: std::sync::Arc<dyn AuthService>,
+        email_service: E,
+        otp_config: OtpConfig,
+    ) -> Self {
         Self {
             auth_repository,
+            auth_service,
             email_service,
             otp_config,
         }
@@ -42,6 +50,28 @@ impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E>
             .map_err(|e| anyhow::Error::new(e).context("failed to deserialized job payload"))?;
 
         match payload {
+            AuthJob::FillEmailVerificationOtp(p) => {
+                let otp = Otp::generate()?;
+                if !self
+                    .auth_service
+                    .fill_email_verification_otp(p.user_id, p.otp_request_id, otp.hash())
+                    .await?
+                {
+                    debug!(event = "auth.email_verification_otp.filling_skipped",
+                        user_id = %p.user_id, otp_request_id = %p.otp_request_id,
+                        "Linked request is ineligible; skipping delivery");
+                    return Ok(());
+                }
+                // Assignment has committed. Sending never mutates the request.
+                let template = EmailVerificationCodePayload::new(p.user_email.clone(), otp);
+                self.email_service
+                    .send_email(p.user_email, template.into())
+                    .await
+                    .map_err(|e| e.context("failed to send email verification OTP"))?;
+                debug!(event = "auth.email_verification_otp.sent", user_id = %p.user_id,
+                    otp_request_id = %p.otp_request_id, "Sent email verification OTP");
+                Ok(())
+            }
             AuthJob::SendEmailVerificationOtp(p) => {
                 self.process_send_email_verification_otp(p)
                     .await

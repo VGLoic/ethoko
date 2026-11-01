@@ -1,8 +1,14 @@
 use fake::rand::distr::{Distribution, Uniform};
 use sha2::Digest;
 
-#[derive(Debug, Clone, PartialEq, Eq, sqlx::Type)]
+#[derive(Clone, PartialEq, Eq, sqlx::Type)]
 pub struct Otp(String);
+
+impl std::fmt::Debug for Otp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Otp([REDACTED])")
+    }
+}
 
 impl From<String> for Otp {
     fn from(s: String) -> Self {

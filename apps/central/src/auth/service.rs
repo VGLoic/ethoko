@@ -36,9 +36,20 @@ use tracing::{debug, error};
 
 #[async_trait::async_trait]
 pub trait AuthService: Send + Sync + 'static {
+    /// Atomically fills the linked request; false means successful ineligible skip.
+    /// # Errors
+    /// Returns an error for unexpected persistence failures, which should be retried.
+    async fn fill_email_verification_otp(
+        &self,
+        user_id: uuid::Uuid,
+        request_id: uuid::Uuid,
+        otp_hash: [u8; 32],
+    ) -> Result<bool, anyhow::Error>;
+
     /// Creates a User with the provided email and password hash.
     /// - The User has no Handle Registration and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
+    /// - An Unfilled email-verification OTP Request is created atomically with them.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
@@ -174,11 +185,14 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         &self,
         request: SignupEmailRequest,
     ) -> Result<(User, AuthCredential), SignupEmailError> {
-        let (user, auth_credential) = self.repository.create_user_with_email_auth(request).await?;
+        let (user, auth_credential, otp_request) = self
+            .repository
+            .create_user_with_email_auth(request, &self.otp_config)
+            .await?;
 
         if let Err(e) = self
             .notifier
-            .user_signed_up_with_email(&user, &auth_credential)
+            .user_signed_up_with_email(&user, &auth_credential, otp_request.id)
             .await
         {
             match &e {
@@ -210,6 +224,17 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         );
 
         Ok((user, auth_credential))
+    }
+
+    async fn fill_email_verification_otp(
+        &self,
+        user_id: uuid::Uuid,
+        request_id: uuid::Uuid,
+        otp_hash: [u8; 32],
+    ) -> Result<bool, anyhow::Error> {
+        self.repository
+            .fill_email_verification_otp(user_id, request_id, otp_hash)
+            .await
     }
 
     async fn verify_email(&self, request: VerifyEmailRequest) -> Result<User, VerifyEmailError> {
