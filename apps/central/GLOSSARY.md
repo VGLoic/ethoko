@@ -12,8 +12,14 @@ _Avoid_: "temporary handle", "reserved handle", "provider handle".
 ### Authentication
 
 **OTP Request**:
-A User's latest retained request for a one-time code for a specific purpose: email verification or password reset. A User has at most one request for each purpose; requests for different purposes are independent. Issuing a replacement invalidates the previous code and starts a fresh lifetime and resend cooldown. Successful email verification consumes its request. Expired and consumed requests remain current until replaced, but their codes cannot be used; retaining the current request does not retain a history of previous requests.
+A User's latest retained request for a one-time code for a specific purpose: email verification or password reset. A request is either **Unfilled** or **Filled**. A User has at most one request for each purpose; requests for different purposes are independent. Creating a replacement invalidates the previous code and starts a fresh lifetime and resend cooldown. Successful email verification consumes its request. Expired and consumed requests remain current until replaced, but their codes cannot be used; retaining the current request does not retain a history of previous requests.
 _Avoid_: "OTP history", "latest OTP" (there is only one current request per purpose).
+
+**Unfilled**:
+An OTP Request awaiting code assignment. It has no assigned code and cannot satisfy verification. This describes code assignment, not whether an email has been delivered.
+
+**Filled**:
+An OTP Request with an assigned code. Assignment alone does not make the request usable: expiry and consumption still apply. This describes code assignment, not whether an email has been delivered; consuming a request does not change its assignment state.
 
 **Principal**:
 The authenticated identity making a request to Ethoko Central. Initially the only Principal is the Central UI BFF; a Principal may act alone or convey an authenticated **User** and that User's session-token hash for actions performed on the User's behalf.
