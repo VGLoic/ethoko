@@ -1,6 +1,9 @@
 use ethoko_central::{
     auth::requests::login_email::{HttpLoginEmailBody, HttpLoginEmailResponse},
+    auth::requests::resend_verification_otp::HttpResendVerificationOtpBody,
     auth::requests::signup_email::{HttpSignupEmailBody, HttpSignupEmailResponse},
+    auth::requests::verify_email::HttpVerifyEmailBody,
+    externalcom::email::EmailTemplate,
     newtypes::email::Email,
     newtypes::password::Password,
 };
@@ -17,6 +20,18 @@ pub trait AuthActions {
     /// Signs up a new user and returns the user response along with the password.
     /// The email and password are generated automatically.
     async fn signup_user(&self) -> (HttpSignupEmailResponse, Password);
+
+    /// Submits an email verification attempt, preserving the HTTP response.
+    /// Panics if the HTTP request fails.
+    async fn verify_email(&self, email: &Email, otp: &str) -> reqwest::Response;
+
+    /// Requests another verification code, preserving the HTTP response.
+    /// Panics if the HTTP request fails.
+    async fn resend_verification_otp(&self, email: &Email) -> reqwest::Response;
+
+    /// Returns the codes in captured verification emails for this recipient.
+    /// Panics if the captured email lock is poisoned.
+    fn verification_codes(&self, email: &Email) -> Vec<String>;
 
     /// Logs in a user with the given email and password, returning the authentication token.
     async fn login_user(&self, email: &Email, password: &Password) -> String;
@@ -51,6 +66,41 @@ impl AuthActions for InstanceState {
         self.job_worker.consume_jobs().await.unwrap();
 
         (user, password)
+    }
+
+    async fn verify_email(&self, email: &Email, otp: &str) -> reqwest::Response {
+        self.reqwest_client
+            .post(format!("{}/auth/verify-email", self.server_url))
+            .headers(central_ui_bff_principal_headers())
+            .json(&HttpVerifyEmailBody {
+                email: email.to_string(),
+                otp: otp.to_owned(),
+            })
+            .send()
+            .await
+            .unwrap()
+    }
+
+    async fn resend_verification_otp(&self, email: &Email) -> reqwest::Response {
+        self.reqwest_client
+            .post(format!("{}/auth/resend-verification-otp", self.server_url))
+            .headers(central_ui_bff_principal_headers())
+            .json(&HttpResendVerificationOtpBody {
+                email: email.to_string(),
+            })
+            .send()
+            .await
+            .unwrap()
+    }
+
+    fn verification_codes(&self, email: &Email) -> Vec<String> {
+        self.email_service
+            .get_emails_sent_to(email)
+            .iter()
+            .map(|template| match template {
+                EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_owned(),
+            })
+            .collect()
     }
 
     async fn login_user(&self, email: &Email, password: &Password) -> String {

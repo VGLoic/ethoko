@@ -1,64 +1,38 @@
 use axum::http::StatusCode;
 use ethoko_central::jobs::queue::QueueInspector;
-use ethoko_central::{externalcom::email::EmailTemplate, newtypes::email::Email};
+use ethoko_central::{
+    auth::requests::signup_email::{HttpSignupEmailBody, HttpSignupEmailResponse},
+    externalcom::email::EmailTemplate,
+    newtypes::{email::Email, password::Password},
+};
 use fake::{Fake, Faker};
 use std::{sync::atomic::Ordering, time::Duration};
 mod common;
-use common::{InstanceState, TestConfigBuilder, central_ui_bff_principal_headers, setup_instance};
+use common::{
+    AuthActions, InstanceState, TestConfigBuilder, central_ui_bff_principal_headers, setup_instance,
+};
 
-async fn post(instance: &InstanceState, path: &str, body: serde_json::Value) -> reqwest::Response {
-    instance
-        .reqwest_client
-        .post(format!("{}/auth/{path}", instance.server_url))
-        .headers(central_ui_bff_principal_headers())
-        .json(&body)
-        .send()
-        .await
-        .unwrap()
-}
-
+// These tests control worker execution; the shared signup action processes jobs.
 async fn signup(instance: &InstanceState) -> Email {
     let email = Faker.fake::<Email>();
-    assert_eq!(
-        post(
-            instance,
-            "signup/email",
-            serde_json::json!({"email": email, "password": "Password123!"})
-        )
-        .await
-        .status(),
-        StatusCode::CREATED
-    );
-    email
-}
-
-async fn verify(instance: &InstanceState, email: &Email, otp: &str) -> reqwest::Response {
-    post(
-        instance,
-        "verify-email",
-        serde_json::json!({"email": email, "otp": otp}),
-    )
-    .await
-}
-
-async fn resend(instance: &InstanceState, email: &Email) -> reqwest::Response {
-    post(
-        instance,
-        "resend-verification-otp",
-        serde_json::json!({"email": email}),
-    )
-    .await
-}
-
-fn codes(instance: &InstanceState, email: &Email) -> Vec<String> {
-    instance
-        .email_service
-        .get_emails_sent_to(email)
-        .iter()
-        .map(|template| match template {
-            EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_owned(),
+    let password = Faker.fake::<Password>();
+    let response = instance
+        .reqwest_client
+        .post(format!("{}/auth/signup/email", instance.server_url))
+        .headers(central_ui_bff_principal_headers())
+        .json(&HttpSignupEmailBody {
+            email: email.to_string(),
+            password: password.as_str().to_owned(),
         })
-        .collect()
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    response
+        .json::<HttpSignupEmailResponse>()
+        .await
+        .unwrap()
+        .email
 }
 
 #[tokio::test]
@@ -67,24 +41,24 @@ async fn signup_starts_cooldown_before_worker_and_verifies_only_after_filling() 
         .await
         .unwrap();
     let email = signup(&instance).await;
-    assert!(codes(&instance, &email).is_empty());
-    let response = verify(&instance, &email, "123456").await;
+    assert!(instance.verification_codes(&email).is_empty());
+    let response = instance.verify_email(&email, "123456").await;
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
         response.json::<serde_json::Value>().await.unwrap()["code"],
         "ETKAVE02"
     );
-    let response = resend(&instance, &email).await;
+    let response = instance.resend_verification_otp(&email).await;
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
         response.json::<serde_json::Value>().await.unwrap()["code"],
         "ETKARV02"
     );
     instance.job_worker.consume_jobs().await.unwrap();
-    let codes = codes(&instance, &email);
+    let codes = instance.verification_codes(&email);
     assert_eq!(codes.len(), 1);
     assert_eq!(
-        verify(&instance, &email, &codes[0]).await.status(),
+        instance.verify_email(&email, &codes[0]).await.status(),
         StatusCode::OK
     );
 }
@@ -97,7 +71,7 @@ async fn expired_unfilled_request_is_skipped_without_email_or_retry() {
     let email = signup(&instance).await;
     tokio::time::sleep(Duration::from_millis(1200)).await;
     instance.job_worker.consume_jobs().await.unwrap();
-    assert!(codes(&instance, &email).is_empty());
+    assert!(instance.verification_codes(&email).is_empty());
     assert!(
         instance
             .job_queue
@@ -117,7 +91,7 @@ async fn expired_unfilled_request_is_skipped_without_email_or_retry() {
             .len(),
         1
     );
-    let response = verify(&instance, &email, "123456").await;
+    let response = instance.verify_email(&email, "123456").await;
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
         response.json::<serde_json::Value>().await.unwrap()["code"],
@@ -136,24 +110,28 @@ async fn enqueue_failure_preserves_signup_and_cooldown_and_later_resend_recovers
         .store(true, Ordering::SeqCst);
     let email = signup(&instance).await;
     assert_eq!(
-        resend(&instance, &email).await.status(),
+        instance.resend_verification_otp(&email).await.status(),
         StatusCode::UNPROCESSABLE_ENTITY
     );
     assert_eq!(
-        verify(&instance, &email, "123456").await.status(),
+        instance.verify_email(&email, "123456").await.status(),
         StatusCode::UNPROCESSABLE_ENTITY
     );
     instance.job_worker.consume_jobs().await.unwrap();
-    assert!(codes(&instance, &email).is_empty());
+    assert!(instance.verification_codes(&email).is_empty());
     instance
         .job_queue
         .fail_enqueue
         .store(false, Ordering::SeqCst);
     tokio::time::sleep(Duration::from_millis(1200)).await;
-    assert_eq!(resend(&instance, &email).await.status(), StatusCode::OK);
+    assert_eq!(
+        instance.resend_verification_otp(&email).await.status(),
+        StatusCode::OK
+    );
     instance.job_worker.consume_jobs().await.unwrap();
     assert_eq!(
-        verify(&instance, &email, &codes(&instance, &email)[0])
+        instance
+            .verify_email(&email, &instance.verification_codes(&email)[0])
             .await
             .status(),
         StatusCode::OK
@@ -185,22 +163,22 @@ async fn retry_replaces_assigned_code_without_renewing_cooldown() {
         {
             EmailTemplate::EmailVerificationCode(payload) => payload.otp.show().to_owned(),
         };
-        assert!(codes(&instance, &email).is_empty());
+        assert!(instance.verification_codes(&email).is_empty());
         instance
             .email_service
             .fail_sending
             .store(false, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(2200)).await;
         instance.job_worker.consume_jobs().await.unwrap();
-        let latest = codes(&instance, &email)[0].clone();
+        let latest = instance.verification_codes(&email)[0].clone();
         assert_eq!(
-            resend(&instance, &email).await.status(),
+            instance.resend_verification_otp(&email).await.status(),
             StatusCode::UNPROCESSABLE_ENTITY
         );
         if first == latest {
             continue;
         }
-        let response = verify(&instance, &email, &first).await;
+        let response = instance.verify_email(&email, &first).await;
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(
             response.json::<serde_json::Value>().await.unwrap()["code"],
@@ -208,14 +186,17 @@ async fn retry_replaces_assigned_code_without_renewing_cooldown() {
         );
         // Cooldown ends at creation + 4s, not at retry + 4s.
         tokio::time::sleep(Duration::from_millis(2100)).await;
-        assert_eq!(resend(&instance, &email).await.status(), StatusCode::OK);
+        assert_eq!(
+            instance.resend_verification_otp(&email).await.status(),
+            StatusCode::OK
+        );
         // Legacy resend is queued but has not replaced the linked request yet.
         assert_eq!(
-            verify(&instance, &email, &latest).await.status(),
+            instance.verify_email(&email, &latest).await.status(),
             StatusCode::OK
         );
         instance.job_worker.consume_jobs().await.unwrap();
-        assert_eq!(codes(&instance, &email).len(), 1);
+        assert_eq!(instance.verification_codes(&email).len(), 1);
         break;
     }
 }
@@ -237,9 +218,9 @@ async fn retry_does_not_extend_request_expiry() {
         .store(false, Ordering::SeqCst);
     tokio::time::sleep(Duration::from_millis(2200)).await;
     instance.job_worker.consume_jobs().await.unwrap();
-    let code = codes(&instance, &email)[0].clone();
+    let code = instance.verification_codes(&email)[0].clone();
     tokio::time::sleep(Duration::from_millis(2100)).await;
-    let response = verify(&instance, &email, &code).await;
+    let response = instance.verify_email(&email, &code).await;
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
         response.json::<serde_json::Value>().await.unwrap()["code"],
@@ -256,13 +237,16 @@ async fn obsolete_signup_job_cannot_fill_replacement_request() {
     // Hold the signup job while the transitional resend creates a replacement.
     use ethoko_central::jobs::queue::Queue;
     let held = instance.job_queue.dequeue().await.unwrap().unwrap();
-    assert_eq!(resend(&instance, &email).await.status(), StatusCode::OK);
-    instance.job_worker.consume_jobs().await.unwrap();
-    let code = codes(&instance, &email)[0].clone();
-    instance.job_worker.process_job(&held).await.unwrap();
-    assert_eq!(codes(&instance, &email).len(), 1);
     assert_eq!(
-        verify(&instance, &email, &code).await.status(),
+        instance.resend_verification_otp(&email).await.status(),
+        StatusCode::OK
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    let code = instance.verification_codes(&email)[0].clone();
+    instance.job_worker.process_job(&held).await.unwrap();
+    assert_eq!(instance.verification_codes(&email).len(), 1);
+    assert_eq!(
+        instance.verify_email(&email, &code).await.status(),
         StatusCode::OK
     );
 }
