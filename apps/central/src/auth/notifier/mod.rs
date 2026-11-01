@@ -35,6 +35,7 @@ pub trait AuthNotifier: Send + Sync + 'static {
         &self,
         user: &User,
         auth_credential: &AuthCredential,
+        otp_request_id: uuid::Uuid,
     ) -> Result<(), SignupEmailError>;
 
     /// Triggers a notification when user verified their email
@@ -88,6 +89,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         &self,
         user: &User,
         _auth_credential: &AuthCredential,
+        otp_request_id: uuid::Uuid,
     ) -> Result<(), SignupEmailError> {
         debug!(
             event = "auth.notification.enqueue_started",
@@ -97,7 +99,11 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         );
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+            AuthJob::FillEmailVerificationOtp(jobs::FillEmailVerificationOtpPayload {
+                user_id: user.id(),
+                user_email: user.email().to_owned(),
+                otp_request_id,
+            }),
         )?
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());

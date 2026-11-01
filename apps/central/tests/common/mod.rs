@@ -2,7 +2,7 @@ use ethoko_central::{
     auth,
     config::{Config, OauthClientConfig, OtpConfig},
     httpserver::serve_http_server,
-    jobs::{memoryqueue::InMemoryQueue, rootprocessor::RootProcessor},
+    jobs::rootprocessor::RootProcessor,
     router::app_router,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -14,6 +14,7 @@ use crate::common::{
     fake_oauth_client::FakeOauthClient, manual_worker::ManualWorker,
 };
 mod auth_actions;
+mod controlled_queue;
 mod fake_email_service;
 mod fake_github_client;
 mod fake_oauth_client;
@@ -33,7 +34,8 @@ pub struct InstanceState {
     pub email_service: FakeEmailService,
     pub github_client: FakeGithubClient,
     pub github_oauth_client: FakeOauthClient,
-    pub job_worker: ManualWorker<InMemoryQueue, RootProcessor>,
+    pub job_worker: ManualWorker<controlled_queue::ControlledQueue, RootProcessor>,
+    pub job_queue: controlled_queue::ControlledQueue,
 }
 
 pub struct TestConfigBuilder {
@@ -156,7 +158,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
         return Err(anyhow::anyhow!(err));
     };
 
-    let job_queue = InMemoryQueue::new(2);
+    let job_queue = controlled_queue::ControlledQueue::new();
 
     let email_service = FakeEmailService::default();
     let github_client = FakeGithubClient::default();
@@ -174,7 +176,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     );
 
     let root_processor = RootProcessor::new(HashMap::from([auth.job_registration()]));
-    let job_worker = ManualWorker::new(job_queue, root_processor);
+    let job_worker = ManualWorker::new(job_queue.clone(), root_processor);
 
     let port = config.port;
 
@@ -208,6 +210,7 @@ pub async fn setup_instance(config: &Config) -> Result<InstanceState, anyhow::Er
     Ok(InstanceState {
         server_url,
         job_worker,
+        job_queue,
         email_service,
         github_client,
         github_oauth_client: auth_oauth_github_client_adapter,

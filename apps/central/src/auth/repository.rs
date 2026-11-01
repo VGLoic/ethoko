@@ -8,6 +8,7 @@ use crate::{
             otp_request::{OtpAssignment, OtpPurpose, OtpRequest, OtpRequestRow},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                fill_email_verification_otp::FillEmailVerificationOtpError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
                 send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
@@ -33,13 +34,27 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// Creates a User with the provided email and password hash.
     /// - The User has no Handle Registration and an unverified email.
     /// - An `auth_credential` is created for the user with the provided password hash.
+    /// - An Unfilled email-verification OTP Request starts expiry and cooldown in
+    ///   the same transaction; any creation failure rolls back all three records.
     /// # Errors
     /// * `SignupEmailError::EmailAlreadyExists` if the email is already registered.
     /// * `SignupEmailError::Unknown` for any other errors that may occur during the process.
     async fn create_user_with_email_auth(
         &self,
         request: SignupEmailRequest,
-    ) -> Result<(User, AuthCredential), SignupEmailError>;
+        otp_config: &OtpConfig,
+    ) -> Result<(User, AuthCredential, OtpRequest), SignupEmailError>;
+
+    /// Assigns a hash to the exact current, unexpired, unconsumed request of an
+    /// unverified User under the shared User lock. Ineligible work returns false.
+    /// # Errors
+    /// * `FillEmailVerificationOtpError::Unknown` for unexpected database failures, including commit failure.
+    async fn fill_email_verification_otp(
+        &self,
+        user_id: uuid::Uuid,
+        request_id: uuid::Uuid,
+        otp_hash: [u8; 32],
+    ) -> Result<bool, FillEmailVerificationOtpError>;
 
     /// Find in a user with their Github account, or creates a new user if one does not exist.
     /// Look first for an existing user with the given Github ID, and if not found, create a new user.
@@ -217,7 +232,8 @@ impl AuthRepository for PsqlAuthRepository {
     async fn create_user_with_email_auth(
         &self,
         request: SignupEmailRequest,
-    ) -> Result<(User, AuthCredential), SignupEmailError> {
+        otp_config: &OtpConfig,
+    ) -> Result<(User, AuthCredential, OtpRequest), SignupEmailError> {
         let mut transaction = self
             .pool
             .begin()
@@ -279,12 +295,74 @@ impl AuthRepository for PsqlAuthRepository {
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to create auth credential"))?;
 
+        // The inserted User is already exclusively owned by this transaction.
+        // Start the request lifetime now, not when the notification is processed.
+        let created_at = Utc::now();
+        let expires_at = created_at + TimeDelta::seconds(otp_config.ttl_seconds.into());
+        let otp_request = sqlx::query_as::<_, OtpRequestRow>(
+            "INSERT INTO otp_request (user_id, purpose, created_at, expires_at)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, user_id, otp_hash, purpose, created_at, expires_at, consumed_at",
+        )
+        .bind(user.id())
+        .bind(OtpPurpose::EmailVerification)
+        .bind(created_at)
+        .bind(expires_at)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to create signup otp request"))?;
+
         transaction
             .commit()
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
 
-        Ok((user, auth_credential))
+        Ok((user, auth_credential, otp_request.into()))
+    }
+
+    async fn fill_email_verification_otp(
+        &self,
+        user_id: uuid::Uuid,
+        request_id: uuid::Uuid,
+        otp_hash: [u8; 32],
+    ) -> Result<bool, FillEmailVerificationOtpError> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
+        let email_verified = sqlx::query_scalar::<_, bool>(
+            "SELECT email_verified FROM ethoko_user WHERE id = $1 FOR UPDATE",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to lock user for otp filling"))?;
+        if email_verified != Some(false) {
+            return Ok(false);
+        }
+        // All eligibility checks and assignment share creation/verification's
+        // lock. Assignment deliberately does not check cooldown or renew dates.
+        let assigned = sqlx::query(
+            "UPDATE otp_request SET otp_hash = $1
+             WHERE id = $2 AND user_id = $3 AND purpose = $4
+               AND consumed_at IS NULL AND expires_at > $5",
+        )
+        .bind(otp_hash)
+        .bind(request_id)
+        .bind(user_id)
+        .bind(OtpPurpose::EmailVerification)
+        .bind(Utc::now())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| anyhow::anyhow!(e).context("failed to fill email verification otp"))?
+        .rows_affected()
+            == 1;
+        transaction
+            .commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
+        Ok(assigned)
     }
 
     async fn get_or_create_user_with_github_auth(

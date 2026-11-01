@@ -14,6 +14,13 @@ impl<Q: Queue, Processor: JobProcessor> ManualWorker<Q, Processor> {
         Self { queue, processor }
     }
 
+    pub async fn process_job(
+        &self,
+        job: &ethoko_central::jobs::job::Job,
+    ) -> Result<(), anyhow::Error> {
+        self.processor.process_job(job).await
+    }
+
     pub async fn consume_jobs(&self) -> Result<(), anyhow::Error> {
         while let Some(job) = self.queue.dequeue().await? {
             info!("Processing job: {:?}", job.id);

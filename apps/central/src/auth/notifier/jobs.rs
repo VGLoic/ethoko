@@ -5,6 +5,14 @@ use crate::{auth::models::user::User, newtypes::email::Email};
 #[derive(Serialize, Deserialize, Debug)]
 pub enum AuthJob {
     SendEmailVerificationOtp(SendEmailVerificationOtpPayload),
+    FillEmailVerificationOtp(FillEmailVerificationOtpPayload),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FillEmailVerificationOtpPayload {
+    pub user_id: uuid::Uuid,
+    pub user_email: Email,
+    pub otp_request_id: uuid::Uuid,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -250,7 +250,7 @@ async fn concurrent_issuance(replacement: bool) {
     let instance = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(2).build())
         .await
         .unwrap();
-    // Leave signup's notification queued to also exercise the no-request-yet case.
+    // Leave signup's linked notification queued in the initial-request case.
     let email = Email::new(&format!("otp-{}@example.com", uuid::Uuid::new_v4())).unwrap();
     let signup = instance
         .reqwest_client
@@ -271,11 +271,16 @@ async fn concurrent_issuance(replacement: bool) {
         None
     };
 
-    // HTTP acceptance only enqueues work; issuance and its authoritative cooldown
-    // check happen later in the worker.
+    // Resend remains transitional: after cooldown HTTP acceptance only enqueues
+    // legacy issuance. Initial signup already starts cooldown synchronously.
     let (first, second) = tokio::join!(resend(&instance, &email), resend(&instance, &email));
-    assert_eq!(first.status(), StatusCode::OK);
-    assert_eq!(second.status(), StatusCode::OK);
+    let expected = if replacement {
+        StatusCode::OK
+    } else {
+        StatusCode::UNPROCESSABLE_ENTITY
+    };
+    assert_eq!(first.status(), expected);
+    assert_eq!(second.status(), expected);
     let (first_worker, second_worker) = tokio::join!(
         instance.job_worker.consume_jobs(),
         instance.job_worker.consume_jobs()
