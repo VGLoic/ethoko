@@ -8,7 +8,6 @@ pub enum AuthJob {
     FillEmailVerificationOtp(FillEmailVerificationOtpPayload),
 }
 
-/// Linked work contains metadata only, never a cleartext code.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FillEmailVerificationOtpPayload {
     pub user_id: uuid::Uuid,

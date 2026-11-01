@@ -11,19 +11,20 @@ use crate::{
     newtypes::otp::Otp,
     operational_tracing::{error_chain, error_classification},
 };
+use std::sync::Arc;
 use tracing::{debug, error, warn};
 
 #[derive(Clone)]
-pub struct AuthJobProcessor<R: AuthRepository, E: EmailService> {
+pub struct AuthJobProcessor<R: AuthRepository, S: AuthService, E: EmailService> {
     auth_repository: R,
-    auth_service: std::sync::Arc<dyn AuthService>,
+    auth_service: Arc<S>,
     email_service: E,
     otp_config: OtpConfig,
 }
-impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
+impl<R: AuthRepository, S: AuthService, E: EmailService> AuthJobProcessor<R, S, E> {
     pub fn new(
         auth_repository: R,
-        auth_service: std::sync::Arc<dyn AuthService>,
+        auth_service: Arc<S>,
         email_service: E,
         otp_config: OtpConfig,
     ) -> Self {
@@ -37,7 +38,9 @@ impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
 }
 
 #[async_trait::async_trait]
-impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E> {
+impl<R: AuthRepository, S: AuthService, E: EmailService> JobProcessor
+    for AuthJobProcessor<R, S, E>
+{
     async fn process_job(&self, job: &Job) -> Result<(), anyhow::Error> {
         debug!(
             event = "auth.job.started",
@@ -84,7 +87,7 @@ impl<R: AuthRepository, E: EmailService> JobProcessor for AuthJobProcessor<R, E>
     }
 }
 
-impl<R: AuthRepository, E: EmailService> AuthJobProcessor<R, E> {
+impl<R: AuthRepository, S: AuthService, E: EmailService> AuthJobProcessor<R, S, E> {
     async fn process_send_email_verification_otp(
         &self,
         payload: SendEmailVerificationOtpPayload,
