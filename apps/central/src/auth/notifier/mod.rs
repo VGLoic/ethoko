@@ -11,7 +11,7 @@ use crate::{
             },
             user::User,
         },
-        notifier::jobs::{AuthJob, SendEmailVerificationOtpPayload},
+        notifier::jobs::AuthJob,
         requests::login_github_callback::LoginGithubCallbackError,
     },
     jobs::{
@@ -64,6 +64,7 @@ pub trait AuthNotifier: Send + Sync + 'static {
         &self,
         user: &User,
         auth_credential: &AuthCredential,
+        otp_request_id: Option<uuid::Uuid>,
     ) -> Result<(), LoginGithubCallbackError>;
 
     /// Triggers a notification when user logged in with Github
@@ -185,8 +186,9 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         &self,
         user: &User,
         _auth_credential: &AuthCredential,
+        otp_request_id: Option<uuid::Uuid>,
     ) -> Result<(), LoginGithubCallbackError> {
-        if user.email_verified() {
+        let Some(otp_request_id) = otp_request_id else {
             debug!(
                 event = "auth.notification.skipped",
                 notification_type = "user_signed_up_with_github",
@@ -194,7 +196,7 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
                 "No notification action required for signup with GitHub event for verified users"
             );
             return Ok(());
-        }
+        };
         debug!(
             event = "auth.notification.enqueue_started",
             notification_type = "email_verification_otp",
@@ -203,7 +205,11 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
         );
         let job = JobRequest::new(
             AUTH_JOB_TOPIC.to_string(),
-            AuthJob::SendEmailVerificationOtp(SendEmailVerificationOtpPayload::new(user)),
+            AuthJob::FillEmailVerificationOtp(jobs::FillEmailVerificationOtpPayload {
+                user_id: user.id(),
+                user_email: user.email().to_owned(),
+                otp_request_id,
+            }),
         )?
         .with_max_retries(3)
         .with_scheduled_at(Utc::now());

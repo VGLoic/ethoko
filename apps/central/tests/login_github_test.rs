@@ -14,10 +14,266 @@ use common::{AuthActions, TestConfigBuilder, central_ui_bff_principal_headers, s
 use fake::{Fake, Faker};
 
 use crate::common::central_ui_bff_with_user_principal_headers;
+use ethoko_central::jobs::queue::{Queue, QueueInspector};
+use std::{sync::atomic::Ordering, time::Duration};
+
+// Drive repeated GitHub authentication through HTTP without running the worker.
+async fn github_login(
+    instance: &common::InstanceState,
+    github_user: &GithubApiUserResponse,
+    email: &Email,
+    verified: bool,
+) -> reqwest::Response {
+    instance.github_client.set_next_user(github_user.clone());
+    instance
+        .github_client
+        .set_next_user_emails(vec![GithubApiUserEmailsResponseItem {
+            email: email.to_string(),
+            verified,
+            primary: true,
+        }]);
+    let start = instance
+        .reqwest_client
+        .post(format!("{}/auth/login/github/start", instance.server_url))
+        .headers(central_ui_bff_principal_headers())
+        .send()
+        .await
+        .unwrap()
+        .json::<HttpLoginGithubStartResponse>()
+        .await
+        .unwrap();
+    instance
+        .reqwest_client
+        .post(format!(
+            "{}/auth/login/github/callback",
+            instance.server_url
+        ))
+        .headers(central_ui_bff_principal_headers())
+        .json(&HttpLoginGithubCallbackBody {
+            code: instance.github_oauth_client.code().unwrap(),
+            state: start.state,
+        })
+        .send()
+        .await
+        .unwrap()
+}
 
 #[tokio::test]
-async fn concurrent_first_resend_serializes_before_github_notification_processing() {
-    use ethoko_central::jobs::queue::Queue;
+async fn github_enqueue_failure_preserves_session_cooldown_and_resend_recovery() {
+    let instance = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(2).build())
+        .await
+        .unwrap();
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    instance
+        .job_queue
+        .fail_enqueue
+        .store(true, Ordering::SeqCst);
+    let response = github_login(&instance, &github_user, &email, false).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let token = response
+        .json::<HttpLoginGithubCallbackResponse>()
+        .await
+        .unwrap()
+        .token;
+    let me = instance
+        .reqwest_client
+        .get(format!("{}/auth/me", instance.server_url))
+        .headers(central_ui_bff_with_user_principal_headers(&token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(me.status(), StatusCode::OK);
+    let user = me.json::<UserResponse>().await.unwrap();
+    assert_eq!(user.email, email);
+    assert!(!user.email_verified);
+    assert!(user.handle_registration.is_none());
+    assert_eq!(user.suggested_handle, Some(github_user.login));
+    let response = instance.resend_verification_otp(&email).await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKARV02"
+    );
+    let response = instance.verify_email(&email, "123456").await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKAVE02"
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    assert!(instance.verification_codes(&email).is_empty());
+    instance
+        .job_queue
+        .fail_enqueue
+        .store(false, Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_millis(2200)).await;
+    assert_eq!(
+        instance.resend_verification_otp(&email).await.status(),
+        StatusCode::OK
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    let codes = instance.verification_codes(&email);
+    assert_eq!(codes.len(), 1);
+    assert_eq!(
+        instance.verify_email(&email, &codes[0]).await.status(),
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn expired_github_signup_request_is_not_recreated_by_worker() {
+    let instance = setup_instance(&TestConfigBuilder::new().with_otp_ttl(1).build())
+        .await
+        .unwrap();
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    assert_eq!(
+        github_login(&instance, &github_user, &email, false)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    instance.job_worker.consume_jobs().await.unwrap();
+    assert!(instance.verification_codes(&email).is_empty());
+    assert!(
+        instance
+            .job_queue
+            .inner
+            .pending_jobs()
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        instance
+            .job_queue
+            .inner
+            .successful_jobs()
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    let response = instance.verify_email(&email, "123456").await;
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response
+            .json::<UnprocessableEntityError>()
+            .await
+            .unwrap()
+            .code,
+        "ETKAVE03"
+    );
+}
+
+#[tokio::test]
+async fn github_login_preserves_unverified_users_request_after_cooldown() {
+    let instance = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(0).build())
+        .await
+        .unwrap();
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    assert_eq!(
+        github_login(&instance, &github_user, &email, false)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    let codes = instance.verification_codes(&email);
+    assert_eq!(codes.len(), 1);
+    assert_eq!(
+        github_login(&instance, &github_user, &email, false)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    assert!(instance.job_queue.dequeue().await.unwrap().is_none());
+    instance.job_worker.consume_jobs().await.unwrap();
+    assert_eq!(instance.verification_codes(&email).len(), 1);
+    // A replacement request would invalidate this previously assigned code.
+    assert_eq!(
+        instance.verify_email(&email, &codes[0]).await.status(),
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn github_verified_signup_and_login_skip_verification_work() {
+    let instance = setup_instance(&TestConfigBuilder::build_default())
+        .await
+        .unwrap();
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    for _ in 0..2 {
+        assert_eq!(
+            github_login(&instance, &github_user, &email, true)
+                .await
+                .status(),
+            StatusCode::OK
+        );
+        assert!(instance.job_queue.dequeue().await.unwrap().is_none());
+        instance.job_worker.consume_jobs().await.unwrap();
+        assert!(instance.verification_codes(&email).is_empty());
+    }
+}
+
+#[tokio::test]
+async fn obsolete_github_signup_job_cannot_fill_resend_replacement() {
+    let instance = setup_instance(&TestConfigBuilder::new().with_otp_cooldown(0).build())
+        .await
+        .unwrap();
+    let email = Faker.fake::<Email>();
+    let github_user = GithubApiUserResponse {
+        id: Faker.fake::<u64>(),
+        login: Faker.fake::<Handle>().to_string(),
+    };
+    assert_eq!(
+        github_login(&instance, &github_user, &email, false)
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    let held = instance.job_queue.dequeue().await.unwrap().unwrap();
+    assert_eq!(
+        instance.resend_verification_otp(&email).await.status(),
+        StatusCode::OK
+    );
+    instance.job_worker.consume_jobs().await.unwrap();
+    let codes = instance.verification_codes(&email);
+    assert_eq!(codes.len(), 1);
+    instance.job_worker.process_job(&held).await.unwrap();
+    assert_eq!(instance.verification_codes(&email).len(), 1);
+    assert_eq!(
+        instance.verify_email(&email, &codes[0]).await.status(),
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn unverified_github_signup_starts_cooldown_before_filling() {
     let instance = setup_instance(&TestConfigBuilder::build_default())
         .await
         .unwrap();
@@ -58,29 +314,21 @@ async fn concurrent_first_resend_serializes_before_github_notification_processin
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    // GitHub's transitional notification has not created any request yet.
-    // Hold it so only linked resend work is processed in this scenario.
-    let _held = instance.job_queue.dequeue().await.unwrap().unwrap();
     let (first, second) = tokio::join!(
         instance.resend_verification_otp(&email),
         instance.resend_verification_otp(&email)
     );
-    let mut statuses = [first.status().as_u16(), second.status().as_u16()];
-    statuses.sort();
-    assert_eq!(statuses, [200, 422]);
-    let rejected = if first.status() == StatusCode::OK {
-        second
-    } else {
-        first
-    };
-    assert_eq!(
-        rejected
-            .json::<UnprocessableEntityError>()
-            .await
-            .unwrap()
-            .code,
-        "ETKARV02"
-    );
+    for rejected in [first, second] {
+        assert_eq!(rejected.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            rejected
+                .json::<UnprocessableEntityError>()
+                .await
+                .unwrap()
+                .code,
+            "ETKARV02"
+        );
+    }
     assert!(instance.verification_codes(&email).is_empty());
     assert_eq!(
         instance

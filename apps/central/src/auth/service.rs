@@ -479,9 +479,9 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         let github_user = self.github_port.get_user(&access_token).await?;
 
-        let (user, _auth_credential, is_new_user) = self
+        let (user, auth_credential, is_new_user, otp_request) = self
             .repository
-            .get_or_create_user_with_github_auth(github_user)
+            .get_or_create_user_with_github_auth(github_user, &self.otp_config)
             .await?;
 
         let opaque_session_token_value = OpaqueTokenValue::generate_session_token();
@@ -498,7 +498,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         if let Err(e) = if is_new_user {
             self.notifier
-                .user_signed_up_with_github(&user, &_auth_credential)
+                .user_signed_up_with_github(&user, &auth_credential, otp_request.map(|r| r.id))
                 .await
         } else {
             self.notifier.user_logged_in_with_github(&user).await

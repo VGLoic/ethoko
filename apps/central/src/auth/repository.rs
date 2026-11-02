@@ -59,15 +59,18 @@ pub trait AuthRepository: Send + Sync + 'static {
     /// Find in a user with their Github account, or creates a new user if one does not exist.
     /// Look first for an existing user with the given Github ID, and if not found, create a new user.
     /// An existing user with the same primary email as the Github user will fail to be created.
+    /// New Users with unverified email receive an Unfilled OTP Request in the
+    /// same transaction. Returns that request for notification after commit.
     /// # Errors
     /// * `LoginGithubCallbackError::PrimaryEmailCollision` if an existing user with the same primary email as the Github user exists.
     /// * `LoginGithubCallbackError::Unknown` for any other errors that may occur during the process.
     /// # Returns
-    /// * `Ok((user, auth_credential, is_new_user))` if the operation succeeds, where `is_new_user` indicates whether a new user was created.
+    /// * `Ok((user, auth_credential, is_new_user, otp_request))` on success.
     async fn get_or_create_user_with_github_auth(
         &self,
         github_user: GithubUser,
-    ) -> Result<(User, AuthCredential, bool), LoginGithubCallbackError>;
+        otp_config: &OtpConfig,
+    ) -> Result<(User, AuthCredential, bool, Option<OtpRequest>), LoginGithubCallbackError>;
 
     /// Creates an email-verification OTP Request for the User.
     /// - Resend passes no hash to create an Unfilled request. A hash is supported
@@ -355,7 +358,8 @@ impl AuthRepository for PsqlAuthRepository {
     async fn get_or_create_user_with_github_auth(
         &self,
         github_user: GithubUser,
-    ) -> Result<(User, AuthCredential, bool), LoginGithubCallbackError> {
+        otp_config: &OtpConfig,
+    ) -> Result<(User, AuthCredential, bool, Option<OtpRequest>), LoginGithubCallbackError> {
         let mut transaction = self
             .pool
             .begin()
@@ -392,7 +396,7 @@ impl AuthRepository for PsqlAuthRepository {
                 .commit()
                 .await
                 .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
-            return Ok((user, auth_credential, false));
+            return Ok((user, auth_credential, false, None));
         }
 
         let user_row = sqlx::query_as::<_, UserRow>(
@@ -450,12 +454,36 @@ impl AuthRepository for PsqlAuthRepository {
         .await
         .map_err(|e| anyhow::anyhow!(e).context("failed to create auth credential"))?;
 
+        let otp_request = if !user.email_verified() {
+            // The new User is exclusively owned by this transaction. Creation,
+            // not background assignment, starts the request lifetime/cooldown.
+            let created_at = Utc::now();
+            let expires_at = created_at + TimeDelta::seconds(otp_config.ttl_seconds.into());
+            let request = sqlx::query_as::<_, OtpRequestRow>(
+                "INSERT INTO otp_request (user_id, purpose, created_at, expires_at)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, user_id, otp_hash, purpose, created_at, expires_at, consumed_at",
+            )
+            .bind(user.id())
+            .bind(OtpPurpose::EmailVerification)
+            .bind(created_at)
+            .bind(expires_at)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(e).context("failed to create github signup otp request")
+            })?;
+            Some(request.into())
+        } else {
+            None
+        };
+
         transaction
             .commit()
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to commit transaction"))?;
 
-        Ok((user, auth_credential, true))
+        Ok((user, auth_credential, true, otp_request))
     }
 
     async fn register_email_verification_otp(
