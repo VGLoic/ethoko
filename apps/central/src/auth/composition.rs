@@ -42,15 +42,14 @@ impl Auth {
         let notifier = AuthNotifierImpl::new(job_queue);
         let github_adapter = AuthGithubAdapter::new(github_client);
         let service = Arc::new(AuthServiceImpl::new(
-            repository.clone(),
+            repository,
             notifier,
-            otp_config.clone(),
+            otp_config,
             oauth_client,
             oauth_transaction_ttl_seconds,
             github_adapter,
         ));
-        let job_processor =
-            AuthJobProcessor::new(repository, service.clone(), email_service, otp_config);
+        let job_processor = AuthJobProcessor::new(service.clone(), email_service);
 
         Self {
             state: AuthState {
