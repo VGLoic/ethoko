@@ -4,7 +4,6 @@ use tracing::debug;
 use crate::{
     auth::{
         models::{
-            auth_credential::AuthCredential,
             requests::{
                 login_email::LoginEmailError, resend_verification_otp::ResendVerificationOtpError,
                 signup_email::SignupEmailError, verify_email::VerifyEmailError,
@@ -34,7 +33,6 @@ pub trait AuthNotifier: Send + Sync + 'static {
     async fn user_signed_up_with_email(
         &self,
         user: &User,
-        auth_credential: &AuthCredential,
         otp_request_id: uuid::Uuid,
     ) -> Result<(), SignupEmailError>;
 
@@ -63,7 +61,6 @@ pub trait AuthNotifier: Send + Sync + 'static {
     async fn user_signed_up_with_github(
         &self,
         user: &User,
-        auth_credential: &AuthCredential,
         otp_request_id: Option<uuid::Uuid>,
     ) -> Result<(), LoginGithubCallbackError>;
 
@@ -90,7 +87,6 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
     async fn user_signed_up_with_email(
         &self,
         user: &User,
-        _auth_credential: &AuthCredential,
         otp_request_id: uuid::Uuid,
     ) -> Result<(), SignupEmailError> {
         debug!(
@@ -185,7 +181,6 @@ impl<Q: Queue> AuthNotifier for AuthNotifierImpl<Q> {
     async fn user_signed_up_with_github(
         &self,
         user: &User,
-        _auth_credential: &AuthCredential,
         otp_request_id: Option<uuid::Uuid>,
     ) -> Result<(), LoginGithubCallbackError> {
         let Some(otp_request_id) = otp_request_id else {

@@ -6,13 +6,13 @@ use crate::{
             opaque_token::{OpaqueTokenCreatePayload, OpaqueTokenValue},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                create_email_verification_otp::CreateEmailVerificationOtpError,
                 fill_email_verification_otp::FillEmailVerificationOtpError,
                 logout::LogoutError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
                 resend_verification_otp::{
                     ResendVerificationOtpError, ResendVerificationOtpRequest,
                 },
-                send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
             },
@@ -192,7 +192,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         if let Err(e) = self
             .notifier
-            .user_signed_up_with_email(&user, &auth_credential, otp_request.id)
+            .user_signed_up_with_email(&user, otp_request.id)
             .await
         {
             match &e {
@@ -292,17 +292,19 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
         // email and cooldown checks are authoritative inside request creation.
         let otp_request = self
             .repository
-            .register_email_verification_otp(user.id(), None, &self.otp_config)
+            .create_email_verification_otp(user.id(), &self.otp_config)
             .await
             .map_err(|e| match e {
-                SendEmailVerificationOtpError::NotFound => ResendVerificationOtpError::UserNotFound,
-                SendEmailVerificationOtpError::EmailAlreadyVerified => {
+                CreateEmailVerificationOtpError::NotFound => {
+                    ResendVerificationOtpError::UserNotFound
+                }
+                CreateEmailVerificationOtpError::EmailAlreadyVerified => {
                     ResendVerificationOtpError::UserAlreadyVerified
                 }
-                SendEmailVerificationOtpError::CooldownNotElapsed => {
+                CreateEmailVerificationOtpError::CooldownNotElapsed => {
                     ResendVerificationOtpError::CooldownNotElapsed
                 }
-                SendEmailVerificationOtpError::Unknown(err) => err
+                CreateEmailVerificationOtpError::Unknown(err) => err
                     .context("Error creating replacement email-verification OTP request")
                     .into(),
             })?;
@@ -479,7 +481,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         let github_user = self.github_port.get_user(&access_token).await?;
 
-        let (user, auth_credential, is_new_user, otp_request) = self
+        let (user, _auth_credential, is_new_user, otp_request) = self
             .repository
             .get_or_create_user_with_github_auth(github_user, &self.otp_config)
             .await?;
@@ -498,7 +500,7 @@ impl<R: AuthRepository, N: AuthNotifier, GhPort: AuthGithubPort, GhOauth: AuthOa
 
         if let Err(e) = if is_new_user {
             self.notifier
-                .user_signed_up_with_github(&user, &auth_credential, otp_request.map(|r| r.id))
+                .user_signed_up_with_github(&user, otp_request.map(|r| r.id))
                 .await
         } else {
             self.notifier.user_logged_in_with_github(&user).await

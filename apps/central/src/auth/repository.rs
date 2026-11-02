@@ -8,9 +8,9 @@ use crate::{
             otp_request::{OtpAssignment, OtpPurpose, OtpRequest, OtpRequestRow},
             queries::{GetUserByEmailError, GetUserBySessionTokenError},
             requests::{
+                create_email_verification_otp::CreateEmailVerificationOtpError,
                 fill_email_verification_otp::FillEmailVerificationOtpError,
                 register_handle::{RegisterHandleError, RegisterHandleRequest},
-                send_email_verification_otp::SendEmailVerificationOtpError,
                 signup_email::{SignupEmailError, SignupEmailRequest},
                 verify_email::{VerifyEmailError, VerifyEmailRequest},
             },
@@ -72,23 +72,20 @@ pub trait AuthRepository: Send + Sync + 'static {
         otp_config: &OtpConfig,
     ) -> Result<(User, AuthCredential, bool, Option<OtpRequest>), LoginGithubCallbackError>;
 
-    /// Creates an email-verification OTP Request for the User.
-    /// - Resend passes no hash to create an Unfilled request. A hash is supported
-    ///   only for transitional legacy GitHub notification work.
+    /// Creates an Unfilled email-verification OTP Request for the User.
     /// - Replaces the current email-verification request with a fresh identity and lifetime.
-    /// - Serializes issuance on the User, including when no request exists yet.
+    /// - Serializes creation on the User, including when no request exists yet.
     /// - Other purposes are neither checked for cooldown nor replaced.
     /// # Errors
-    /// * `SendEmailVerificationOtpError::NotFound` if the user is not found.
-    /// * `SendEmailVerificationOtpError::EmailAlreadyVerified` if the user's email is already verified.
-    /// * `SendEmailVerificationOtpError::CooldownNotElapsed` if the cooldown period has not elapsed yet for requesting a new verification code.
-    /// * `SendEmailVerificationOtpError::Unknown` for any other errors that may occur during the process.
-    async fn register_email_verification_otp(
+    /// * `CreateEmailVerificationOtpError::NotFound` if the user is not found.
+    /// * `CreateEmailVerificationOtpError::EmailAlreadyVerified` if the user's email is already verified.
+    /// * `CreateEmailVerificationOtpError::CooldownNotElapsed` if the cooldown period has not elapsed yet for requesting a new verification code.
+    /// * `CreateEmailVerificationOtpError::Unknown` for any other errors that may occur during the process.
+    async fn create_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
-        otp_hash: Option<[u8; 32]>,
         otp_config: &OtpConfig,
-    ) -> Result<OtpRequest, SendEmailVerificationOtpError>;
+    ) -> Result<OtpRequest, CreateEmailVerificationOtpError>;
 
     /// Verifies the email of the user with the provided OTP hash.
     /// - The user is fetched from the database using the provided user ID.
@@ -486,19 +483,18 @@ impl AuthRepository for PsqlAuthRepository {
         Ok((user, auth_credential, true, otp_request))
     }
 
-    async fn register_email_verification_otp(
+    async fn create_email_verification_otp(
         &self,
         user_id: uuid::Uuid,
-        otp_hash: Option<[u8; 32]>,
         otp_config: &OtpConfig,
-    ) -> Result<OtpRequest, SendEmailVerificationOtpError> {
+    ) -> Result<OtpRequest, CreateEmailVerificationOtpError> {
         let mut transaction = self
             .pool
             .begin()
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
 
-        // A request-row lock cannot serialize first issuance: there may be no
+        // A request-row lock cannot serialize first creation: there may be no
         // request yet. Lock the persistent User before reading purpose cooldown.
         let email_verified = sqlx::query_scalar::<_, bool>(
             "SELECT email_verified FROM ethoko_user WHERE id = $1 FOR UPDATE",
@@ -506,14 +502,14 @@ impl AuthRepository for PsqlAuthRepository {
         .bind(user_id)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|e| anyhow::anyhow!(e).context("failed to lock user for otp issuance"))?;
+        .map_err(|e| anyhow::anyhow!(e).context("failed to lock user for otp creation"))?;
 
         let email_verified = match email_verified {
             Some(email_verified) => email_verified,
-            None => return Err(SendEmailVerificationOtpError::NotFound),
+            None => return Err(CreateEmailVerificationOtpError::NotFound),
         };
         if email_verified {
-            return Err(SendEmailVerificationOtpError::EmailAlreadyVerified);
+            return Err(CreateEmailVerificationOtpError::EmailAlreadyVerified);
         }
 
         let current_otp_request = get_otp_request_by_user_and_purpose(
@@ -525,7 +521,7 @@ impl AuthRepository for PsqlAuthRepository {
         .map_err(|e| anyhow::anyhow!(e).context("failed to fetch current otp request"))?;
 
         // Measure the new lifetime after acquiring the lock, not from PostgreSQL's
-        // transaction-start time, which may precede a competing issuance.
+        // transaction-start time, which may precede a competing creation.
         let created_at = Utc::now();
         if let Some(otp_request) = current_otp_request {
             let cooldown_limit = otp_request
@@ -533,7 +529,7 @@ impl AuthRepository for PsqlAuthRepository {
                 .checked_add_signed(TimeDelta::seconds(otp_config.cooldown_seconds.into()))
                 .ok_or(anyhow::anyhow!("failed to compute cooldown limit"))?;
             if created_at < cooldown_limit {
-                return Err(SendEmailVerificationOtpError::CooldownNotElapsed);
+                return Err(CreateEmailVerificationOtpError::CooldownNotElapsed);
             }
         }
 
@@ -552,11 +548,10 @@ impl AuthRepository for PsqlAuthRepository {
             r#"
             INSERT INTO otp_request (
                 user_id,
-                otp_hash,
                 purpose,
                 expires_at,
                 created_at
-            ) VALUES ($1, $2, $3, $4, $5)
+            ) VALUES ($1, $2, $3, $4)
             RETURNING
                 id,
                 user_id,
@@ -568,7 +563,6 @@ impl AuthRepository for PsqlAuthRepository {
             "#,
         )
         .bind(user_id)
-        .bind(otp_hash)
         .bind(OtpPurpose::EmailVerification)
         .bind(expires_at)
         .bind(created_at)
@@ -594,7 +588,7 @@ impl AuthRepository for PsqlAuthRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e).context("failed to start transaction"))?;
 
-        // Share issuance's lock before reading the User or current request, so
+        // Share creation's lock before reading the User or current request, so
         // verification and replacement observe one another's committed outcome.
         let user_id = sqlx::query_scalar::<_, uuid::Uuid>(
             "SELECT id FROM ethoko_user WHERE email = $1 FOR UPDATE",

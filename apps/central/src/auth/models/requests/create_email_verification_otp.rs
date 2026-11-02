@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum SendEmailVerificationOtpError {
+pub enum CreateEmailVerificationOtpError {
     #[error("User not found")]
     NotFound,
     #[error("User email is already verified")]
